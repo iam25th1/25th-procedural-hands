@@ -4,6 +4,7 @@
 // orbit) or from an explicit shot or scene choice; nothing here animates it.
 import * as THREE from '/vendor/three.module.js';
 import { fovFor } from './fov.js';
+import { orbitPosition } from '/ui/camera-map.js';
 
 export const EYE_HEIGHT = 1.55;
 export const NEAR = 0.02;
@@ -83,9 +84,9 @@ export function createView(canvas, { preserveDrawingBuffer = false } = {}) {
     camera.up.set(0, 1, 0);
     camera.lookAt(eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]);
   }
-  function setOrbit({ target, yaw, pitch, dist }) {
-    const cp = Math.cos(pitch);
-    camera.position.set(target[0] + dist * cp * Math.sin(yaw), target[1] + dist * Math.sin(pitch), target[2] + dist * cp * Math.cos(yaw));
+  function setOrbit(orbit) {
+    const { target } = orbit;
+    camera.position.set(...orbitPosition(orbit));
     camera.up.set(0, 1, 0);
     camera.lookAt(target[0], target[1], target[2]);
   }

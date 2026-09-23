@@ -15,6 +15,8 @@ import { createController, SCENE_LABELS } from './controllers.js';
 import { createRecorder } from './recorder.js';
 import { attachInput } from './input.js';
 import { createPanels, TABS } from './panels.js';
+import { cameraSettings, dragOrbit, dragLook, lookDirection } from './camera-map.js';
+import { load, save } from './store.js';
 import { el, button, segmented, toggle } from './dom.js';
 
 const SPEEDS = [[0.1, '0.1x'], [0.25, '0.25x'], [1, '1x']];
@@ -38,7 +40,9 @@ export function startApp({ canvas, shot }) {
   let orbit = null;
   let eye = null;
   let framedDist = 1; // the orbit distance the last framing chose, for zoom
-  const look = { yaw: 0, pitch: 0 };
+  let look = { yaw: 0, pitch: 0 };
+  // Camera drag settings: direct mapping unless the user inverts an axis.
+  let camSettings = cameraSettings(load('camera', {}));
   let bucket = aspectBucket(view.camera.aspect);
   let flash = null; // { text, kind, until } a short note in the status line
   let lastResult = null;
@@ -146,7 +150,7 @@ export function startApp({ canvas, shot }) {
   // Camera -----------------------------------------------------------------
   function frameCamera() {
     const f = ctl.frame(state.cam === 'fp' ? 'fp' : 'inspect', view.camera.aspect);
-    if (f.eye) { eye = f; look.yaw = 0; look.pitch = 0; } else { orbit = { ...f, target: f.target.slice() }; framedDist = f.dist; }
+    if (f.eye) { eye = f; look = { yaw: 0, pitch: 0 }; } else { orbit = { ...f, target: f.target.slice() }; framedDist = f.dist; }
     if (state.cam === 'fp' && !f.eye) eye = null;
     applyCamera();
   }
@@ -165,10 +169,7 @@ export function startApp({ canvas, shot }) {
   }
   function applyCamera() {
     if (state.cam === 'fp' && eye) {
-      const [dx, dy, dz] = eye.dir;
-      const yaw = Math.atan2(dx, -dz) + look.yaw;
-      const pitch = Math.max(-1.4, Math.min(1.4, Math.atan2(dy, Math.hypot(dx, dz)) + look.pitch));
-      view.setEye(eye.eye, [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)]);
+      view.setEye(eye.eye, lookDirection(eye.dir, look));
     } else if (orbit) {
       view.setOrbit(orbit);
     }
@@ -214,13 +215,8 @@ export function startApp({ canvas, shot }) {
     },
     dragEnd() { drag = null; },
     orbit(dx, dy) {
-      if (state.cam === 'fp') {
-        look.yaw -= dx * 0.005;
-        look.pitch -= dy * 0.005;
-      } else if (orbit) {
-        orbit.yaw -= dx * 0.008;
-        orbit.pitch = Math.max(-1.4, Math.min(1.4, orbit.pitch + dy * 0.006));
-      }
+      if (state.cam === 'fp') look = dragLook(look, dx, dy, camSettings);
+      else if (orbit) orbit = dragOrbit(orbit, dx, dy, camSettings);
       applyCamera();
     },
     zoom(k) {
@@ -256,8 +252,8 @@ export function startApp({ canvas, shot }) {
   // Pressing the camera already in use frames it again (recentre).
   const camSeg = segmented([['inspect', 'Inspect'], ['fp', 'First person']], state.cam, (k) => { state.cam = k; frameCamera(); }, { label: 'Camera' });
   for (const b of camSeg.buttons.values()) b.title = 'Press again to recentre';
-  const moveCam = toggle('Move camera', state.moveCamera, (v) => { state.moveCamera = v; note(v ? 'Drag turns the camera' : 'Drag moves the hand'); });
-  moveCam.el.title = 'When on, dragging the view turns the camera; when off, it moves the selected hand';
+  const moveCam = toggle('Move camera', state.moveCamera, (v) => { state.moveCamera = v; note(v ? 'Drag moves the camera' : 'Drag moves the hand'); });
+  moveCam.el.title = 'When on, dragging the view moves the camera the way you drag; when off, it moves the selected hand';
   cam.append(camSeg.el, moveCam.el);
   const perf = el('dl', 'perf ui');
   perf.hidden = true;
@@ -304,6 +300,8 @@ export function startApp({ canvas, shot }) {
     setReduced: (v) => act({ type: 'reduced', value: v }),
     setPerf: (v) => { state.perf = v; perf.hidden = !v; },
     recentre: frameCamera,
+    camera: () => camSettings,
+    setCamera: (patch) => { camSettings = cameraSettings({ ...camSettings, ...patch }); save('camera', camSettings); },
     seed: () => seed,
   }, drawer);
 
@@ -414,6 +412,16 @@ export function startApp({ canvas, shot }) {
     get recording() { return recorder.recording; },
     get replaying() { return recorder.replaying; },
     get result() { return lastResult; },
+    // The camera's position and its own right and up vectors, world space.
+    camera() {
+      const e = view.camera.matrixWorld.elements;
+      return { pos: view.camera.position.toArray(), right: [e[0], e[1], e[2]], up: [e[4], e[5], e[6]] };
+    },
+    // Where the control centre and the 3D view sit on screen, in CSS pixels.
+    layout() {
+      const box = (n) => { if (!n) return null; const r = n.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
+      return { canvas: box(canvas), dock: box(dock), open: state.open };
+    },
   };
   requestAnimationFrame((t) => { last = t; frame(t); });
 }

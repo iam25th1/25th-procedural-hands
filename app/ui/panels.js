@@ -7,6 +7,7 @@
 import { el, button, segmented, toggle, humanize, clear } from './dom.js';
 import { paletteFor, matrixRows, GRIP_LIST, OBJECT_LIST, objectLabel, gripLabel } from './catalog.js';
 import { DIGITS } from '/hands/src/index.js';
+import { SENSITIVITY } from './camera-map.js';
 
 const DIGIT_NAMES = { thumb: 'Thumb', index: 'Index', middle: 'Middle', ring: 'Ring', little: 'Little' };
 const JOINTS = {
@@ -39,7 +40,8 @@ function sliderRow(label, { min, max, step, value }, onInput) {
 }
 
 // app: { act(action), playRow(row), goScene(kind), hands(), scene(),
-//        hand(), setHand(h), setReduced(v), setPerf(v), recentre() }
+//        hand(), setHand(h), setReduced(v), setPerf(v), recentre(),
+//        camera(), setCamera(patch) }
 export function createPanels(app, drawer) {
   const panels = {};
   const handRow = el('div', 'hand-row');
@@ -184,10 +186,18 @@ export function createPanels(app, drawer) {
     };
     settings.reduced = onOff('Reduced motion', app.reduced(), (v) => app.setReduced(v));
     settings.perf = onOff('Perf overlay', false, (v) => app.setPerf(v));
+    const cam = app.camera();
+    settings.invertX = onOff('Invert X', cam.invertX, (v) => app.setCamera({ invertX: v }));
+    settings.invertY = onOff('Invert Y', cam.invertY, (v) => app.setCamera({ invertY: v }));
+    const sens = sliderRow('Sensitivity', { min: SENSITIVITY.min, max: SENSITIVITY.max, step: SENSITIVITY.step, value: cam.sensitivity }, (v) => app.setCamera({ sensitivity: v }));
     wrap.append(
       line('Reduced motion', 'No interface animation; calmer idle sway and gestures on the rig.', settings.reduced.el),
       line('Perf overlay', 'Frame rate, frame and solver time, triangles and draw calls.', settings.perf.el),
       line('Camera', 'Frame the current station or the hands again.', button('Recentre', '', () => app.recentre())),
+      el('h2', 'group-title', 'Move camera'),
+      line('Invert X', 'Off: drag right and the camera moves right.', settings.invertX.el),
+      line('Invert Y', 'Off: drag up and the camera moves up.', settings.invertY.el),
+      sens.row,
     );
     const recTitle = el('h2', 'group-title', 'Recording');
     settings.facts = el('dl', 'facts');

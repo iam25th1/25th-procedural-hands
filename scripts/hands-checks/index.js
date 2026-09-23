@@ -9,6 +9,7 @@ import { fingerChecks } from './fingers.js';
 import { manipulationChecks, scenarioChecks } from './manipulation.js';
 import { physicsChecks } from './physics.js';
 import { sandboxBudgetChecks } from './sandbox-budget.js';
+import { uiChecks } from './ui.js';
 
 export const CHECKS = [
   ...servedChecks,
@@ -21,4 +22,5 @@ export const CHECKS = [
   ...scenarioChecks,
   ...budgetChecks,
   ...sandboxBudgetChecks,
+  ...uiChecks,
 ];
