@@ -28,7 +28,7 @@ const SCENARIO_VIEWS = {
   hook: { target: [-0.35, -0.38, -0.46], yaw: -2.5, pitch: 0.45, dist: 0.7 },
   slipHeavy: { target: [-0.25, -0.4, -0.33], yaw: -2.5, pitch: 0.45, dist: 0.6 },
   slipJerk: { target: [-0.17, -0.38, -0.3], yaw: -2.5, pitch: 0.45, dist: 0.6 },
-  throwCatch: { target: [0, -0.28, -0.34], yaw: 3.3, pitch: 0.45, dist: 0.8 },
+  throwCatch: { target: [0.08, -0.3, -0.38], yaw: 3.3, pitch: 0.45, dist: 0.9 },
   grabCarryPlace: { target: [0.28, -0.38, -0.36], yaw: 2.5, pitch: 0.5, dist: 0.7 },
   sphericalGrip: { target: [0.18, -0.4, -0.42], yaw: 2.5, pitch: 0.45, dist: 0.6 },
   pressButton: { target: [-0.2, -0.24, -0.42], yaw: -1.3, pitch: 0.25, dist: 0.5 },
