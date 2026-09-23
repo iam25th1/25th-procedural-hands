@@ -37,6 +37,7 @@ export function clean(r) {
   if (r.jump / MM >= LIMITS.jump) bad.push(`wrist step ${(r.jump / MM).toFixed(1)} mm`);
   if (r.margin < -1e-6) bad.push(`limit ${r.marginAt}`);
   if (r.driftViolations || r.floating) bad.push(`${r.driftViolations} drift, ${r.floating} floating`);
+  if (r.disturbed.length) bad.push(`knocked: ${r.disturbed.join(', ')}`);
   return bad;
 }
 export const scenarioChecks = Object.entries(SCENARIOS).map(([id, sc]) => ({
@@ -95,13 +96,14 @@ export const manipulationChecks = [
     },
   },
   {
-    name: 'contact: pushed and pulled objects move only through contact, and nothing at rest floats',
+    name: 'contact: pushed and pulled objects move only through contact, nothing is knocked, and nothing at rest floats',
     async run() {
       const all = auditAll();
-      const drift = all.reduce((a, r) => a + r.driftViolations, 0);
+      const knocked = all.filter((r) => r.disturbed.length).map((r) => `${r.id}: ${r.disturbed.join(', ')}`);
+      const drift = all.reduce((a, r) => a + r.driftViolations, 0) + knocked.length;
       const floating = all.reduce((a, r) => a + r.floating, 0);
       const where = all.filter((r) => r.driftViolations || r.floating).map((r) => `${r.id} ${r.driftAt || r.floatAt}`).join(', ');
-      return { pass: drift === 0 && floating === 0, worst: drift + floating, limit: 0, unit: 'frames', note: `${drift} moved without contact, ${floating} floating${where ? `: ${where}` : ''}` };
+      return { pass: drift === 0 && floating === 0, worst: drift + floating, limit: 0, unit: 'frames', note: `${drift} moved without contact or knocked, ${floating} floating${where ? `: ${where}` : ''}${knocked.length ? `; knocked ${knocked.join('; ')}` : ''}` };
     },
   },
   {

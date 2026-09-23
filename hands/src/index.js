@@ -282,10 +282,11 @@ export class Hands {
     this.rig.release(side);
     return obj;
   }
-  release(hand, { velocity = null } = {}) {
+  // openAfter: seconds before the fingers open (a world's hand backs off first).
+  release(hand, { velocity = null, openAfter = null } = {}) {
     const out = [];
     for (const side of sidesOf(hand)) {
-      if (this.interaction && this.interaction.hold[side]) { out.push(this.interaction.release(side, { velocity })); continue; }
+      if (this.interaction && this.interaction.hold[side]) { out.push(this.interaction.release(side, { velocity, openAfter })); continue; }
       const obj = this.rig.attachedObject(side);
       if (!obj) continue;
       this.rig.release(side);

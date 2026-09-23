@@ -20,7 +20,7 @@ const M = {
   grasps: 'manipulation: every grasp a scenario asks for takes hold',
   grip: 'manipulation: a held object never leaves the grip (contacts within 2 mm, the hand on what it follows within 5 mm)',
   climb: 'climbing: at least one hand attached from the first grip to the last letting go',
-  contact: 'contact: pushed and pulled objects move only through contact, and nothing at rest floats',
+  contact: 'contact: pushed and pulled objects move only through contact, nothing is knocked, and nothing at rest floats',
   continuity: 'continuity: every scenario under 20 rad/s per joint, wrist under 4 cm a frame, no self-penetration over 1 mm, inside limits',
   strength: 'strength: too heavy a load or too hard a jerk slips, the fingers come off it; nothing else slips',
   weight: 'weight: a heavier load lowers the wrist further (pebble < rock < iron shot)',

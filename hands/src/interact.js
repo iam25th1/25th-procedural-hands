@@ -727,7 +727,9 @@ export class Interaction {
     let vel = [0, 0, 0];
     let object = null;
     // Fingers hooked round a handle open off it without dragging it along.
-    if (rec.kind === 'body' && ['hook', 'powerCylinder'].includes(rec.grip)) rec.body.letGo = { hand: side, until: this.world.time + 0.8 };
+    // (A dragged body stays on its surface, so letting go of it cannot drop
+    // it onto the fingers; a carried one lands on them as they open.)
+    if (rec.kind === 'body' && rec.tethers && ['hook', 'powerCylinder'].includes(rec.grip)) rec.body.letGo = { hand: side, until: this.world.time + 0.8 };
     if (rec.kind === 'body' && rec.tethers) {
       this.world.tethers = this.world.tethers.filter((t) => !rec.tethers.includes(t));
       rec.body.heldBy = null;

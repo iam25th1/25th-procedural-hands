@@ -42,8 +42,8 @@ export const EXPECT = {
     verify: (m, r) => [m.both.max === 1 && m.lift.max >= 0.05 && r.grasped >= 2, `both hands on the box, lifted ${f(m.lift.max * 100, 1)} cm, set back ${f(m.lift.last * 1000, 1)} mm off its rest`],
   },
   handover: {
-    measure: (c) => ({ right: held(c, 'right', 'handle'), left: held(c, 'left', 'handle'), both: held(c, 'left', 'handle') * held(c, 'right', 'handle'), home: fromHome(c, 'handle') }),
-    verify: (m) => [m.right.max === 1 && m.both.max === 1 && m.left.max === 1 && m.home.last <= 0.02, `right hand holds, both hold at the pass, left hand carries it back (${f(m.home.last * 1000, 1)} mm from its rest)`],
+    measure: (c) => ({ right: held(c, 'right', 'handle'), left: held(c, 'left', 'handle'), both: held(c, 'left', 'handle') * held(c, 'right', 'handle'), x: c.body('handle').pos[0] - c.body('handle').home.pos[0], rest: c.world.isSupported(c.body('handle')) && !c.body('handle').heldBy ? 1 : 0 }),
+    verify: (m) => [m.right.max === 1 && m.both.max === 1 && m.left.max === 1 && m.x.last < -0.08 && m.rest.last === 1, `right hand holds, both hold at the pass, the left hand lays it on the bench ${f(-m.x.last * 100, 1)} cm to the left, at rest`],
   },
   inHandRoll: spinIn('pebbleM'),
   inHandSpin: spinIn('dowel'),

@@ -33,7 +33,7 @@ export const LEDGE = [
   { name: 'pebbleM', shape: 'sphere', r: 0.019, mass: 0.06, at: [0.18, -0.3], on: 'pebbleStandM', kind: 'pebble', friction: 0.8 },
   { name: 'pebbleL', shape: 'sphere', r: 0.024, mass: 0.12, at: [0.34, -0.3], on: 'pebbleStandL', kind: 'pebble', friction: 0.8 },
   { name: 'rock', shape: 'sphere', r: 0.03, mass: 0.3, at: [0.42, -0.48], kind: 'rock', friction: 0.8 },
-  { name: 'ball', shape: 'sphere', r: 0.035, mass: 0.06, at: [0.18, -0.5], kind: 'ball', restitution: 0.55, friction: 0.7 },
+  { name: 'ball', shape: 'sphere', r: 0.035, mass: 0.06, at: [0.26, -0.58], kind: 'ball', restitution: 0.55, friction: 0.7 },
   { name: 'dowel', shape: 'capsule', r: 0.007, h: 0.04, mass: 0.012, at: [0.06, -0.42], rot: Z_TO_X, on: 'dowelRack', kind: 'dowel', friction: 0.8 },
   { name: 'card', shape: 'box', hx: 0.027, hy: 0.0015, hz: 0.043, mass: 0.006, at: [-0.08, -0.44], rot: CARD_YAW, on: 'cardStand', kind: 'card', friction: 0.8 },
   { name: 'shot', shape: 'sphere', r: 0.02, mass: 0.9, at: [-0.17, -0.28], kind: 'iron', friction: 0.6 },

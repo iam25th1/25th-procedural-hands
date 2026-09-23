@@ -60,7 +60,7 @@ export function auditScenario(id, { seed = 1 } = {}) {
     firstGrasp: null, lastRelease: null, attachedSeries: [],
     maxSag: { left: 0, right: 0 }, loads: { left: 0, right: 0 },
     stepMs: [],
-    measures: {}, runState: {},
+    measures: {}, runState: {}, handled: new Set(), moved: new Map(), start: null,
     hashes: [],
   };
   let prevRot = null;
@@ -154,6 +154,11 @@ export function auditScenario(id, { seed = 1 } = {}) {
         }
         if (ex.run) ex.run(p.ctx, r.runState);
       }
+      // Bystanders: every body this scenario never takes hold of must stay
+      // where it was (a pebble knocked off its post reads wrong).
+      if (!r.start) r.start = new Map(world.bodies.map((b) => [b, b.pos.slice()]));
+      for (const side of ['left', 'right']) { const h = hands.holding(side); if (h && h.body) r.handled.add(h.body.name); }
+      for (const b of world.bodies) { const d = v3.dist(b.pos, r.start.get(b)); if (d > (r.moved.get(b.name) || 0)) r.moved.set(b.name, d); }
       const attachedNow = ['left', 'right'].filter((s) => hands.holding(s)).length;
       r.minAttached = Math.min(r.minAttached, attachedNow);
       r.attachedSeries.push([t, attachedNow]);
@@ -194,6 +199,9 @@ export function auditScenario(id, { seed = 1 } = {}) {
     for (const [t, n] of r.attachedSeries) if (t > r.firstGrasp + 1e-9 && t < end - 1e-9) r.minAttachedHolding = Math.min(r.minAttachedHolding, n);
   }
   delete r.attachedSeries;
+  const allowed = new Set([...r.handled, ...(SCENARIOS[id].moves || [])]);
+  r.disturbed = [...r.moved].filter(([name, d]) => !allowed.has(name) && d > 0.005).map(([name, d]) => `${name} ${(d * 1000).toFixed(0)} mm`);
+  delete r.start;
   if (EXPECT[id]) [r.achieved, r.achievedNote] = EXPECT[id].verify(r.measures, r, r.runState);
   else [r.achieved, r.achievedNote] = [false, 'no expectation written'];
   return r;
@@ -208,7 +216,7 @@ export function auditAll({ seed = 1 } = {}) {
 }
 
 export function summarize(r) {
-  return `${r.id}: pen ${(r.pen / MM).toFixed(2)} mm (${r.penAt}); self ${r.self.toFixed(2)} mm (${r.selfAt}); margin ${r.margin.toFixed(3)} (${r.marginAt}); speed ${r.speed.toFixed(1)} rad/s (${r.speedAt}); jump ${(r.jump / MM).toFixed(1)} mm; grip gap ${(r.gripGap / MM).toFixed(2)} mm (${r.gripAt}) over ${r.heldFrames} held frames; follow ${(r.followErr / MM).toFixed(2)} mm (${r.followAt}); floating ${r.floating} (${r.floatAt}); drift ${r.driftViolations} (${r.driftAt}); grasps ${r.grasped} missed ${r.missed} (${r.missAt}); ${r.achieved ? 'achieved' : 'NOT achieved'}: ${r.achievedNote}`;
+  return `${r.id}: pen ${(r.pen / MM).toFixed(2)} mm (${r.penAt}); self ${r.self.toFixed(2)} mm (${r.selfAt}); margin ${r.margin.toFixed(3)} (${r.marginAt}); speed ${r.speed.toFixed(1)} rad/s (${r.speedAt}); jump ${(r.jump / MM).toFixed(1)} mm; grip gap ${(r.gripGap / MM).toFixed(2)} mm (${r.gripAt}) over ${r.heldFrames} held frames; follow ${(r.followErr / MM).toFixed(2)} mm (${r.followAt}); floating ${r.floating} (${r.floatAt}); drift ${r.driftViolations} (${r.driftAt}); grasps ${r.grasped} missed ${r.missed} (${r.missAt}); disturbed [${r.disturbed.join(', ')}]; ${r.achieved ? 'achieved' : 'NOT achieved'}: ${r.achievedNote}`;
 }
 
 export { SCENARIOS };

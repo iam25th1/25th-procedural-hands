@@ -30,16 +30,18 @@ function pick(t0, side, target, grip, hint, { approach = 0.07, lift = 0.08, at =
 }
 
 // Keys that lower a held body onto the surface under it and let go.
-function place(t0, side, name, { surface = null, clear = 0.07, back = 0.02 } = {}) {
+function place(t0, side, name, { surface = null, clear = 0.07, back = 0.02, openAfter = null } = {}) {
   return [
     // Down until the object meets the surface, or the fingers under it do.
     [t0, (c) => c.hands.setDown(side, surface)],
-    [t0 + 0.55, (c) => c.hands.release(side)],
+    [t0 + 0.55, (c) => (settled(c, side) ? c.hands.release(side, openAfter == null ? {} : { openAfter }) : WAIT)],
     [t0 + 1.05, (c) => c.nudge(side, [0, clear, back])],
   ];
 }
 
 const home = (side) => (c) => c.hands.moveTo(side, c.ready(side));
+// Has a set-down finished (the object resting on its surface)?
+const settled = (c, side) => { const d = c.hands.interaction.down && c.hands.interaction.down[side]; return !d || d.done; };
 // The hand not taking part draws back out of the way of a long object.
 const aside = (side) => (c) => { const r = c.ready(side); c.hands.setTarget(side, { ...r, pos: v3.add([0, 0, 0], r.pos, [side === 'left' ? -0.1 : 0.1, -0.1, 0.1]) }); };
 
@@ -73,7 +75,7 @@ function putBack(t0, side, name, { above = 0.04, clear = 0.06, surface } = {}) {
   return [
     [t0, (c) => c.hands.setTarget(side, wristFor(c, above))],
     [t0 + 0.7, (c) => c.hands.setDown(side, surface)],
-    [t0 + 1.3, (c) => c.hands.release(side)],
+    [t0 + 1.3, (c) => (settled(c, side) ? c.hands.release(side) : WAIT)],
     [t0 + 1.8, (c) => c.nudge(side, [0, clear, 0.02])],
   ];
 }
@@ -129,10 +131,12 @@ export const SCENARIOS = {
   grabCarryPlace: {
     label: 'Grab, lift, carry, place', group: 'manipulation', station: 'ledge', duration: 5.2,
     keys: [
+      [0, aside('left')],
       ...pick(0, 'right', (c) => c.body('rock'), 'spherical', DOWN, { lift: 0.1 }),
-      [1.8, carryTo('right', [0.26, -0.3, -0.3])],
-      [2.3, carryTo('right', [0.2, -0.27, -0.28])],
-      [2.8, carryTo('right', [0.22, -0.33, -0.27])],
+      // Up, round toward the body and out to the right, clear of the posts.
+      [1.8, carryTo('right', [0.46, -0.3, -0.42])],
+      [2.3, carryTo('right', [0.5, -0.27, -0.34])],
+      [2.8, carryTo('right', [0.5, -0.33, -0.29])],
       ...place(3.4, 'right', 'rock'),
       [4.5, home('right')],
     ],
@@ -140,6 +144,7 @@ export const SCENARIOS = {
   padPinch: {
     label: 'Pad pinch on three sizes', group: 'grips', station: 'ledge', duration: 12.4,
     keys: [
+      [0, aside('left')],
       ...pickAndReturn(0, 'right', 'pebbleS', 'padPinch', PINCH, { lift: 0.06 }),
       ...pickAndReturn(3.9, 'right', 'pebbleM', 'padPinch', PINCH, { lift: 0.06 }),
       ...pickAndReturn(7.8, 'right', 'pebbleL', 'padPinch', PINCH, { lift: 0.06 }),
@@ -149,6 +154,7 @@ export const SCENARIOS = {
   tripod: {
     label: 'Tripod on three sizes', group: 'grips', station: 'ledge', duration: 12.4,
     keys: [
+      [0, aside('left')],
       ...pickAndReturn(0, 'right', 'pebbleS', 'tripod', TRIPOD, { lift: 0.06 }),
       ...pickAndReturn(3.9, 'right', 'pebbleM', 'tripod', TRIPOD, { lift: 0.06 }),
       ...pickAndReturn(7.8, 'right', 'pebbleL', 'tripod', TRIPOD, { lift: 0.06 }),
@@ -188,6 +194,7 @@ export const SCENARIOS = {
   sphericalGrip: {
     label: 'Spherical grip on a ball', group: 'grips', station: 'ledge', duration: 4.0,
     keys: [
+      [0, aside('left')],
       ...pickAndReturn(0, 'right', 'ball', 'spherical', DOWN, { lift: 0.1 }),
       [3.4, home('right')],
     ],
@@ -212,9 +219,10 @@ export const SCENARIOS = {
   handover: {
     label: 'Handover between hands', group: 'manipulation', station: 'bench', duration: 7.2,
     keys: [
+      [0, aside('left')],
       ...pick(0, 'right', (c) => c.body('handle'), 'powerCylinder', DOWN, { lift: 0.08, at: [0, 0, 0.045] }),
       // Held out in front, the handle across the body, its free end to the left.
-      [1.6, aim('right', [0.08, -0.3, -0.33], [[-0.2, -0.2, -0.96], [0, -1, 0.2]])],
+      [1.6, aim('right', [0.08, -0.22, -0.33], [[-0.2, -0.2, -0.96], [0, -1, 0.2]])],
       // The left hand takes the end of the handle nearer to it.
       [2.3, (c) => c.hands.reach('left', c.body('handle'), 'powerCylinder', { hint: c.rot('left', ...DOWN), at: leftEnd(c, 'handle', 0.045), approach: 0.06 })],
       [2.8, (c) => (c.hands.arrived('left') ? c.hands.reach('left', c.body('handle'), 'powerCylinder', { hint: c.rot('left', ...DOWN), at: leftEnd(c, 'handle', 0.045), open: false }) : WAIT)],
@@ -222,28 +230,33 @@ export const SCENARIOS = {
       [3.6, (c) => c.hands.release('right')],
       [4.2, (c) => { c.nudge('right', [0.05, 0.02, 0.05]); }],
       [4.7, home('right')],
-      ...putBack(4.3, 'left', 'handle'),
+      // The left hand takes it away to the left and lays it on the bench.
+      [4.3, carryTo('left', [-0.24, -0.33, -0.3])],
+      ...place(5.0, 'left', 'handle'),
       [6.6, home('left')],
     ],
   },
   inHandRoll: {
-    label: 'In-hand roll', group: 'manipulation', station: 'ledge', duration: 5.2,
+    label: 'In-hand roll', group: 'manipulation', station: 'ledge', duration: 5.9,
     keys: [
+      [0, aside('left')],
       ...pick(0, 'right', (c) => c.body('pebbleM'), 'tripod', TRIPOD, { lift: 0.08 }),
       [1.5, (c) => { c.hands.gesture('pebbleRoll', { hand: 'right' }); c.hands.spin('right', [0, 0, 1], 2.4); }],
       [3.4, (c) => { c.hands.spin('right', [0, 0, 1], 0); c.hands.stopGesture('right'); }],
-      ...place(3.7, 'right', 'pebbleM'),
-      [4.8, home('right')],
+      // The dowel rack is close: the fingers open once the hand is up clear of it.
+      ...place(3.7, 'right', 'pebbleM', { openAfter: 0.7 }),
+      [5.4, home('right')],
     ],
   },
   inHandSpin: {
-    label: 'In-hand spin', group: 'manipulation', station: 'ledge', duration: 5.2,
+    label: 'In-hand spin', group: 'manipulation', station: 'ledge', duration: 5.9,
     keys: [
+      [0, aside('left')],
       ...pick(0, 'right', (c) => c.body('dowel'), 'tripod', TRIPOD, { lift: 0.08 }),
       [1.5, (c) => c.hands.spin('right', [0, 0, 1], 6)],
       [3.4, (c) => c.hands.spin('right', [0, 0, 1], 0)],
       ...place(3.7, 'right', 'dowel'),
-      [4.8, home('right')],
+      [5.4, home('right')],
     ],
   },
   throwCatch: {
@@ -338,7 +351,7 @@ export const SCENARIOS = {
   },
   // Crate station.
   pushCrate: {
-    label: 'Push a crate', group: 'props', station: 'crate', duration: 5.0,
+    label: 'Push a crate', group: 'props', station: 'crate', duration: 5.0, moves: ['crate'],
     // A steady push, the speed a crate is walked across a bench.
     tick: glide('right', 1.4, 3.2, [0, 0, -0.12]),
     keys: [

@@ -13,7 +13,7 @@ export const PRESENT = {
   // with the thumb pointing up.
   across: (side) => { const s = side === 'right' ? 1 : -1; return { pos: [0.1 * s, -0.2, -0.34], rot: handRotation([-0.95 * s, 0.05, -0.3], [-0.3 * s, 0, 0.95]), pole: [0.55 * s, -0.75, 0.05] }; },
   // Lowered out of the way at the side: the hand not being inspected.
-  away: (side) => { const s = side === 'right' ? 1 : -1; return { pos: [0.3 * s, -0.62, -0.12], rot: handRotation([0.1 * s, -0.95, -0.2], [-0.95 * s, 0, 0.1]), pole: [0.55 * s, -0.8, 0.1] }; },
+  away: (side) => { const s = side === 'right' ? 1 : -1; return { pos: [0.34 * s, -0.7, 0.02], rot: handRotation([0.1 * s, -0.95, -0.2], [-0.95 * s, 0, 0.1]), pole: [0.55 * s, -0.8, 0.1] }; },
   // Held out, palm up and turned in a little: grips show the object.
   offer: (side) => { const s = side === 'right' ? 1 : -1; return { pos: [0.13 * s, -0.22, -0.36], rot: handRotation([-0.25 * s, 0.15, -0.95], [-0.45 * s, 0.85, 0.2]), pole: [0.55 * s, -0.75, 0.05] }; },
 };
