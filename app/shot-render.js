@@ -49,7 +49,10 @@ export function renderShot(canvas, shot) {
       // Inspection: orbit round the middle of the two hands.
       // Inspection from behind and to the right of the shooter, fixed for an
       // action: both hands, the fork and the bands in frame.
-      applyCamera({ target: [0.0, -0.14, -0.3], yaw: shot.yaw ?? 1.35, pitch: shot.pitch ?? 0.45, dist: (shot.dist ?? 0.62) / shot.zoom * (view.camera.aspect < 0.8 ? 1.5 : 1) });
+      // Short wide screens see a shallow slice: aim lower and stand back, so
+      // a pickup from the ground and a knockout stay in frame.
+      const wide = view.camera.aspect > 1.8;
+      applyCamera({ target: [0.0, wide ? -0.36 : -0.14, -0.3], yaw: shot.yaw ?? 1.35, pitch: shot.pitch ?? 0.45, dist: (shot.dist ?? 0.62) / shot.zoom * (view.camera.aspect < 0.8 ? 1.5 : wide ? 1.7 : 1) });
     } else {
       // First person: just behind the player's eye, looking down the aim, so
       // the drawn pouch at the cheek stays in front of the near plane.
