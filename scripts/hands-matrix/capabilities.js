@@ -35,6 +35,13 @@ const P = {
   contact: 'physics: a hand moves an object only through contact, the object stops the hand passing into it, a rung holds a load',
   replay: 'physics: fixed timestep and seeded, the same calls replay bit for bit',
 };
+const K = {
+  pouch: 'slingshot: pouch within 2 mm of the pinch point while drawing',
+  bands: 'slingshot: band ends locked to the fork tips',
+  launch: 'slingshot: launch direction within 1 degree of the aim',
+  actions: 'penetration: fingers, palm and held objects across every action',
+  replay: 'determinism: identical hashes through every action',
+};
 
 export const CAPABILITIES = [
   { group: 'fingers', name: 'Curl 0 to 1 per finger', checks: [C.fullRange], sheet: 'fingers-control' },
@@ -94,4 +101,6 @@ export const CAPABILITIES = [
   { group: 'physics', name: 'Climbing moves the body anchor between hands, one hand always attached', checks: [M.climb], sheet: '11-climb' },
   { group: 'physics', name: 'Deterministic: fixed timestep, seeded, replays hash identically', checks: [P.replay, M.replay], sheet: '07-grab-carry-place' },
   { group: 'budget', name: 'Solver time with the sandbox loaded', checks: [M.solver], sheet: '07-grab-carry-place' },
+  // The module still drives a real tool.
+  { group: 'slingshot', name: 'Slingshot draw, aim and release', checks: [K.pouch, K.bands, K.launch, K.actions, K.replay], sheet: '12-slingshot' },
 ];

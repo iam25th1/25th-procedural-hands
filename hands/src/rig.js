@@ -50,7 +50,11 @@ export function resolveNamedPose(side, name) {
   if (solved) {
     const pre = preShape(scratch, side, solved.obj, solved.grip);
     const placed = placeObject(scratch, side, solved.obj, solved.grip);
-    out = solveGrasp(scratch, side, { ...solved.obj, ...placed }, solved.grip, pre.pose).pose;
+    // The digits the grip closes start from the pre-shape; the rest keep the
+    // authored pose (an OK sign's other three fingers stand up).
+    const start = POSES[name] ? { ...POSES[name] } : pre.pose;
+    for (const d of GRIPS[solved.grip].digits) start[d] = pre.pose[d];
+    out = solveGrasp(scratch, side, { ...solved.obj, ...placed }, solved.grip, clonePose(start)).pose;
   } else if (name.startsWith('set:')) {
     const set = name.slice(4) === 'none' ? [] : name.slice(4).split('+');
     const g = fingerSetPose(set);

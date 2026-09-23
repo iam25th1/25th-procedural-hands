@@ -1,26 +1,27 @@
-// Sandbox entry. Starts the renderer on the plain backdrop; the scenes land
-// with the module.
-import * as THREE from '/vendor/three.module.js';
-import { animate } from '/vendor/anime.esm.js';
+// Sandbox entry. With ?shot=1 it renders one exact frame for the gallery and
+// the checks; otherwise it starts the interactive sandbox (scenes Hands,
+// Sandbox and Slingshot on one injected clock).
+import { parseShot } from '/shot.js';
+import { renderShot } from '/shot-render.js';
 
+const shot = parseShot(location.search);
 const canvas = document.getElementById('view');
-const status = document.getElementById('status');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x15171A);
-const camera = new THREE.PerspectiveCamera(60, 1, 0.025, 50);
 
-function resize() {
-  const w = canvas.clientWidth || 1;
-  const h = canvas.clientHeight || 1;
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.render(scene, camera);
+if (shot.shot) {
+  document.documentElement.classList.add('ui-hidden');
+  let info = null;
+  let error = null;
+  let frame = null;
+  try {
+    frame = renderShot(canvas, shot);
+    info = frame.info;
+  } catch (e) {
+    error = String((e && e.stack) || e);
+  }
+  // advance(t): the same run stepped on to a later time and drawn again,
+  // for strips of frames from one scenario.
+  window.__handsShot = { ready: true, info, error, params: shot, advance: (t) => { try { return { info: frame.advance(t) }; } catch (e) { return { error: String((e && e.stack) || e) }; } } };
+} else {
+  // The interactive app loads only when it is wanted: shot mode stays lean.
+  import('/ui/app.js').then(({ startApp }) => startApp({ canvas, shot }));
 }
-addEventListener('resize', resize);
-resize();
-status.textContent = `three r${THREE.REVISION} ready`;
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-animate(status, { opacity: [0, 1], duration: reduced ? 0 : 240, ease: 'outCubic' });

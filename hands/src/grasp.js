@@ -492,7 +492,8 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null, env = [])
     const names = digit === 'thumb' ? ['thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal'] : ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => `${XR_PREFIX[digit]}-${seg}`);
     // 2.6 mm: a spare finger that grazes a light object on the way in knocks it off its perch.
     const depth = () => Math.max(0, -minDist(names) + 2.6 * MM) + (digit === 'thumb' ? 0 : lifted());
-    if (depth() <= 0) continue;
+    // A spare digit already clear of the object keeps its pose.
+    if (-minDist(names) + 2.6 * MM <= 0) continue;
     if (digit !== 'thumb') {
       // Curl in or open out, whichever takes the finger clear (a spare
       // finger pointing at the table clears it by curling, not by opening).

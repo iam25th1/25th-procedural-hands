@@ -35,3 +35,106 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 400; margin: 0; }
 .topbar { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: calc(var(--safe-top) + var(--gap)) calc(var(--safe-right) + var(--gap)) var(--gap) calc(var(--safe-left) + var(--gap)); pointer-events: none; }
 .brand { font-size: 20px; color: var(--yellow); padding: 6px 10px; background: var(--tar); border-radius: var(--radius); }
 .status { margin: 0; padding: 6px 10px; background: var(--tar); border-radius: var(--radius); color: var(--zinc); }
+
+/* Shot mode: the frame only, no chrome. */
+.ui-hidden .topbar, .ui-hidden .ui { display: none !important; }
+
+/* Interactive sandbox UI (app/ui). Phone portrait first; landscape phones
+   and desktop below. Every control is at least --tap square. */
+.topbar { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "brand scenes" "status status" "perf cam"; align-items: center; row-gap: 6px; }
+.brand { grid-area: brand; font-size: 16px; line-height: 1.2; white-space: nowrap; padding: 6px 8px; }
+.status { grid-area: status; justify-self: start; max-width: 100%; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status.alert { color: var(--chalk); background: var(--pepper); }
+.status.good { color: var(--tar); background: var(--yellow); }
+.scenes { grid-area: scenes; justify-self: end; }
+.scenes .btn { padding: 0 9px; }
+.cam { grid-area: cam; justify-self: end; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; pointer-events: none; }
+.perf { grid-area: perf; justify-self: start; align-self: start; display: grid; grid-template-columns: auto auto; column-gap: 8px; padding: 6px 10px; background: var(--tar); border-radius: var(--radius); font-size: 14px; color: var(--chalk); }
+.perf dt { color: var(--zinc); }
+.perf dd { margin: 0; text-align: right; }
+.perf[hidden] { display: none; }
+
+.btn { min-height: var(--tap); min-width: var(--tap); padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--chalk); font: 600 16px/1.1 var(--font-ui); font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: background-color 120ms, border-color 120ms, color 120ms; }
+.btn:hover { border-color: var(--zinc); }
+.btn:focus-visible, .slider:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+.btn.on { background: var(--yellow); border-color: var(--yellow); color: var(--tar); font-weight: 800; }
+.btn.rec.on { background: var(--pepper); border-color: var(--pepper); color: var(--chalk); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--tar); font-weight: 800; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--tar); border-radius: calc(var(--radius) + 3px); pointer-events: auto; }
+.seg .btn { border-color: transparent; background: transparent; }
+.seg .btn.on { background: var(--yellow); color: var(--tar); }
+.cam > .btn:not(.on), .cam > .seg { background: var(--tar); }
+
+.dock { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 1180px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "transport" "tabs" "drawer"; row-gap: 6px; padding: 0 calc(var(--safe-right) + var(--gap)) 0 calc(var(--safe-left) + var(--gap)); will-change: transform; }
+.transport { grid-area: transport; justify-self: center; display: flex; gap: 3px; padding: 3px; background: var(--tar); border-radius: calc(var(--radius) + 3px); }
+.transport .btn { padding: 0 8px; }
+.transport .sep { width: 1px; margin: 6px 2px; background: var(--line); }
+.tabs { grid-area: tabs; display: flex; gap: 2px; padding: 3px 3px 0; background: var(--tar); border-radius: calc(var(--radius) + 3px) calc(var(--radius) + 3px) 0 0; }
+.tabs .btn { flex: 1 1 0; padding: 0 4px; border-color: transparent; background: transparent; border-radius: var(--radius) var(--radius) 0 0; }
+.tabs .btn.on { background: var(--panel); color: var(--yellow); }
+.drawer { grid-area: drawer; height: min(34dvh, 340px); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; background: var(--panel); padding: 0 10px calc(14px + var(--safe-bottom)); }
+.drawer[inert] { visibility: hidden; }
+.hand-row { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px; padding: 8px 0; background: var(--panel); }
+.hand-row .label { color: var(--zinc); }
+.hand-row[hidden] { display: none; }
+.panel[hidden] { display: none; }
+.group { margin: 6px 0 14px; }
+.group-title { margin: 0 0 6px; font: 800 17px/1.2 var(--font-ui); color: var(--chalk); }
+.group-note { margin: -2px 0 8px; color: var(--zinc); font-size: 15px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.note { color: var(--zinc); margin: 8px 0 12px; }
+
+.matrix { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding-top: 8px; }
+.row { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 10px; align-items: center; min-height: var(--tap); padding: 6px 12px; text-align: left; }
+.row .row-group { color: var(--zinc); font-size: 15px; }
+.row .row-label { color: var(--chalk); }
+.row.on .row-group, .row.on .row-label { color: var(--tar); }
+
+.digits { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding-top: 4px; }
+.digit { background: var(--tar); border-radius: var(--radius); padding: 8px 10px 4px; }
+.digit-title { margin: 0 0 2px; font: 800 17px/1.2 var(--font-ui); color: var(--yellow); }
+.slider-row { display: grid; grid-template-columns: 5.8em minmax(0, 1fr) 2.6em; align-items: center; gap: 8px; min-height: var(--tap); }
+.slider-row .label { color: var(--zinc); font-size: 15px; }
+.slider-row output { text-align: right; }
+.joints-foot { display: flex; gap: 8px; padding: 10px 0 4px; }
+.slider { -webkit-appearance: none; appearance: none; width: 100%; height: var(--tap); margin: 0; background: transparent; touch-action: pan-y; cursor: pointer; }
+.slider::-webkit-slider-runnable-track { height: 6px; background: var(--line); border-radius: 3px; }
+.slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; margin-top: -11px; border-radius: 50%; background: var(--yellow); border: 3px solid var(--tar); }
+.slider::-moz-range-track { height: 6px; background: var(--line); border-radius: 3px; }
+.slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--yellow); border: 3px solid var(--tar); }
+
+.settings { display: grid; gap: 12px; padding-top: 8px; }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.setting .label { color: var(--chalk); }
+.setting .hint { display: block; color: var(--zinc); font-size: 15px; }
+.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; }
+.facts dt { color: var(--zinc); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts .match { color: var(--yellow); }
+.facts .mismatch { color: var(--pepper); }
+
+/* Phones in landscape: tabs and transport share one row and the sheet stays
+   under about 45 percent of the height. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .topbar { grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "brand scenes cam" "status status perf"; row-gap: 4px; }
+  .perf { justify-self: end; grid-template-columns: repeat(10, auto); }
+  .dock { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "tabs transport" "drawer drawer"; column-gap: 8px; }
+  .transport { align-self: end; margin-bottom: 3px; }
+  .drawer { height: calc(45dvh - 56px); }
+  .hand-row { position: static; padding: 4px 0; }
+  .digits, .matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) and (min-height: 561px) {
+  .topbar { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "brand scenes status cam" "perf perf perf perf"; }
+  .status { justify-self: center; }
+  .dock { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "tabs transport" "drawer drawer"; column-gap: 12px; }
+  .transport { align-self: end; margin-bottom: 3px; }
+  .drawer { height: min(36dvh, 340px); }
+  .digits { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .matrix { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+}
+
+/* Reduced motion: no UI animation at all. The class starts from
+   prefers-reduced-motion and follows the Reduced motion setting. */
+.reduced *, .reduced *::before, .reduced *::after { transition: none !important; animation: none !important; }

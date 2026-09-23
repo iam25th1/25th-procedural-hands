@@ -7,7 +7,9 @@ import { solverChecks } from './solvers.js';
 import { budgetChecks } from './budget.js';
 import { fingerChecks } from './fingers.js';
 import { manipulationChecks, scenarioChecks } from './manipulation.js';
+import { slingshotChecks } from './slingshot.js';
 import { physicsChecks } from './physics.js';
+import { sandboxBudgetChecks } from './sandbox-budget.js';
 
 export const CHECKS = [
   ...servedChecks,
@@ -18,5 +20,7 @@ export const CHECKS = [
   ...physicsChecks,
   ...manipulationChecks,
   ...scenarioChecks,
+  ...slingshotChecks,
   ...budgetChecks,
+  ...sandboxBudgetChecks,
 ];
