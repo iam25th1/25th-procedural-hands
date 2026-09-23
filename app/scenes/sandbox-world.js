@@ -143,7 +143,7 @@ export function buildSandbox({ seed = 1 } = {}) {
 
   // Crate station: a bench and a wooden crate with a bar handle on its near face.
   const C = S.crate.x;
-  add('crateBench', { shape: 'box', pos: [C, BENCH_TOP - 0.03, -0.46], hx: 0.34, hy: 0.03, hz: 0.24, friction: 0.5, render: 'wood' });
+  add('crateBench', { shape: 'box', pos: [C, BENCH_TOP - 0.03, -0.5], hx: 0.34, hy: 0.03, hz: 0.28, friction: 0.5, render: 'wood' });
   const crate = world.add({
     name: 'crate', shape: 'box', hx: 0.12, hy: 0.085, hz: 0.1, mass: 2.2, friction: 0.22, restitution: 0.05, angDamp: 4, kind: 'crate',
     pos: [C + 0.06, BENCH_TOP + 0.085, -0.47],

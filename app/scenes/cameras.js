@@ -33,9 +33,10 @@ const SCENARIO_VIEWS = {
   sphericalGrip: { target: [0.18, -0.4, -0.42], yaw: 2.5, pitch: 0.45, dist: 0.6 },
   pressButton: { target: [-0.2, -0.24, -0.42], yaw: -1.3, pitch: 0.25, dist: 0.5 },
   flipSwitch: { target: [-0.1, -0.24, -0.42], yaw: -1.3, pitch: 0.25, dist: 0.5 },
-  turnKnob: { target: [0.08, -0.22, -0.45], yaw: -0.5, pitch: 0.3, dist: 0.45 },
+  turnKnob: { target: [0.08, -0.22, -0.45], yaw: -0.6, pitch: 0.7, dist: 0.42, wide: 1.25 },
   pullLever: { target: [0.26, -0.26, -0.36], yaw: 1.45, pitch: 0.25, dist: 0.7 },
   drawer: { target: [0.02, -0.4, -0.38], yaw: 1.3, pitch: 0.35, dist: 0.7 },
+  hang: { target: [0, -0.12, -0.3], yaw: 1.2, pitch: 0.12, dist: 1.0 },
 };
 
 export function scenarioView(id, station) {
