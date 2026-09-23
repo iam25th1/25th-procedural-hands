@@ -160,7 +160,7 @@ Hands module alone, no sandbox props:
 | Triangles, both arms, low LOD | 5 960 | 8 000 |
 | Draw calls, both arms | 2 | 6 |
 | Bones | 60 | 80 |
-| Solver time per frame, median in Node | 0.046 ms | 0.5 ms |
+| Rig step ms (one fixed step of the module alone), median in Node | 0.047 ms | 0.5 ms |
 
 Sandbox scene loaded:
 
@@ -169,9 +169,10 @@ Sandbox scene loaded:
 | Triangles, worst of six stations | 23 786 | 30 000 |
 | Draw calls, worst of six stations | 37 | 45 |
 | Bones | 60 | 80 |
-| Solver time per frame (hands, interaction, world), median in Node | 0.896 ms | 1.2 ms |
+| Sim step ms (one fixed step: script keys, rig, interaction, physics), median in Node | 0.891 ms | 1.2 ms |
+| Sim step ms, median, live in headless Chromium (the perf overlay's figure) | 1.1 to 2.1 ms (bimodal run to run) | 3.0 ms |
 
-The sandbox triangle and draw-call counts come from three's `renderer.info` after rendering in headless Chromium on the machine running the check, not from a phone. The on-device figures come from the sandbox's perf overlay.
+The perf overlay and the checks use the same names for the same things: **sim step ms** is one fixed 1/60 s step of the scene, **frame ms** is the main thread's JavaScript for one animation frame (not GPU time), each shown as the median of the last 120. The sandbox triangle and draw-call counts come from three's `renderer.info` after rendering in headless Chromium on the machine running the check, not from a phone. The on-device figures come from the sandbox's perf overlay.
 
 ## Skin tones
 

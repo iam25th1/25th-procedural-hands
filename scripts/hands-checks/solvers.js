@@ -287,7 +287,8 @@ export const solverChecks = [
     },
   },
   {
-    name: 'budget: solver time per frame (median)',
+    // rig step ms: one fixed step of the hands module alone (rig.step), in Node.
+    name: 'budget: rig step ms, median, hands module alone in Node',
     async run() {
       const rig = new Rig({ seed: 9 });
       const times = [];

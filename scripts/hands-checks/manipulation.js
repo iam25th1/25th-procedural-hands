@@ -185,7 +185,8 @@ export const manipulationChecks = [
     },
   },
   {
-    name: 'budget: solver time per frame with the sandbox loaded (hands, interaction and world)',
+    // sim step ms in Node, the same metric the perf overlay shows live.
+    name: 'budget: sim step ms, median, sandbox loaded in Node (script keys, rig, interaction, physics)',
     async run() {
       const ms = auditAll().flatMap((r) => r.stepMs).sort((a, b) => a - b);
       const at = (q) => ms[Math.min(ms.length - 1, Math.floor(q * ms.length))];

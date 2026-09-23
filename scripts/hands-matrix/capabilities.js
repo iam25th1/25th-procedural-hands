@@ -25,7 +25,8 @@ const M = {
   strength: 'strength: too heavy a load or too hard a jerk slips, the fingers come off it; nothing else slips',
   weight: 'weight: a heavier load lowers the wrist further (pebble < rock < iron shot)',
   replay: 'determinism: a scripted 30 s sandbox run hashes identically when replayed',
-  solver: 'budget: solver time per frame with the sandbox loaded (hands, interaction and world)',
+  solver: 'budget: sim step ms, median, sandbox loaded in Node (script keys, rig, interaction, physics)',
+  solverLive: 'budget: sim step ms, median, sandbox loaded live in a browser (the perf overlay figure)',
 };
 const P = {
   rest: 'physics: sphere, box and capsule bodies fall and come to rest on the ground and on a table, then sleep',
@@ -93,5 +94,5 @@ export const CAPABILITIES = [
   { group: 'physics', name: 'Hands move objects, objects resist hands', checks: [P.contact, M.contact, S('Push a crate')], sheet: '09-push-drag' },
   { group: 'physics', name: 'Climbing moves the body anchor between hands, one hand always attached', checks: [M.climb], sheet: '11-climb' },
   { group: 'physics', name: 'Deterministic: fixed timestep, seeded, replays hash identically', checks: [P.replay, M.replay], sheet: '07-grab-carry-place' },
-  { group: 'budget', name: 'Solver time with the sandbox loaded', checks: [M.solver], sheet: '07-grab-carry-place' },
+  { group: 'budget', name: 'Sim step time with the sandbox loaded, in Node and live', checks: [M.solver, M.solverLive], sheet: '07-grab-carry-place' },
 ];

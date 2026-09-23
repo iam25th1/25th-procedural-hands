@@ -116,13 +116,22 @@ export function startApp({ canvas, shot }) {
   }
 
   // Clock ------------------------------------------------------------------
-  let solverMs = 0;
+  // Perf metrics, named for what they time (the same names as hands:check):
+  // sim step ms, one fixed 1/60 s step of the scene (script keys, rig,
+  // interaction and physics), and frame ms, the main thread's JavaScript for
+  // one animation frame (steps, view sync, draw submission; not GPU time).
+  // The overlay shows the median of the last 120 of each.
+  const RING = 600;
+  const stepTimes = [];
+  const frameTimes = [];
+  const push = (ring, v) => { ring.push(v); if (ring.length > RING) ring.shift(); };
+  const median = (ring, n = ring.length) => { const a = ring.slice(-n).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
   clock.onStep((dt, t, c) => {
     const s = performance.now();
     recorder.beforeStep(c.frame - 1, applyAction);
     ctl.step();
     recorder.afterStep(c.frame, applyAction, () => ctl.hands.hash());
-    solverMs += performance.now() - s;
+    push(stepTimes, performance.now() - s);
   });
   const applyRate = () => { clock.rate = state.paused ? 0 : state.speed; };
 
@@ -281,7 +290,7 @@ export function startApp({ canvas, shot }) {
   const perf = el('dl', 'perf ui');
   perf.hidden = true;
   const perfCells = {};
-  for (const [k, label] of [['fps', 'fps'], ['frame', 'frame ms'], ['solver', 'solver ms'], ['tris', 'triangles'], ['calls', 'draw calls']]) {
+  for (const [k, label] of [['fps', 'fps'], ['frame', 'frame ms'], ['step', 'sim step ms'], ['tris', 'triangles'], ['calls', 'draw calls']]) {
     perf.append(el('dt', '', label));
     perfCells[k] = el('dd', '', '0');
     perf.append(perfCells[k]);
@@ -575,7 +584,6 @@ export function startApp({ canvas, shot }) {
       if (!centreAnim) setOpen(state.open, true);
     }
     const t0 = performance.now();
-    solverMs = 0;
     let info = { calls: 0, triangles: 0 };
     try {
       clock.advance(dt);
@@ -587,6 +595,7 @@ export function startApp({ canvas, shot }) {
       console.warn(e);
     }
     const frameMs = performance.now() - t0;
+    push(frameTimes, frameMs);
     perfState.frames += 1;
     perfState.acc += dt;
     if (state.perf && now - perfState.lastShow > 250) {
@@ -595,8 +604,8 @@ export function startApp({ canvas, shot }) {
       perfState.acc = 0;
       perfState.lastShow = now;
       perfCells.fps.textContent = perfState.fps.toFixed(0);
-      perfCells.frame.textContent = frameMs.toFixed(1);
-      perfCells.solver.textContent = solverMs.toFixed(1);
+      perfCells.frame.textContent = median(frameTimes, 120).toFixed(1);
+      perfCells.step.textContent = median(stepTimes, 120).toFixed(2);
       perfCells.tris.textContent = info.triangles.toLocaleString('en-GB');
       perfCells.calls.textContent = String(info.calls);
     }
@@ -622,6 +631,9 @@ export function startApp({ canvas, shot }) {
     get replaying() { return recorder.replaying; },
     get result() { return lastResult; },
     get plansLoaded() { return Boolean(planLoaded); },
+    // The perf overlay's numbers over the last 600 steps and frames.
+    perf: () => ({ stepMedian: median(stepTimes), stepMax: Math.max(0, ...stepTimes), steps: stepTimes.length, frameMedian: median(frameTimes), frames: frameTimes.length }),
+    resetPerf: () => { stepTimes.length = 0; frameTimes.length = 0; },
     planStats: () => (ctl.planStats ? ctl.planStats() : null),
     // The camera's position and its own right and up vectors, world space.
     camera() {

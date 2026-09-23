@@ -78,9 +78,10 @@ export function auditScenario(id, { seed = 1 } = {}) {
         r.lastRelease = p.t;
       });
       p.sb.hands.on('slipped', () => { r.slipped++; });
-      // Solver time per frame, the whole step: rig, interaction and world.
-      const step = p.sb.hands.step.bind(p.sb.hands);
-      p.sb.hands.step = () => { const t0 = performance.now(); const out = step(); r.stepMs.push(performance.now() - t0); return out; };
+      // sim step ms: one whole fixed step, as the sandbox's perf overlay
+      // times it: the script's keys, then rig, interaction and world.
+      const step = p.step.bind(p);
+      p.step = () => { const t0 = performance.now(); step(); r.stepMs.push(performance.now() - t0); };
     },
     onStep: (t, p) => {
       const { hands, world } = p.sb;

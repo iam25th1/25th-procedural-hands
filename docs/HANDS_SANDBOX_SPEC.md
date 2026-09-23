@@ -112,13 +112,19 @@ Hands module alone, no sandbox props (both arms with nails and sleeves), carried
 - Triangles: at most 20000 at high LOD, at most 8000 at low LOD.
 - Draw calls: at most 6.
 - Bones: at most 80.
-- Solver time per frame: median at or under 0.5 ms, in Node.
+- Rig step ms (one fixed 1/60 s step of the hands module alone, rig.step): median at or under 0.5 ms, in Node.
 
 Sandbox scene loaded (the hands, the interaction layer, the world and every station's props):
 - Triangles: at most 30000.
 - Draw calls: at most 45.
 - Bones: at most 80.
-- Solver time per frame (hands, interaction and world): median at or under 1.2 ms, in Node, over every capability scenario.
+- Sim step ms (one fixed 1/60 s step of the scene: the script's keys, rig, interaction and physics): median at or under 1.2 ms in Node over every capability scenario, and at or under 3.0 ms live in a browser while scripted actions play (headless Chromium on the machine running the check, reading the same figure the perf overlay shows).
+
+Metric names are the same in the checks and in the perf overlay, and each times exactly one thing:
+- sim step ms: one fixed step of the scene, as above; the overlay shows the median of the last 120 steps.
+- frame ms: the main thread's JavaScript for one animation frame (the steps that fell in it, the view sync and the draw submission); it does not include GPU or compositor time. The overlay shows the median of the last 120 frames.
+- rig step ms: the hands module alone, in Node only.
+The 3.0 ms live sim step budget was set in the metrics commit, not in the original spec. On the machine it was set on, the figure is bimodal from run to run, 1.1 to 1.2 ms or 1.9 to 2.1 ms with nothing between (frame ms moves with it, so it is how the operating system schedules the browser, not the code; keeping the renderer in the foreground did not change it). 3.0 ms is 1.4 times the slow mode and 2.7 times the fast one, so a real regression still trips it.
 
 The sandbox triangle and draw-call counts are not an on-device measurement. They are read from three's renderer.info after the sandbox renders in headless Chromium on the machine running the check (WebGL through ANGLE, on the GPU where there is one, SwiftShader otherwise), taking the worst of six station shots at 844x390. The on-device figures, frame time included, come from the sandbox's perf overlay on the phone itself.
 
