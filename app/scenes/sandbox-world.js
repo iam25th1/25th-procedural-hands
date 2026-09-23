@@ -111,7 +111,11 @@ export function buildSandbox({ seed = 1 } = {}) {
   world.add(new Prop({
     name: 'knob', type: 'hinge', anchor: [P + 0.08, -0.22, FACE + 0.02], axis: [0, 0, 1], min: -1.7, max: 1.7,
     inertia: 4e-4, damping: 0.02, friction: 0.03,
-    parts: [{ name: 'grip', shape: 'sphere', r: 0.021, pos: [0, 0, 0], strength: 0.6, stiffness: 2.5, driveDamping: 0.08 }],
+    parts: [
+      { name: 'grip', shape: 'sphere', r: 0.021, pos: [0, 0, 0], strength: 0.6, stiffness: 2.5, driveDamping: 0.08 },
+      // A pointer fin against the face: a sphere alone shows no turn.
+      { name: 'pointer', shape: 'box', hx: 0.004, hy: 0.016, hz: 0.006, pos: [0, 0.032, -0.012], collide: false },
+    ],
   }));
   // Lever: pivot low on the right, the arm up, a ball grip on top; pulling
   // it back toward the player is positive q.

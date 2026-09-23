@@ -51,8 +51,9 @@ export function renderShot(canvas, shot) {
       // action: both hands, the fork and the bands in frame.
       applyCamera({ target: [0.0, -0.14, -0.3], yaw: shot.yaw ?? 1.35, pitch: shot.pitch ?? 0.45, dist: (shot.dist ?? 0.62) / shot.zoom * (view.camera.aspect < 0.8 ? 1.5 : 1) });
     } else {
-      // First person: the player's own eye, looking down the aim.
-      applyCamera({ eye: [0, 0, 0], dir: [0, -0.18, -1] });
+      // First person: just behind the player's eye, looking down the aim, so
+      // the drawn pouch at the cheek stays in front of the near plane.
+      applyCamera({ eye: [0.03, 0.03, 0.16], dir: [0, -0.18, -1] });
     } };
     place();
     const draw = () => { hands.update(); tool.update(); return view.render(); };

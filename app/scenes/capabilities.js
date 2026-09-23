@@ -320,6 +320,7 @@ export const SCENARIOS = {
   turnKnob: {
     label: 'Turn a knob', group: 'props', station: 'panel', duration: 5.2,
     keys: [
+      [0, aside('left')],
       ...pick(0, 'right', (c) => c.part('knob', 'grip'), 'tripod', [[-0.1, -0.2, -0.97], [0.1, -0.2, -0.97]], { lift: 0, approach: 0.05 }),
       [1.4, (c) => { const cur = c.hands.target('right'); c.hands.intent('right', { pos: cur.pos, rot: quat.multiply([0, 0, 0, 1], quat.fromAxisAngle([0, 0, 0, 1], [0, 0, 1], -1.2), cur.rot) }); }],
       [3.2, (c) => c.hands.release('right')],

@@ -16,7 +16,7 @@ const STATION_VIEWS = {
   bench: { target: [0, -0.38, -0.36], yaw: 2.7, pitch: 0.45, dist: 0.8 },
   panel: { target: [0, -0.28, -0.42], yaw: 1.3, pitch: 0.3, dist: 0.8 },
   crate: { target: [0, -0.5, -0.4], yaw: 2.2, pitch: 0.4, dist: 0.9 },
-  ladder: { target: [0, 0.36, -0.25], yaw: 1.2, pitch: 0.12, dist: 1.75 },
+  ladder: { target: [0, 0.3, -0.3], yaw: 1.2, pitch: 0.12, dist: 1.2, wide: 1.3 }, // a tall climb: wide screens stand back
   rope: { target: [0.03, -0.22, -0.42], yaw: 2.3, pitch: 0.35, dist: 0.75 },
 };
 const SCENARIO_VIEWS = {
@@ -33,7 +33,7 @@ const SCENARIO_VIEWS = {
   sphericalGrip: { target: [0.18, -0.4, -0.42], yaw: 2.5, pitch: 0.45, dist: 0.6 },
   pressButton: { target: [-0.2, -0.24, -0.42], yaw: -1.3, pitch: 0.25, dist: 0.5 },
   flipSwitch: { target: [-0.1, -0.24, -0.42], yaw: -1.3, pitch: 0.25, dist: 0.5 },
-  turnKnob: { target: [0.08, -0.24, -0.42], yaw: 0.35, pitch: 0.75, dist: 0.5 },
+  turnKnob: { target: [0.08, -0.22, -0.45], yaw: -0.5, pitch: 0.3, dist: 0.45 },
   pullLever: { target: [0.26, -0.26, -0.36], yaw: 1.45, pitch: 0.25, dist: 0.7 },
   drawer: { target: [0.02, -0.4, -0.38], yaw: 1.3, pitch: 0.35, dist: 0.7 },
 };
@@ -47,8 +47,8 @@ export function stationView(sb, x, station = 'ledge') {
   return { ...v, target: [x + v.target[0], v.target[1], v.target[2]] };
 }
 
-function scaleForAspect(dist, aspect) {
-  return aspect < 0.8 ? dist * NARROW : aspect < 1.3 ? dist * 1.12 : dist;
+function scaleForAspect(dist, aspect, wide = 1) {
+  return aspect < 0.8 ? dist * NARROW : aspect < 1.3 ? dist * 1.12 : dist * wide;
 }
 
 function rot(q, v) {
@@ -85,7 +85,7 @@ export function cameraFor({ scene, scenario, sb, shot, hands, aspect }) {
     if (shot.focus === 'left' || shot.focus === 'right') out.target = handCentre(sb.hands, shot.focus);
     if (shot.yaw != null) out.yaw = shot.yaw;
     if (shot.pitch != null) out.pitch = shot.pitch;
-    out.dist = scaleForAspect((shot.dist ?? v.dist) / shot.zoom, aspect);
+    out.dist = scaleForAspect((shot.dist ?? v.dist) / shot.zoom, aspect, v.wide);
     return out;
   }
   // Hands scene: framed on one hand or both.
