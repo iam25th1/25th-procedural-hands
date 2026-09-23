@@ -255,6 +255,9 @@ function sandboxController({ seed, reducedMotion }) {
     group,
     get hands() { return sb.hands; },
     get station() { return sb.station; },
+    // The scripted action last started, and how long it runs (for rendering it).
+    get scenarioId() { return player ? Object.keys(SCENARIOS).find((k) => SCENARIOS[k] === player.sc) || null : null; },
+    get scenarioDuration() { return player ? player.duration : 0; },
     // For the headless checks: how the running scenario's recorded plans went.
     planStats() { return plans ? { used: plans.used, of: plans.size, stopped: plans.stopped, miss: plans.miss } : null; },
     get status() {

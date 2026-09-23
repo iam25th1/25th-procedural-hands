@@ -206,6 +206,13 @@ Open the root URL. Two scenes share one injected clock (pause, single step, 0.1x
 
 The control bar at the bottom holds Controls, Pause, Step and the speed. **Controls** (or the **C** key) opens the control centre with the Actions, Matrix, Joints, Objects, Capture and Settings tabs; **Escape** closes it and **Space** pauses. It starts collapsed and remembers whether you left it open. Open, it docks beside the view instead of over it (a sheet above the bar in portrait, a column at the right in landscape and on desktop), so it never covers the hands, first person included, and opening it changes neither the camera nor the field of view.
 
+**Video.** The Capture tab records the view two ways, both saved to your device (a save dialog where the browser has one, a download otherwise), named for the scene, the action and the time:
+
+- **Record video** (live) records what you see, as you see it, until you press Stop: `canvas.captureStream` into a `MediaRecorder`, in the most efficient codec the browser records (AV1, then VP9, H.264 High, H.264, VP8) at an explicit high bitrate. The Capture tab shows which codec and bitrate it used.
+- **Render video** (offline) is the quality path: it plays the action again from its start (or 5, 10 or 20 s of the scene as it is), one fixed 1/60 s step per frame off the injected clock, and encodes every frame with WebCodecs, so the file is 60 fps with nothing dropped whatever the display does. VP9 in WebM where the browser encodes it, H.264 in MP4 otherwise; the containers are written by `app/capture/webm.js` and `app/capture/mp4.js`.
+
+The control centre stays closed while a video is made (it would resize the view); the bar shows the time or the progress, and pressing it stops or cancels. **Record actions** and **Replay actions**, in the same tab, record the actions you take rather than video, and replay them exactly.
+
 Touch drags the hand's target. In Move camera mode a drag moves the camera the way you drag: right moves it right, up moves it up, and in first person the view turns right and looks up. Settings has Invert X, Invert Y and a sensitivity slider (0.25 to 3); the defaults are the direct mapping, touch and mouse behave the same, and the choice is remembered on the device. Buttons are at least 44 px; portrait and landscape both lay out, clear of notches and home indicators. First person and inspection cameras move only from your input. There is a perf overlay, record and replay, and a reduced motion setting that follows the system's.
 
 Shot mode renders any frame exactly from URL parameters, which is what the gallery uses: `/?shot=1&scene=sandbox&cap=throwCatch&t=2.45`.

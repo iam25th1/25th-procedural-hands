@@ -18,6 +18,7 @@ import { attachInput } from './input.js';
 import { createPanels, TABS } from './panels.js';
 import { cameraSettings, dragOrbit, dragLook, lookDirection } from './camera-map.js';
 import { load, save } from './store.js';
+import { liveSupported, startLive, offlineSupported, probeOffline, renderOffline, videoName, askWhereToSave, saveVideo } from '/capture/video.js';
 import { el, button, segmented, toggle } from './dom.js';
 
 const SPEEDS = [[0.1, '0.1x'], [0.25, '0.25x'], [1, '1x']];
@@ -303,7 +304,11 @@ export function startApp({ canvas, shot }) {
   stepBtn.title = 'One fixed step of 1/60 s';
   const speedSeg = segmented(SPEEDS.map(([v, l]) => [String(v), l]), String(state.speed), (v) => { state.speed = Number(v); applyRate(); }, { label: 'Speed', className: 'speed' });
   transport.append(pauseBtn, stepBtn, speedSeg.el);
-  bar.append(ccBtn, transport);
+  // While a video is being made this takes the Controls button's place: it
+  // shows the time or the progress, and pressing it stops or cancels.
+  const capBtn = button('', 'cap-live', () => { if (live) stopLive(); else if (rendering) rendering.abort.aborted = true; });
+  capBtn.hidden = true;
+  bar.append(ccBtn, capBtn, transport);
 
   // The control centre: docked beside the view (landscape and desktop) or
   // above the bar (portrait). The view shrinks to make room, so the panel
@@ -329,9 +334,127 @@ export function startApp({ canvas, shot }) {
   centre.append(centreHead, tabs, drawer);
   document.body.append(centre, bar);
 
-  // Sequence record and replay live in the Capture tab.
-  const recBtn = button('Rec', 'rec', toggleRecord);
-  const replayBtn = button('Replay', '', startReplay);
+  // Sequence record and replay live in the Capture tab. They record the
+  // actions you take, not video, and are named so.
+  const recBtn = button('Record actions', 'rec', toggleRecord);
+  const replayBtn = button('Replay actions', '', startReplay);
+
+  // Video, also in the Capture tab: live (MediaRecorder) and offline
+  // (every frame through WebCodecs at 60 fps).
+  let live = null; // { rec, startedAt }
+  let rendering = null; // { abort }
+  let offlineProbe = null;
+  if (offlineSupported()) probeOffline().then((p) => { offlineProbe = p; }).catch(() => {});
+  const liveBtn = button('Record video', 'rec', () => (live ? stopLive() : startLiveVideo()));
+  liveBtn.disabled = !liveSupported();
+  let renderLength = 'action';
+  const lengthSeg = segmented([['action', 'This action'], ['5', '5 s'], ['10', '10 s'], ['20', '20 s']], renderLength, (v) => { renderLength = v; }, { label: 'Length', className: 'chips' });
+  const renderBtn = button('Render video', 'primary', () => renderVideo());
+  renderBtn.disabled = !offlineSupported();
+  const actionLabel = () => (ctl && ctl.scenarioId ? ctl.scenarioId : state.scene === 'hands' ? 'hands' : 'free');
+  function showCapture(on, text = '') {
+    ccBtn.hidden = on;
+    capBtn.hidden = !on;
+    if (on) capBtn.textContent = text;
+  }
+
+  function startLiveVideo() {
+    if (live || rendering) return;
+    // The whole view, as big as it goes, and it stays that size: the control
+    // centre is closed and cannot open until the recording stops.
+    setOpen(false, true);
+    view.resize(true);
+    applyViewOffset();
+    applyCamera();
+    try {
+      live = { rec: startLive(canvas), startedAt: performance.now() };
+    } catch (e) {
+      note(String(e.message || e), 'alert');
+      return;
+    }
+    const i = live.rec.info;
+    note(`Recording live: ${i.codec}, ${i.width}x${i.height}, ${(i.bitrate / 1e6).toFixed(1)} Mbit/s`);
+    liveBtn.textContent = 'Stop video';
+    liveBtn.classList.add('on');
+    panels.showVideo({ ...i, state: 'recording' });
+  }
+  async function stopLive() {
+    const L = live;
+    if (!L) return;
+    live = null;
+    liveBtn.textContent = 'Record video';
+    liveBtn.classList.remove('on');
+    showCapture(false);
+    const name = videoName(state.scene, actionLabel(), L.rec.info.ext);
+    // Straight from the click: where to save needs the gesture.
+    const where = askWhereToSave(name, L.rec.info.mime.split(';')[0], L.rec.info.ext);
+    try {
+      const file = await L.rec.stop();
+      const handle = await where;
+      if (handle === 'cancelled') { note('Video not saved'); return; }
+      const how = await saveVideo(file.blob, name, handle);
+      panels.showVideo({ ...file, name, size: file.blob.size, seconds: (performance.now() - L.startedAt) / 1000, state: how });
+      note(`${how === 'saved' ? 'Saved' : 'Downloaded'} ${name}`, 'good');
+    } catch (e) {
+      note(`Recording failed: ${e.message || e}`, 'alert');
+    }
+  }
+
+  async function renderVideo() {
+    if (live || rendering) return;
+    if (recorder.recording || recorder.replaying) { note('Finish recording or replaying actions first', 'alert'); return; }
+    const ext = offlineProbe ? offlineProbe.ext : 'webm';
+    const name = videoName(state.scene, renderLength === 'action' ? actionLabel() : `${renderLength}s`, ext);
+    const handle = await askWhereToSave(name, offlineProbe ? offlineProbe.mime : 'video/webm', ext);
+    if (handle === 'cancelled') { note('Not rendered: no place chosen'); return; }
+    rendering = { abort: { aborted: false } };
+    setOpen(false, true);
+    view.resize(true);
+    // What to render: this action from its start (played again from the
+    // same seed), or a fixed length of the scene as it is now.
+    let frames;
+    if (renderLength === 'action' && ctl.scenarioId) {
+      act({ type: 'scenario', id: ctl.scenarioId });
+      frames = Math.min(60 * 60, Math.ceil(ctl.scenarioDuration * 60) + 30);
+    } else {
+      frames = (renderLength === 'action' ? 5 : Number(renderLength)) * 60;
+    }
+    // Output: the view's shape, long edge 1920 pixels, even sides.
+    const { width, height } = view.size;
+    const k = 1920 / Math.max(width, height);
+    const W = Math.max(2, Math.round((width * k) / 2) * 2);
+    const H = Math.max(2, Math.round((height * k) / 2) * 2);
+    view.renderer.setPixelRatio(1);
+    view.renderer.setSize(W, H, false);
+    view.camera.aspect = W / H;
+    view.camera.updateProjectionMatrix();
+    applyViewOffset();
+    applyCamera();
+    showCapture(true, 'Rendering 0%');
+    try {
+      const file = await renderOffline({
+        canvas,
+        frames,
+        drawFrame: () => { clock.step(); ctl.sync(); view.render(); },
+        onProgress: (done, of) => { capBtn.textContent = `Rendering ${Math.floor((done / of) * 100)}%, press to cancel`; panels.showVideo({ mode: 'offline', state: `rendering ${done} of ${of} frames` }); },
+        abort: rendering.abort,
+      });
+      const how = await saveVideo(file.blob, name, handle);
+      panels.showVideo({ ...file, name, size: file.blob.size, seconds: frames / 60, state: how });
+      note(`${how === 'saved' ? 'Saved' : 'Downloaded'} ${name}: ${file.codec}, ${W}x${H}, 60 fps, ${frames} frames`, 'good');
+    } catch (e) {
+      note(e && e.name === 'AbortError' ? 'Rendering cancelled' : `Rendering failed: ${e.message || e}`, e && e.name === 'AbortError' ? '' : 'alert');
+      panels.showVideo(null);
+    } finally {
+      rendering = null;
+      showCapture(false);
+      view.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
+      view.resize(true);
+      applyViewOffset();
+      applyCamera();
+      resync();
+    }
+  }
 
   const panels = createPanels({
     act, playRow, goScene: setScene,
@@ -349,6 +472,7 @@ export function startApp({ canvas, shot }) {
     seed: () => seed,
   }, drawer);
   panels.setSequenceControls(recBtn, replayBtn);
+  panels.setVideoControls({ liveBtn, lengthSeg: lengthSeg.el, renderBtn, liveOk: liveSupported(), offlineOk: offlineSupported() });
 
   function syncTabs() {
     for (const [key, b] of tabBtns) {
@@ -361,7 +485,7 @@ export function startApp({ canvas, shot }) {
   function syncTransport() {
     setText(pauseBtn, state.paused ? 'Play' : 'Pause');
     pauseBtn.classList.toggle('on', state.paused);
-    setText(recBtn, recorder.recording ? 'Stop' : 'Rec');
+    setText(recBtn, recorder.recording ? 'Stop recording actions' : 'Record actions');
     recBtn.classList.toggle('on', recorder.recording);
     recBtn.disabled = recorder.replaying;
     replayBtn.disabled = !recorder.last || recorder.recording || recorder.replaying;
@@ -381,6 +505,8 @@ export function startApp({ canvas, shot }) {
   const wide = () => window.matchMedia('(orientation: landscape), (min-width: 900px)').matches;
   function persist() { save('controls', { open: state.open, tab: state.tab }); }
   function setOpen(open, instant = false) {
+    // Opening the centre resizes the view, which a recording cannot take.
+    if (open && (live || rendering)) { note('Stop the video first: the control centre would resize the view'); return; }
     state.open = open;
     persist();
     ccBtn.classList.toggle('on', open);
@@ -429,6 +555,12 @@ export function startApp({ canvas, shot }) {
     requestAnimationFrame(frame);
     const dt = Math.max(0, (now - last) / 1000);
     last = now;
+    // Offline rendering steps the clock and draws on its own schedule.
+    if (rendering) { refreshStatus(now); return; }
+    if (live) {
+      const sec = Math.floor((now - live.startedAt) / 1000);
+      showCapture(true, `Stop video ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`);
+    }
     if (view.resize()) {
       // A turn of the phone reframes for the new shape, keeping the user's angle and zoom.
       const b = aspectBucket(screenAspect());

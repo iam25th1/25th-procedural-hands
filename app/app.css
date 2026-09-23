@@ -79,6 +79,9 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 400; margin: 0; }
 .bar { position: fixed; left: 0; right: var(--stage-right); bottom: 0; height: var(--bar-h); display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 0 calc(var(--safe-right) + var(--gap)) var(--safe-bottom) calc(var(--safe-left) + var(--gap)); background: var(--tar); border-top: 1px solid var(--line); }
 .cc-toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; }
 .cc-toggle.on { background: var(--yellow); border-color: var(--yellow); color: var(--tar); }
+.cap-live { background: var(--pepper); border-color: var(--pepper); color: var(--chalk); font-weight: 800; }
+.cap-live[hidden], .cc-toggle[hidden] { display: none; }
+.group .chips > .label { flex-basis: 100%; color: var(--zinc); font-size: 15px; margin-top: 4px; }
 .key { display: inline-block; min-width: 1.6em; padding: 1px 5px; border: 1px solid currentColor; border-radius: 5px; font: 600 13px/1.2 var(--font-ui); text-align: center; opacity: 0.8; }
 .transport { display: flex; align-items: center; gap: 3px; }
 .transport .btn { padding: 0 9px; }
