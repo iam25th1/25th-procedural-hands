@@ -52,7 +52,7 @@ test('mirror: left mesh is the x mirror of the right mesh', () => {
   assert.ok(worst < 1e-9, `mirror error ${worst}`);
 });
 
-test('triangle budget: both arms fit the high and low budgets with room for the slingshot', () => {
+test('triangle budget: both arms fit the high and low budgets with room for the objects they hold', () => {
   const high = buildArmMesh(skel, 'right', { lod: 'high' }).stats.triangles * 2;
   const low = buildArmMesh(skel, 'right', { lod: 'low' }).stats.triangles * 2;
   assert.ok(high <= 15000, `high ${high}`);

@@ -2,7 +2,7 @@
 // camera and the settings; the clock steps there in fixed steps, one frame
 // is rendered and window.__handsShot reports it. The gallery drives this.
 
-const SCENES = new Set(['hands', 'sandbox', 'slingshot']);
+const SCENES = new Set(['hands', 'sandbox']);
 const CAMS = new Set(['fp', 'view', 'palm', 'back', 'side', 'three', 'front', 'orbit']);
 
 function num(v, fallback, lo, hi) {

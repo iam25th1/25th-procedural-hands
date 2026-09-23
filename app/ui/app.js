@@ -28,7 +28,7 @@ export function startApp({ canvas, shot }) {
   const recorder = createRecorder();
   const prefersReduced = globalThis.matchMedia ? globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
   const state = {
-    scene: ['hands', 'sandbox', 'slingshot'].includes(shot.scene) ? shot.scene : 'sandbox',
+    scene: ['hands', 'sandbox'].includes(shot.scene) ? shot.scene : 'sandbox',
     hand: 'both', cam: 'inspect', moveCamera: false, reduced: prefersReduced || shot.reduced,
     speed: 1, paused: false, perf: false, tab: 'actions', open: true,
   };
@@ -251,7 +251,7 @@ export function startApp({ canvas, shot }) {
   }
 
   // Chrome -----------------------------------------------------------------
-  const sceneSeg = segmented([['hands', 'Hands'], ['sandbox', 'Sandbox'], ['slingshot', 'Slingshot']], state.scene, (k) => setScene(k), { label: 'Scene', className: 'scenes ui' });
+  const sceneSeg = segmented([['hands', 'Hands'], ['sandbox', 'Sandbox']], state.scene, (k) => setScene(k), { label: 'Scene', className: 'scenes ui' });
   const cam = el('div', 'cam ui');
   // Pressing the camera already in use frames it again (recentre).
   const camSeg = segmented([['inspect', 'Inspect'], ['fp', 'First person']], state.cam, (k) => { state.cam = k; frameCamera(); }, { label: 'Camera' });

@@ -1,5 +1,5 @@
-// Scene controllers for the interactive sandbox. Each owns one scene (Hands,
-// Sandbox or Slingshot): its hands instance, the three.js objects that draw
+// Scene controllers for the interactive sandbox. Each owns one scene (Hands
+// or Sandbox): its hands instance, the three.js objects that draw
 // it, and a dispatch(action) that applies a plain data action. Actions are
 // data so the recorder can log them and replay them on a fresh controller
 // with the same seed, stamped with the clock frame they landed on.
@@ -11,13 +11,11 @@ import { STEP, GRIPS, DIGITS } from '/hands/src/index.js';
 import { createThreeView } from '/hands/src/three-view.js';
 import { SKIN_TONES, SLEEVE_COLOURS } from '/hands/src/defaults.js';
 import { createWorldView } from '/render/world-view.js';
-import { createSlingshotView } from '/render/slingshot-view.js';
 import { createSandbox, startScenario } from '/scenes/runner.js';
 import { SCENARIOS } from '/scenes/capabilities.js';
 import { STATIONS } from '/scenes/sandbox-world.js';
 import { createHandsScene, GRIP_OBJECTS } from '/scenes/hands-scene.js';
-import { createSlingshotScene, ACTION_NAMES, ACTION_DURATIONS } from '/scenes/slingshot-scene.js';
-import { cameraFor, handCentre } from '/scenes/cameras.js';
+import { cameraFor } from '/scenes/cameras.js';
 import { humanize } from './dom.js';
 
 const LOOK = { lod: 'high', skinTone: SKIN_TONES[0], sleeveColour: SLEEVE_COLOURS[0] };
@@ -30,7 +28,7 @@ const OBJECT_NAMES = {
 };
 export const objectLabel = (key) => (key.startsWith('preset:') ? `${humanize(key)} preset` : OBJECT_NAMES[key] || humanize(key));
 
-export const SCENE_LABELS = { hands: 'Hands', sandbox: 'Sandbox', slingshot: 'Slingshot' };
+export const SCENE_LABELS = { hands: 'Hands', sandbox: 'Sandbox' };
 
 // Timed sequences a single press plays, as [seconds, action] pairs. They run
 // on the controller's own step count, so they replay exactly.
@@ -263,67 +261,9 @@ function sandboxController({ seed, reducedMotion }) {
   };
 }
 
-function slingshotController({ seed, reducedMotion }) {
-  let reduced = reducedMotion;
-  const scene = createSlingshotScene({ seed, reducedMotion });
-  let name = 'idle';
-  let handsView = null;
-  let toolView = null;
-  const group = new THREE.Group();
-  const sched = scheduler();
-
-  function mount() {
-    handsView = createThreeView(scene.hands, LOOK);
-    toolView = createSlingshotView(scene.hands, { lod: 'high' });
-    group.add(handsView.group, toolView.group);
-  }
-  function unmount() {
-    group.remove(handsView.group, toolView.group);
-    handsView.dispose();
-    toolView.dispose();
-  }
-  function play(next) {
-    if (handsView) unmount();
-    scene.play(next);
-    // The scene builds a fresh rig per play; carry the reduced setting over.
-    scene.hands.rig.reduced = reduced;
-    name = next;
-    mount();
-  }
-  play('idle');
-
-  function apply(a) {
-    if (applyFingers(scene.hands, a)) { if (a.type === 'reduced') reduced = Boolean(a.value); return; }
-    if (a.type === 'slingshot') { play(a.name); return; }
-    throw new Error(`the Slingshot scene has no action ${a.type}`);
-  }
-
-  return {
-    kind: 'slingshot',
-    group,
-    get hands() { return scene.hands; },
-    get status() { return `${humanize(name)}${scene.time >= ACTION_DURATIONS[name] ? ', done' : ''}`; },
-    dispatch(a) {
-      if (a.type === 'sequence') { sched.play(SEQUENCES[a.id], a.hand || 'both'); return { reframe: false }; }
-      apply(a);
-      return { reframe: false };
-    },
-    step() { sched.run(apply); scene.hands.step(); sched.tick(); },
-    sync() { handsView.update(); toolView.update(); },
-    frame(mode, aspect) {
-      if (mode === 'fp') return { eye: [0, 0, 0], dir: [0, -0.18, -1] };
-      const h = scene.hands;
-      const target = handCentre(h, 'left').map((v, i) => (v + handCentre(h, 'right')[i]) / 2);
-      return { target, yaw: 0.6, pitch: 0.25, dist: 0.75 * (aspect < 0.8 ? 1.45 : 1) };
-    },
-    dispose() { unmount(); scene.dispose(); },
-  };
-}
-
 export function createController(kind, opts) {
   if (kind === 'hands') return handsController(opts);
-  if (kind === 'slingshot') return slingshotController(opts);
   return sandboxController(opts);
 }
 
-export { ACTION_NAMES, SCENARIOS, STATIONS, GRIP_OBJECTS, GRIPS };
+export { SCENARIOS, STATIONS, GRIP_OBJECTS, GRIPS };

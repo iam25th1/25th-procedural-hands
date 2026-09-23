@@ -1,8 +1,7 @@
-// The sheets the gallery renders: the twelve core sheets first (the ones
+// The sheets the gallery renders: the eleven core sheets first (the ones
 // the acceptance rubric reviews), then the full set. Each frame is a set of
 // shot mode URL parameters (app/shot.js); a sheet is a strip or grid of them.
 import { SCENARIOS } from '../../app/scenes/capabilities.js';
-import { ACTION_KEYFRAMES } from '../../app/scenes/slingshot/scenarios.js';
 import { GESTURES } from '../../hands/src/gestures.js';
 
 export const VIEWPORTS = [
@@ -59,21 +58,10 @@ export const CORE = [
     frames: [...strip('pullLever', [1.3, 2.6]), ...strip('flipSwitch', [0.9, 1.7]), ...strip('turnKnob', [1.3, 2.8]), ...strip('drawer', [1.3, 2.8, 4.5]), ...strip('pressButton', [1.5])],
   },
   { key: '11-climb', title: 'Climb hand over hand on rungs', frames: strip('climb', [1.5, 2.3, 3.4, 4.6, 5.3, 6.4, 7.5, 8.2, 9.3, 10.4, 11.0, 11.8]) },
-  {
-    key: '12-slingshot', title: 'Slingshot draw and release',
-    frames: [
-      ...[0, 0.7, 1.4].map((t) => ({ name: `draw ${t.toFixed(2)} s`, params: { scene: 'slingshot', action: 'draw', t, cam: 'orbit' } })),
-      // The release is fast: frames 25 ms apart through the snap, so the strip shows it move, not jump.
-      ...[0.05, 0.075, 0.1, 0.125, 0.15, 0.4, 1.0].map((t) => ({ name: `release ${t.toFixed(3)} s`, params: { scene: 'slingshot', action: 'release', t, cam: 'orbit' } })),
-      // From above: first person lines the drawing hand up with the fork, so the draw reads as overlap there.
-      { name: 'full draw, from above', params: { scene: 'slingshot', action: 'fullDrawHold', t: 0.5, cam: 'orbit', yaw: 1.35, pitch: 1.1 } },
-      { name: 'release, from above', params: { scene: 'slingshot', action: 'release', t: 0.1, cam: 'orbit', yaw: 1.35, pitch: 1.1 } },
-    ],
-  },
 ];
 
 // Every sheet beyond the core: fingers, sets, all gestures, every capability
-// scenario across its run, every slingshot action, the skin tones.
+// scenario across its run, the skin tones.
 export function fullSet() {
   const out = [];
   out.push({
@@ -99,9 +87,6 @@ export function fullSet() {
     const n = 8;
     const times = Array.from({ length: n }, (_, i) => +((sc.duration * (i + 0.5)) / n).toFixed(2));
     out.push({ key: `cap-${id}`, title: sc.label, frames: strip(id, times) });
-  }
-  for (const [action, times] of Object.entries(ACTION_KEYFRAMES)) {
-    out.push({ key: `slingshot-${action}`, title: `Slingshot: ${action}`, frames: times.map((t) => ({ name: `${action} ${t.toFixed(2)} s`, params: { scene: 'slingshot', action, t, cam: 'orbit' } })) });
   }
   out.push({
     key: 'skin-tones', title: 'Skin tones and sleeves',

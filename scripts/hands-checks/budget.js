@@ -1,7 +1,6 @@
-// Budget, mobile first: triangles at high and low LOD, draw calls, bones.
-// The rig's draw calls are one per mesh: two arms now, fork, bands and
-// pouch, and a stone once the slingshot lands. Solver timing is measured in
-// the solver check.
+// Budget, mobile first, for the hands module alone: triangles at high and
+// low LOD, draw calls (one per arm mesh) and bones. Solver timing is measured
+// in the solver check; the sandbox scene's own budgets in sandbox-budget.js.
 import { Skeleton } from '../../hands/src/skeleton.js';
 import { buildArmMesh } from '../../hands/src/mesh.js';
 

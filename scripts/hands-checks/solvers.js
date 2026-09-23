@@ -1,5 +1,5 @@
 // Solver acceptance: limits, penetration, contacts, IK, determinism and
-// solver time. Actions and the slingshot add their own checks.
+// solver time. The manipulation checks add their own.
 import { Skeleton, FINGERS, XR_PREFIX } from '../../hands/src/skeleton.js';
 import { Rig } from '../../hands/src/rig.js';
 import { POSES, POSE_NAMES } from '../../hands/src/poses.js';

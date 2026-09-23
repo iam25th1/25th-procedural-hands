@@ -1,6 +1,6 @@
 # 25th procedural hands
 
-Procedural human hands and arms for the browser, with no animation files: every pose, grip and gesture is solved at run time from anatomy (bone lengths, joint limits, finger coupling) and from the shape and size of what the hand is holding. The library lives in [`hands/src`](hands/src) and imports nothing but [three.js](https://threejs.org). Around it, this repository holds an interaction sandbox that exercises every capability: grips on objects of many sizes, carrying, throwing and catching, buttons, switches, a lever, a knob, a drawer, a crate to push and drag, a rope and a ladder to climb, and a slingshot demo that proves the module still drives a real tool.
+Procedural human hands and arms for the browser, with no animation files: every pose, grip and gesture is solved at run time from anatomy (bone lengths, joint limits, finger coupling) and from the shape and size of what the hand is holding. The library lives in [`hands/src`](hands/src) and imports nothing but [three.js](https://threejs.org). Around it, this repository holds an interaction sandbox that exercises every capability: grips on objects of many sizes, carrying, throwing and catching, buttons, switches, a lever, a knob, a drawer, a crate to push and drag, a rope and a ladder to climb.
 
 <p align="center"><img src="docs/assets/finger-curl.svg" width="360" alt="Animated drawing of a finger curling at its three joints"></p>
 
@@ -26,7 +26,7 @@ The server prints the sandbox URL on this machine and on the local network (open
 | --- | --- |
 | `npm start` | The static dev server: whitelisted files only, strict CSP (no inline scripts, no eval), `nosniff`, `frame-ancestors 'none'` |
 | `npm run check` | `node --check` over every source folder, and a scan for characters the house style bans |
-| `npm test` | `node --test`: module, physics, server, isolation and slingshot tests |
+| `npm test` | `node --test`: module, physics, server and isolation tests |
 | `npm run hands:check` | The acceptance suite: every check with its worst measured value against its limit |
 | `npm run hands:matrix` | The capability matrix: one row per capability, the checks and sheet that prove it, PASS or FAIL |
 | `npm run hands:gallery` | Renders the sheets in a real browser at 390x844, 844x390 and 1440x900 into `artifacts/gallery/` |
@@ -174,11 +174,10 @@ The sandbox triangle and draw-call counts come from three's `renderer.info` afte
 
 ## The sandbox
 
-Open the root URL. Three scenes share one injected clock (pause, single step, 0.1x, 0.25x, 1x) and seeded randomness:
+Open the root URL. Two scenes share one injected clock (pause, single step, 0.1x, 0.25x, 1x) and seeded randomness:
 
 - **Hands**: the rig alone on a plain backdrop, for inspection: poses, counting, gestures, grips on objects of any size, per joint sliders for all ten digits.
 - **Sandbox**: stations for a ledge of objects, a bench for two hands, a button panel with switch, knob, lever and drawer, a crate, a ladder and a rope. The action palette and the capability matrix play every capability.
-- **Slingshot**: the one from the original rig, drawn and released by the module.
 
 Touch drags the hand's target; buttons are at least 44 px; portrait and landscape both lay out, clear of notches and home indicators. First person and inspection cameras move only from your input. There is a perf overlay, record and replay, and a reduced motion setting that follows the system's.
 

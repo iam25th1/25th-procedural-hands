@@ -67,7 +67,7 @@ export class SpringSet {
 }
 
 // Under damped second order oscillator for things that should ring and
-// settle (the slingshot bands after release): damping ratio zeta below one.
+// settle (a sprung band or strap after release): damping ratio zeta below one.
 export class Oscillator {
   constructor(omega, zeta, x = 0) {
     this.w = omega;

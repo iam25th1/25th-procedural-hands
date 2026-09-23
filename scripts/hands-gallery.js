@@ -1,11 +1,11 @@
 // Renders the sandbox through its shot mode in a real browser (GPU where
 // there is one, SwiftShader otherwise) at phone portrait, phone landscape
-// and desktop: the twelve core sheets first, then the full set. Frames go to
+// and desktop: the eleven core sheets first, then the full set. Frames go to
 // artifacts/gallery/<viewport>/<sheet>/, contact sheets to
 // artifacts/gallery/sheets/, and one overview per viewport to docs/assets.
 //
 //   npm run hands:gallery                 everything
-//   npm run hands:gallery -- --core       the twelve core sheets only
+//   npm run hands:gallery -- --core       the eleven core sheets only
 //   npm run hands:gallery -- --only=re    sheets whose "<viewport>/<key>" matches
 import fs from 'node:fs';
 import path from 'node:path';
@@ -120,7 +120,7 @@ async function main() {
       if (!ONLY || ONLY.test(`${vp.key}/overview`)) {
         const r = await renderSheet(context, base, vp, { key: 'overview', frames: OVERVIEW });
         problems.push(...r.problems.map((p) => `${vp.key}/overview: ${p}`));
-        const file = await composeSheet(context, vp, 'overview', 'the twelve core sheets, one frame each', r.frames);
+        const file = await composeSheet(context, vp, 'overview', 'the eleven core sheets, one frame each', r.frames);
         const dest = path.join(ROOT, 'docs', 'assets', `overview-${vp.key}.png`);
         fs.mkdirSync(path.dirname(dest), { recursive: true });
         fs.copyFileSync(file, dest);

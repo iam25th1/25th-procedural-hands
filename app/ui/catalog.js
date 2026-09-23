@@ -5,7 +5,6 @@
 import { GESTURES, GRIPS, DIGITS } from '/hands/src/index.js';
 import { SCENARIOS } from '/scenes/capabilities.js';
 import { STATIONS } from '/scenes/sandbox-world.js';
-import { ACTION_NAMES } from '/scenes/slingshot-scene.js';
 import { GRIP_OBJECTS } from '/scenes/hands-scene.js';
 import { SEQUENCES, objectLabel } from './controllers.js';
 import { humanize } from './dom.js';
@@ -32,9 +31,6 @@ export function paletteFor(scene) {
       { title: 'Presentation', items: [['raised', 'Raised'], ['rest', 'At rest'], ['offer', 'Offered']].map(([kind, label]) => ({ label, action: { type: 'present', kind } })) },
     ];
   }
-  if (scene === 'slingshot') {
-    return [{ title: 'Slingshot actions', items: ACTION_NAMES.map((name) => ({ label: humanize(name), action: { type: 'slingshot', name } })) }];
-  }
   const groups = new Map();
   for (const [id, sc] of Object.entries(SCENARIOS)) {
     if (!groups.has(sc.group)) groups.set(sc.group, []);
@@ -57,7 +53,6 @@ export function matrixRows() {
   for (const name of Object.keys(GESTURES)) rows.push({ group: 'Gestures', label: gestureLabel(name), scene: 'hands', action: { type: 'gesture', name } });
   for (const grip of GRIP_LIST) rows.push({ group: 'Grips in the hand', label: `${gripLabel(grip)} on a ${objectLabel(grip).toLowerCase()}`, scene: 'hands', action: { type: 'grasp', object: grip, grip, size: 1 } });
   for (const [id, sc] of Object.entries(SCENARIOS)) rows.push({ group: humanize(sc.group), label: sc.label, scene: 'sandbox', action: { type: 'scenario', id } });
-  for (const name of ACTION_NAMES) rows.push({ group: 'Slingshot', label: humanize(name), scene: 'slingshot', action: { type: 'slingshot', name } });
   return rows;
 }
 

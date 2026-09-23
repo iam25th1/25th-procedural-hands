@@ -55,7 +55,7 @@ House rules: CLAUDE.md applies in full (security first; no em dashes anywhere; l
 - Hands move objects and objects resist hands. Pushing a crate moves it, pulling a lever rotates it, climbing transfers the body anchor between hands with at least one hand attached at all times.
 
 === COMMIT 6 - The sandbox ===
-- The sandbox is this repo's app, served at the root URL, with a scene picker: Hands (the rig alone on a plain backdrop for inspection), Sandbox (the interaction playground), Slingshot (a demo scene carrying the slingshot rig from the snapshot, proving the module still drives a real tool).
+- The sandbox is this repo's app, served at the root URL, with a scene picker: Hands (the rig alone on a plain backdrop for inspection) and Sandbox (the interaction playground).
 - Sandbox props: a ledge of objects in many sizes and shapes, a button panel, a switch, a lever, a knob, a drawer, a crate to push and drag, a ball to throw and catch, a rope, and a short ladder of rungs to climb.
 - Controls: an action palette grouped by capability; the capability matrix as a panel where every row is a button that plays it; per-joint sliders for all ten digits; hand picker (left, right, both); object picker and size slider; speed (0.1x, 0.25x, 1x); pause and single step; record and replay a sequence; first-person and inspection cameras; perf overlay; reduced motion.
 - Mobile first: touch drags the hand target, buttons are at least 44 px, portrait and landscape both lay out cleanly, nothing sits under the notch or the home indicator.
@@ -65,10 +65,10 @@ House rules: CLAUDE.md applies in full (security first; no em dashes anywhere; l
 === COMMIT 7 - Checks, matrix, gallery, docs ===
 - npm run hands:check keeps every check that came with the rig and adds: no hand to object penetration beyond 1 mm during any manipulation; a held object never leaves the grip while the grip holds and the slip threshold is not crossed; climbing always has at least one hand attached; pushed and pulled objects move only through contact; determinism hashes over a scripted 30 second sandbox run; budgets (triangles, draw calls, bones, solver ms) measured with the sandbox scene loaded.
 - npm run hands:matrix prints the capability matrix: one row per capability, the check or sheet that proves it, and PASS or FAIL.
-- npm run hands:gallery renders the twelve core sheets first and the full set second, at phone portrait 390x844, phone landscape 844x390 and desktop 1440x900. Frames go to artifacts/ (gitignored); commit one overview sheet per viewport to docs/assets so the PR shows them.
+- npm run hands:gallery renders the eleven core sheets first and the full set second, at phone portrait 390x844, phone landscape 844x390 and desktop 1440x900. Frames go to artifacts/ (gitignored); commit one overview sheet per viewport to docs/assets so the PR shows them.
 - README.md for the repo, unique to this library: what it is, install and run, the API table, the capability list, budgets, and the sandbox. Animated SVG of a finger curling, mermaid for the capability and state model, LaTeX for the grasp contact condition and the slip threshold, collapsible <details> for the API and limit tables, a clearly marked spot where 25TH drops a directly uploaded video. hands/README.md covers the module internals and how to add a gesture or capability. Credit both fonts as OFL-1.1.
 
-## THE TWELVE CORE SHEETS
+## THE ELEVEN CORE SHEETS
 
 1. Anatomy close-up: palm, back, side, three-quarter.
 2. Counting 1 to 5 on both hands, both counting styles.
@@ -81,7 +81,6 @@ House rules: CLAUDE.md applies in full (security first; no em dashes anywhere; l
 9. Push and drag a crate: frame strip.
 10. Lever, switch, knob and drawer: frame strip.
 11. Climb hand over hand on rungs: frame strip.
-12. Slingshot draw and release: frame strip, proving the module drives a real tool.
 
 ## ACCEPTANCE
 
@@ -120,7 +119,7 @@ The sandbox triangle and draw-call counts are not an on-device measurement. They
 
 ## LOOP
 
-Each iteration: gate, hands:check, hands:matrix, hands:gallery, then review the twelve core sheets yourself, fix blockers first, commit each fix with the failing row in the message. When the core sheets carry zero blockers, do one full pass over every sheet in the gallery, then hand the twelve core sheets to a fresh subagent to review without your notes. Any blocker it finds sends you back into the loop. Before stopping each turn, print one line: what still fails and what changes next.
+Each iteration: gate, hands:check, hands:matrix, hands:gallery, then review the eleven core sheets yourself, fix blockers first, commit each fix with the failing row in the message. When the core sheets carry zero blockers, do one full pass over every sheet in the gallery, then hand the eleven core sheets to a fresh subagent to review without your notes. Any blocker it finds sends you back into the loop. Before stopping each turn, print one line: what still fails and what changes next.
 
 VERIFY: report each change, its root cause, and why it works at runtime. Where visual/interactive/environment behavior CANNOT be confirmed headlessly, SAY SO explicitly with the exact manual check to run (a green build is NOT proof for visual/runtime/prod-environment features). Gate green. At minimum list: touch control of the hand on a real phone, frame rate from the perf overlay on a mid-range phone, how grips and weight read on real screens, throw and catch timing, climb feel, reduced motion, and the sandbox in both phone orientations.
 

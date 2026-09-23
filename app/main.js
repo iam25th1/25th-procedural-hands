@@ -1,6 +1,6 @@
 // Sandbox entry. With ?shot=1 it renders one exact frame for the gallery and
 // the checks; otherwise it starts the interactive sandbox (scenes Hands,
-// Sandbox and Slingshot on one injected clock).
+// and Sandbox on one injected clock).
 import { parseShot } from '/shot.js';
 import { renderShot } from '/shot-render.js';
 
