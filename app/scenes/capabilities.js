@@ -442,12 +442,14 @@ function climbKeys() {
   for (const [s, i] of moves) {
     // Rise until the next rung is a comfortable reach above the shoulder,
     // the other hand's rung then level with it.
+    const from = y;
     y = 0.01 + 0.26 * i;
     const to = y;
     // The lower hand lets go (the other holds the rung above), the body
-    // pulls up on that hand, and the free hand goes up past it.
+    // pulls up on that hand, and the free hand rises with it (left where it
+    // was, its elbow would fold back under it), then goes up past it.
     keys.push([t, (c) => c.hands.release(s)]);
-    keys.push([t + 0.6, (c) => c.hands.moveBody([c.X, to, 0], 0.8)]);
+    keys.push([t + 0.6, (c) => { c.hands.moveBody([c.X, to, 0], 0.8); c.nudge(s, [0, to - from, 0]); }]);
     keys.push([t + 1.5, reachRung(s, i, 0.05)]);
     keys.push([t + 2.1, (c) => (c.hands.arrived(s) ? closeRung(s, i)(c) : WAIT)]);
     keys.push([t + 2.6, (c) => (c.hands.arrived(s) ? c.hands.grasp(s, rung(c, i), 'powerCylinder') : WAIT)]);
