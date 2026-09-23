@@ -7,6 +7,7 @@ import { solverChecks } from './solvers.js';
 import { budgetChecks } from './budget.js';
 import { fingerChecks } from './fingers.js';
 import { manipulationChecks, scenarioChecks } from './manipulation.js';
+import { physicsChecks } from './physics.js';
 
 export const CHECKS = [
   ...servedChecks,
@@ -14,6 +15,7 @@ export const CHECKS = [
   ...structureChecks,
   ...solverChecks,
   ...fingerChecks,
+  ...physicsChecks,
   ...manipulationChecks,
   ...scenarioChecks,
   ...budgetChecks,

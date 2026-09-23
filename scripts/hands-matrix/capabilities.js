@@ -27,6 +27,14 @@ const M = {
   replay: 'determinism: a scripted 30 s sandbox run hashes identically when replayed',
   solver: 'budget: solver time per frame with the sandbox loaded (hands, interaction and world)',
 };
+const P = {
+  rest: 'physics: sphere, box and capsule bodies fall and come to rest on the ground and on a table, then sleep',
+  bounce: 'physics: restitution bounces a ball, friction stops a slide, a resting box does not creep',
+  props: 'physics: hinges keep their limits, a switch snaps to a well, a sprung button returns, a drawer holds where left',
+  rope: 'physics: a rope hangs from its pinned top at its length (stretch under 2 percent)',
+  contact: 'physics: a hand moves an object only through contact, the object stops the hand passing into it, a rung holds a load',
+  replay: 'physics: fixed timestep and seeded, the same calls replay bit for bit',
+};
 
 export const CAPABILITIES = [
   { group: 'fingers', name: 'Curl 0 to 1 per finger', checks: [C.fullRange], sheet: 'fingers-control' },
@@ -76,4 +84,14 @@ export const CAPABILITIES = [
   { group: 'strength', name: 'Grip strength and slip', checks: [M.strength, S('Slip: too heavy for the grip'), S('Slip: accelerated too hard')], sheet: 'cap-slipHeavy' },
   { group: 'strength', name: 'Weight reads in the arms', checks: [M.weight], sheet: 'cap-slipJerk' },
   { group: 'manipulation', name: 'Every manipulation clean: no penetration, grips hold, continuous', checks: [M.pen, M.grip, M.continuity], sheet: '07-grab-carry-place' },
+  // Interaction physics (commit 5).
+  { group: 'physics', name: 'Rigid bodies: sphere, box, capsule with mass, gravity, friction, restitution', checks: [P.rest, P.bounce], sheet: 'cap-sphericalGrip' },
+  { group: 'physics', name: 'Hinge (lever, switch, knob)', checks: [P.props, S('Pull a lever'), S('Flip a switch'), S('Turn a knob')], sheet: '10-props' },
+  { group: 'physics', name: 'Slider (drawer, button)', checks: [P.props, S('Open and close a drawer'), S('Press a button')], sheet: '10-props' },
+  { group: 'physics', name: 'Fixed rungs', checks: [P.contact, S('Climb hand over hand')], sheet: '11-climb' },
+  { group: 'physics', name: 'Rope as a chain of points', checks: [P.rope, S('Hold a rope')], sheet: 'cap-rope' },
+  { group: 'physics', name: 'Hands move objects, objects resist hands', checks: [P.contact, M.contact, S('Push a crate')], sheet: '09-push-drag' },
+  { group: 'physics', name: 'Climbing moves the body anchor between hands, one hand always attached', checks: [M.climb], sheet: '11-climb' },
+  { group: 'physics', name: 'Deterministic: fixed timestep, seeded, replays hash identically', checks: [P.replay, M.replay], sheet: '07-grab-carry-place' },
+  { group: 'budget', name: 'Solver time with the sandbox loaded', checks: [M.solver], sheet: '07-grab-carry-place' },
 ];
