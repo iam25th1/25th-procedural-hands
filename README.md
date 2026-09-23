@@ -149,7 +149,9 @@ with the capacities $C$ per grip in `GRIPS` (a pad pinch 16 N, a power grip 160 
 
 ## Budgets
 
-Measured by `npm run hands:check`; the sandbox row is measured in a real browser with the whole sandbox loaded.
+Two sets, each on its own subject, as set in [the spec's BUDGETS section](docs/HANDS_SANDBOX_SPEC.md). Measured by `npm run hands:check`; the values below are from the run on 2026-09-23.
+
+Hands module alone, no sandbox props:
 
 | Budget | Measured | Limit |
 | --- | --- | --- |
@@ -157,8 +159,18 @@ Measured by `npm run hands:check`; the sandbox row is measured in a real browser
 | Triangles, both arms, low LOD | 5 640 | 8 000 |
 | Draw calls, both arms | 2 | 6 |
 | Bones | 60 | 80 |
-| Sandbox scene loaded: triangles, draw calls | about 21 000, 32 | 100 000, 60 |
-| Solver time per frame with the sandbox (hands, interaction, world), median in Node | under 1 ms | 2 ms |
+| Solver time per frame, median in Node | 0.046 ms | 0.5 ms |
+
+Sandbox scene loaded:
+
+| Budget | Measured | Limit |
+| --- | --- | --- |
+| Triangles, worst of six stations | 23 186 | 30 000 |
+| Draw calls, worst of six stations | 37 | 45 |
+| Bones | 60 | 80 |
+| Solver time per frame (hands, interaction, world), median in Node | 0.871 ms | 1.2 ms |
+
+The sandbox triangle and draw-call counts come from three's `renderer.info` after rendering in headless Chromium on the machine running the check, not from a phone. The on-device figures come from the sandbox's perf overlay.
 
 ## The sandbox
 

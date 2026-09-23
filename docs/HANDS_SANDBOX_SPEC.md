@@ -100,6 +100,24 @@ Minors, listed in docs/HANDS_MINORS.md with the sheet and one line each, not blo
 - Mesh defects carried over from the rig's last review: ring seams at the finger joints, flat palms in the anatomy close-up, pinch frames where the free fingers splay straight.
 - Any new cosmetic nit. These get fixed in a later finishing pass, not this one.
 
+## BUDGETS
+
+Two sets, each measured on its own subject. npm run hands:check fails if any value goes over its limit.
+
+Hands module alone, no sandbox props (both arms with nails and sleeves), carried unchanged from the rig snapshot:
+- Triangles: at most 20000 at high LOD, at most 8000 at low LOD.
+- Draw calls: at most 6.
+- Bones: at most 80.
+- Solver time per frame: median at or under 0.5 ms, in Node.
+
+Sandbox scene loaded (the hands, the interaction layer, the world and every station's props):
+- Triangles: at most 30000.
+- Draw calls: at most 45.
+- Bones: at most 80.
+- Solver time per frame (hands, interaction and world): median at or under 1.2 ms, in Node, over every capability scenario.
+
+The sandbox triangle and draw-call counts are not an on-device measurement. They are read from three's renderer.info after the sandbox renders in headless Chromium on the machine running the check (WebGL through ANGLE, on the GPU where there is one, SwiftShader otherwise), taking the worst of six station shots at 844x390. The on-device figures, frame time included, come from the sandbox's perf overlay on the phone itself.
+
 ## LOOP
 
 Each iteration: gate, hands:check, hands:matrix, hands:gallery, then review the twelve core sheets yourself, fix blockers first, commit each fix with the failing row in the message. When the core sheets carry zero blockers, do one full pass over every sheet in the gallery, then hand the twelve core sheets to a fresh subagent to review without your notes. Any blocker it finds sends you back into the loop. Before stopping each turn, print one line: what still fails and what changes next.

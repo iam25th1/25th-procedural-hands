@@ -190,7 +190,8 @@ export const manipulationChecks = [
       const ms = auditAll().flatMap((r) => r.stepMs).sort((a, b) => a - b);
       const at = (q) => ms[Math.min(ms.length - 1, Math.floor(q * ms.length))];
       const median = at(0.5);
-      return { pass: median <= 2, worst: median, limit: 2, unit: 'ms median', note: `p95 ${at(0.95).toFixed(3)} ms over ${ms.length} frames in Node` };
+      // docs/HANDS_SANDBOX_SPEC.md, BUDGETS: sandbox scene loaded.
+      return { pass: median <= 1.2, worst: median, limit: 1.2, unit: 'ms median', note: `p95 ${at(0.95).toFixed(3)} ms over ${ms.length} frames in Node` };
     },
   },
 ];

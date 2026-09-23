@@ -7,7 +7,7 @@ import path from 'node:path';
 import { launchBrowser, serve, capture } from '../shoot.js';
 import { Skeleton } from '../../hands/src/skeleton.js';
 
-export const SANDBOX_BUDGET = { triangles: 100000, calls: 60, bones: 80 };
+export const SANDBOX_BUDGET = { triangles: 30000, calls: 45, bones: 80 }; // docs/HANDS_SANDBOX_SPEC.md, BUDGETS
 const SHOTS = [
   'scene=sandbox&cap=grabCarryPlace&t=2',
   'scene=sandbox&cap=drawer&t=2.5',
