@@ -28,7 +28,7 @@ const M = {
   solver: 'budget: sim step ms, median, sandbox loaded in Node (script keys, rig, interaction, physics)',
   solverLive: 'budget: sim step ms, median, sandbox loaded live in a browser (the perf overlay figure)',
   solverLiveP95: 'budget: sim step ms, 95th percentile, sandbox loaded live in a browser (the perf overlay figure)',
-  solverLiveWorst: 'budget: sim step ms, worst step, sandbox loaded live in a browser, within the 8 ms per-frame sim budget',
+  solverLiveWorst: 'budget: sim step ms, worst step, sandbox loaded live in a browser, under one 60 Hz frame (16.7 ms)',
   planning: 'planning: switching actions and cold solves after a slider move never hold a frame; the worker answers every solve',
   plans: 'plans: the recorded plan table matches the sources, and every scenario replayed from it ends bit for bit where the live run does',
 };
