@@ -19,6 +19,9 @@ Units are metres, kilograms and seconds. Angles are radians in code and degrees 
 | `springs.js` | Critically damped springs and the under damped oscillator |
 | `mesh.js` | Lofted skinned arm and hand mesh, skin weights, vertex colour |
 | `three-view.js` | `createThreeView`: one `SkinnedMesh` per arm for a three.js scene |
+| `gestures.js` | The gesture registry (data) and the interpreter that plays an entry |
+| `selfcontact.js` | Thumb and neighbouring finger guards that keep transitions from passing digits through each other |
+| `measure.js` | Limit margins, self-penetration and object penetration, shared by tests and checks |
 | `stones.js` | Procedural pebbles, rocks and the sachet |
 | `clock.js`, `rng.js`, `math.js` | Fixed step clock, seeded generator, dependency free vector and quaternion math |
 | `defaults.js` | Skin tones, sleeve colours and object presets, all overridable |
@@ -58,6 +61,28 @@ $$\ddot x = -\omega^2 (x - x_t) - 2\omega\,\dot x$$
 | thumb | IP | 0 deg | 88 deg |
 
 </details>
+
+## Counting and finger sets
+
+`count(hand, n, style)` shows 1 to 5 counted from the index (`'index'`) or from the thumb (`'thumb'`). `showFingers(hand, set)` extends any combination of digits, so "middle only" is `showFingers('right', ['middle'])` and "index and little" is `showFingers('left', ['index', 'little'])`. Both generate a pose from the set (`fingerSetPose` in `poses.js`): extended fingers straight with a natural spread and held straight on purpose (active extension keeps only 30 percent of the enslaving pull from a folded neighbour), folded fingers curled as in a fist, and a folded thumb rested on the nearest run of folded fingers by the same coordinate descent the fist uses. Every one of the 32 combinations is checked by `npm run hands:check`.
+
+## Gestures are data
+
+`GESTURES` in `gestures.js` holds every gesture as a plain entry. A static gesture is only a pose name. A moving one adds any of: `arm` (where the hand goes, mirrored for the left hand), `armOsc` (a wrist oscillation about a body space axis), `osc` (finger oscillations: which digits, which joints, amplitude in degrees, rate, phase step between digits and a waveform), and `object` plus `grip` (something held first, as in the pebble roll). `compileGesture` turns an entry into the rig's gesture spec; nothing else knows which gestures exist.
+
+<details>
+<summary>How to add a gesture</summary>
+
+1. Static: if the hand shape is a combination of straight and folded digits, use a finger set as the pose: `{ pose: 'set:index+little' }`. Otherwise add a `hand(...)` entry to `POSES` in `poses.js` (degrees per joint; `dip` left out follows the PIP) and name it as the entry's `pose`.
+2. Moving: add `arm`, `armOsc` or `osc` fields. The drum entry is a good model: `{ digits: ['little', 'ring', 'middle', 'index'], joints: { mcp: -30, pip: -15, dip: -10 }, hz: 2.8, phaseStep: -0.25, wave: 'tap' }` lifts each finger in turn.
+3. Register it: add it to `GESTURES`, or call `registerGesture(name, entry)` at runtime.
+4. The `gestures:` check in `npm run hands:check` samples every registry entry at 60 fps on both hands for reach, limits, self-penetration and continuity, so a new gesture is covered the moment it exists. Add a shot for it in `scripts/gallery/shots.js` to see it on a sheet.
+
+</details>
+
+## Self contact
+
+Named poses and finger sets are solved clear of each other, but the straight path between two poses in joint space can carry the thumb through a finger (a relaxed hand closing into a fist sweeps the thumb across the index), and spreading a finger toward a straight neighbour would pass through it. After the springs move the hand each step, `guardFingers` stops neighbouring fingers where their sides meet and `guardThumb` runs a short coordinate descent on the thumb's own channels that moves it the least it can to slide over the digit in its way. The springs carry on from the corrected state, so the thumb reaches the pose around the fingers rather than through them.
 
 ## Isolation
 

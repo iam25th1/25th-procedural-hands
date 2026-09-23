@@ -104,6 +104,9 @@ export function aperture(radius) {
 }
 
 const PAD_SQUISH = 0.45 * MM; // contact stops with this much pad compression
+// A thumb resting on other digits may overlap their capsules by at most this
+// much, leaving room for idle drift under the 1 mm penetration limit.
+export const REST_OVERLAP = 0.5 * MM;
 const STEP = deg(1.5);
 const CURL_RATIO = 0.8; // thumb MCP flexion as a fraction of IP flexion while steering
 
@@ -689,9 +692,9 @@ export function restThumbOn(skel, side, pose, fingers, obj = null) {
   const objective = () => {
     let sum = 0;
     for (const names of targets) sum += Math.max(0, distTo(names));
-    return sum + 25 * Math.max(0, -clearance() - 1 * MM) + 25 * Math.max(0, -objDist() - PAD_SQUISH);
+    return sum + 25 * Math.max(0, -clearance() - REST_OVERLAP) + 25 * Math.max(0, -objDist() - PAD_SQUISH);
   };
-  const done = () => targets.every((names) => distTo(names) <= 2 * PAD_SQUISH) && clearance() >= -1 * MM && objDist() >= -PAD_SQUISH;
+  const done = () => targets.every((names) => distTo(names) <= 2 * PAD_SQUISH) && clearance() >= -REST_OVERLAP && objDist() >= -PAD_SQUISH;
   const dofs = [
     { get: () => out.thumb.cmc[0], set: (v) => { out.thumb.cmc[0] = v; }, lim: cmc.limits.flex },
     { get: () => out.thumb.cmc[1], set: (v) => { out.thumb.cmc[1] = v; }, lim: cmc.limits.abd },

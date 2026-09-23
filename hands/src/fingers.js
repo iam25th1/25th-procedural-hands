@@ -24,8 +24,13 @@ export function clonePose(p) {
   const out = { thumb: { cmc: p.thumb.cmc.slice(), mcp: p.thumb.mcp.slice(), ip: p.thumb.ip } };
   for (const f of FINGERS) out[f] = { mcp: p[f].mcp.slice(), pip: p[f].pip, dip: p[f].dip ?? null };
   out.metacarpal = { ring: p.metacarpal ? p.metacarpal.ring : 0, little: p.metacarpal ? p.metacarpal.little : 0 };
+  if (p.effort) out.effort = { ...p.effort };
   return out;
 }
+
+// Active extension resists passive coupling: a finger held straight on
+// purpose (pose.effort[f] = 1) takes only this share of the enslaving pull.
+export const EFFORT_KEEP = 0.3;
 
 // Flatten a pose into named channels, resolving coupling.
 export function poseChannels(pose) {
@@ -34,11 +39,12 @@ export function poseChannels(pose) {
   for (const f of FINGERS) own[f] = { mcp: pose[f].mcp[0], pip: pose[f].pip };
   for (const f of FINGERS) {
     const e = COUPLING.enslave[f] || {};
+    const keep = 1 - (1 - EFFORT_KEEP) * ((pose.effort && pose.effort[f]) || 0);
     let mcp = own[f].mcp;
     let pip = own[f].pip;
     for (const [n, k] of Object.entries(e)) {
-      mcp += k * Math.max(0, own[n].mcp - own[f].mcp);
-      pip += k * Math.max(0, own[n].pip - own[f].pip);
+      mcp += keep * k * Math.max(0, own[n].mcp - own[f].mcp);
+      pip += keep * k * Math.max(0, own[n].pip - own[f].pip);
     }
     const dip = pose[f].dip == null ? COUPLING.dipFromPip * pip : pose[f].dip;
     const p = XR_PREFIX[f];

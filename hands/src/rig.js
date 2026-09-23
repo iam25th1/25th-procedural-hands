@@ -10,11 +10,12 @@
 import { v3, quat, clamp, hashNumbers } from './math.js';
 import { Skeleton, FINGERS, DIGITS } from './skeleton.js';
 import { Spring } from './springs.js';
-import { POSES } from './poses.js';
+import { POSES, fingerSetPose } from './poses.js';
 import { poseChannels, clonePose, DIGIT_OF_JOINT, fingerControlChannels, enslaveNeighbours } from './fingers.js';
 import { solveArm, handRotation } from './ik.js';
 import { solveGrasp, placeObject, attachToHand, attachedWorld, preShape, settleThumb, restThumbOn, openedGraspPose, GRIPS } from './grasp.js';
 import { deg } from './math.js';
+import { guardThumb, guardFingers } from './selfcontact.js';
 
 // Poses solved as grips on a virtual object rather than authored angles.
 export const POSE_GRIPS = {
@@ -32,6 +33,38 @@ export const POSE_THUMB_REST = {
   count2: ['ring', 'little'],
   count3: ['little'],
 };
+
+// Named poses resolved once per side and shared by every rig: the thumb of
+// each authored pose is settled on a scratch skeleton so it rests on the
+// fingers or palm instead of passing through them; finger sets ('set:...')
+// are generated; poses where digits meet are closed by the grasp solver on a
+// small virtual object.
+const RESOLVED = { left: new Map(), right: new Map() };
+let scratch = null;
+export function resolveNamedPose(side, name) {
+  const cache = RESOLVED[side];
+  if (cache.has(name)) return cache.get(name);
+  scratch = scratch || new Skeleton();
+  let out;
+  const solved = POSE_GRIPS[name];
+  if (solved) {
+    const pre = preShape(scratch, side, solved.obj, solved.grip);
+    const placed = placeObject(scratch, side, solved.obj, solved.grip);
+    out = solveGrasp(scratch, side, { ...solved.obj, ...placed }, solved.grip, pre.pose).pose;
+  } else if (name.startsWith('set:')) {
+    const set = name.slice(4) === 'none' ? [] : name.slice(4).split('+');
+    const g = fingerSetPose(set);
+    out = g.thumbRest.length ? restThumbOn(scratch, side, g.pose, g.thumbRest).pose : settleThumb(scratch, side, g.pose).pose;
+  } else if (POSE_THUMB_REST[name]) {
+    out = restThumbOn(scratch, side, POSES[name], POSE_THUMB_REST[name]).pose;
+  } else if (POSES[name]) {
+    out = settleThumb(scratch, side, POSES[name]).pose;
+  } else {
+    throw new Error(`unknown pose ${name}`);
+  }
+  cache.set(name, out);
+  return out;
+}
 
 // Spring stiffness per channel family (rad/s). Fingers settle a little after
 // the wrist and arm because they are softer.
@@ -219,25 +252,7 @@ export class Rig {
   // rather than passing through. Cached per side and name.
   resolvePose(side, pose) {
     if (typeof pose !== 'string') return clonePose(pose);
-    this.settled = this.settled || { left: new Map(), right: new Map() };
-    const cache = this.settled[side];
-    if (!cache.has(pose)) {
-      this.scratch = this.scratch || new Skeleton();
-      const solved = POSE_GRIPS[pose];
-      if (solved) {
-        // Gestures where digits must meet are closed by the grasp solver on a
-        // small virtual object at the meeting point, then the object is dropped.
-        const pre = preShape(this.scratch, side, solved.obj, solved.grip);
-        const placed = placeObject(this.scratch, side, solved.obj, solved.grip);
-        const r = solveGrasp(this.scratch, side, { ...solved.obj, ...placed }, solved.grip, pre.pose);
-        cache.set(pose, r.pose);
-      } else if (POSE_THUMB_REST[pose]) {
-        cache.set(pose, restThumbOn(this.scratch, side, POSES[pose], POSE_THUMB_REST[pose]).pose);
-      } else {
-        cache.set(pose, settleThumb(this.scratch, side, POSES[pose]).pose);
-      }
-    }
-    return clonePose(cache.get(pose));
+    return clonePose(resolveNamedPose(side, pose));
   }
 
   // Base pose for a hand (name or pose object). snap skips the springs.
@@ -429,6 +444,10 @@ export class Rig {
       ctl.curl = patch.curl ?? 0;
       h.control[digit] = ctl;
     }
+    if (ctl.weight.target === 0) {
+      // Taking a released digit back starts from a clean slate.
+      ctl.spread = 0; ctl.opposition = 0; ctl.joints = {}; ctl.force = false;
+    }
     if (patch.curl !== undefined) ctl.curl = patch.curl;
     if (patch.spread !== undefined) ctl.spread = patch.spread;
     if (patch.opposition !== undefined) ctl.opposition = patch.opposition;
@@ -574,6 +593,8 @@ export class Rig {
         s.flex.step(dt); s.abd.step(dt); s.twist.step(dt);
         skel.setChannels(skel.joint(side, name), s.flex.x, s.abd.x, s.twist.x);
       }
+      skel.update();
+      hand.guarded = guardFingers(skel, side, hand.springs) | guardThumb(skel, side, hand.springs);
     }
     skel.update();
     for (const c of this.controllers) if (c.post) c.post(dt, this);

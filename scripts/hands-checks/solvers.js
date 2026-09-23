@@ -8,6 +8,7 @@ import { solveArm, handRotation } from '../../hands/src/ik.js';
 import { preShape, placeObject, solveGrasp, capsuleObjectDistance, aperture, tipGap, GRIPS } from '../../hands/src/grasp.js';
 import { v3, quat, toDeg, deg, segmentDistance } from '../../hands/src/math.js';
 import { MM } from '../../hands/src/anatomy.js';
+import { limitMargin, penetration, objectPenetration } from '../../hands/src/measure.js';
 import { mulberry32 } from '../../hands/src/rng.js';
 import { STEP } from '../../hands/src/clock.js';
 
@@ -23,78 +24,9 @@ export const GRIP_OBJECTS = {
   tripod: { shape: 'sphere', r: 0.015 },
 };
 
-// Smallest margin (degrees) between every measured channel and its limit.
-export function limitMargin(skel) {
-  let worst = Infinity;
-  let where = '';
-  for (const j of skel.joints) {
-    const m = skel.measureChannels(j);
-    for (const axis of ['flex', 'abd', 'twist']) {
-      const L = j.limits[axis];
-      if (L[0] === 0 && L[1] === 0) {
-        // Fixed axis: any motion at all is a violation; margin is minus the motion.
-        const v = Math.abs(m[axis]);
-        if (v > 1e-6 && -toDeg(v) < worst) { worst = -toDeg(v); where = `${j.id} ${axis} fixed`; }
-        continue;
-      }
-      const margin = Math.min(L[1] - m[axis], m[axis] - L[0]);
-      if (toDeg(margin) < worst) { worst = toDeg(margin); where = `${j.id} ${axis}`; }
-    }
-  }
-  return { worst, where };
-}
-
-// Capsules of the hand for penetration tests: phalanges and metacarpals per digit.
-function handCapsules(skel, side) {
-  const out = [];
-  for (const j of skel.sides[side].joints) {
-    if (j.kind !== 'hand' || !j.digit || j.segment === 'tip') continue;
-    const c = j.children[0];
-    out.push({ a: j.worldPos, b: c.worldPos, r: j.radius, digit: j.digit, segment: j.segment, name: j.name });
-  }
-  return out;
-}
-
-// Worst overlap in mm between capsules of different digits (finger to
-// finger and finger to palm through the metacarpals). Pads: distal phalanx
-// capsules touching another digit or the palm are allowed to press a little.
-export function penetration(skel, side, allowedPads = 2.5) {
-  const caps = handCapsules(skel, side);
-  let worst = 0;
-  let where = '';
-  let padWorst = 0;
-  for (let i = 0; i < caps.length; i++) {
-    for (let k = i + 1; k < caps.length; k++) {
-      const A = caps[i], B = caps[k];
-      if (A.digit === B.digit) continue;
-      // Neighbouring metacarpals share the palm and overlap by construction.
-      if (A.segment === 'metacarpal' && B.segment === 'metacarpal') continue;
-      const d = segmentDistance(A.a, A.b, B.a, B.b).d;
-      const overlap = (A.r + B.r) - d;
-      if (overlap <= 0) continue;
-      const pad = A.segment === 'phalanx-distal' || B.segment === 'phalanx-distal';
-      if (pad && overlap <= allowedPads * MM) { padWorst = Math.max(padWorst, overlap); continue; }
-      if (overlap > worst) { worst = overlap; where = `${A.name} vs ${B.name}`; }
-    }
-  }
-  return { worst: worst / MM, where, padWorst: padWorst / MM };
-}
-
-// Object penetration: capsules against the attached object, ignoring the
-// recorded contact segments (which stop at the pad squish).
-export function objectPenetration(skel, side, obj, contacts) {
-  const allowed = new Set(contacts.map((c) => c.joint));
-  let worst = 0;
-  let where = '';
-  for (const c of handCapsules(skel, side)) {
-    if (c.segment === 'metacarpal') continue;
-    const d = capsuleObjectDistance(obj, c.a, c.b, c.r);
-    const depth = -d;
-    if (allowed.has(c.name) && depth <= 1 * MM) continue;
-    if (depth > worst) { worst = depth; where = c.name; }
-  }
-  return { worst: worst / MM, where };
-}
+// Limit, self-penetration and object penetration measures live in the
+// module (hands/src/measure.js) so tests and checks share one definition.
+export { limitMargin, penetration, objectPenetration };
 
 export const solverChecks = [
   {

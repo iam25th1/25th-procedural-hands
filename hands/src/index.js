@@ -16,7 +16,8 @@ import { handRotation } from './ik.js';
 import { v3, quat } from './math.js';
 import { FINGERS, DIGITS } from './skeleton.js';
 import { DEFAULTS, OBJECTS, SKIN_TONES, SLEEVE_COLOURS } from './defaults.js';
-import { POSES } from './poses.js';
+import { POSES, COUNTING, countPoseName, setPoseName, fingerSetPose } from './poses.js';
+import { GESTURES, registerGesture, compileGesture, isDynamic, gestureChannels, gestureArm } from './gestures.js';
 
 export const HANDS = ['left', 'right'];
 export const EVENTS = ['contact', 'grasped', 'released', 'slipped'];
@@ -75,10 +76,13 @@ export class Hands {
     return this;
   }
 
+  // A snapped change lands on the skeleton at once, not on the next step.
+  applyNow(snap) { if (snap) this.rig.step(0); return this; }
+
   // Poses and blends --------------------------------------------------------
   setPose(hand, pose, { snap = false } = {}) {
     for (const side of sidesOf(hand)) this.rig.setPose(side, pose, { snap });
-    return this;
+    return this.applyNow(snap);
   }
   blendPose(hand, pose, weight = 1, { mask = null, layer = 'blend', snap = false } = {}) {
     const m = mask || Object.fromEntries(DIGITS.map((d) => [d, 1]));
@@ -86,7 +90,7 @@ export class Hands {
       if (weight <= 0) this.rig.clearLayer(side, layer);
       else this.rig.setLayer(side, layer, pose, { mask: m, weight, snap });
     }
-    return this;
+    return this.applyNow(snap);
   }
   clearBlend(hand, layer = 'blend') {
     for (const side of sidesOf(hand)) this.rig.clearLayer(side, layer);
@@ -97,7 +101,7 @@ export class Hands {
   setFinger(hand, finger, curl, spread = undefined, { snap = false, force = false } = {}) {
     const d = digitOf(finger);
     for (const side of sidesOf(hand)) this.rig.setFingerControl(side, d, { curl, spread, force }, { snap });
-    return this;
+    return this.applyNow(snap);
   }
   setFingerJoint(hand, finger, joint, curl, { snap = false, force = false } = {}) {
     const d = digitOf(finger);
@@ -107,14 +111,14 @@ export class Hands {
       const ctl = this.rig.hands[side].control[d];
       this.rig.setFingerControl(side, d, { joint, value: curl, force, curl: ctl ? undefined : this.currentCurl(side, d) }, { snap });
     }
-    return this;
+    return this.applyNow(snap);
   }
   setThumbOpposition(hand, amount, { snap = false } = {}) {
     for (const side of sidesOf(hand)) {
       const ctl = this.rig.hands[side].control.thumb;
       this.rig.setFingerControl(side, 'thumb', { opposition: amount, curl: ctl ? undefined : this.currentCurl(side, 'thumb') }, { snap });
     }
-    return this;
+    return this.applyNow(snap);
   }
   releaseFingers(hand, finger = null) {
     for (const side of sidesOf(hand)) this.rig.releaseFingerControl(side, finger);
@@ -129,15 +133,48 @@ export class Hands {
   }
 
   // Gestures ----------------------------------------------------------------
+  // Any name in the gesture registry. Static ones hold a pose as a layer over
+  // the base; moving ones place the arm and run their oscillations; ones
+  // with an object (the pebble roll) grasp it first.
   gesture(name, { hand = 'both', snap = false } = {}) {
-    if (!POSES[name]) throw new Error(`unknown gesture ${name}`);
-    for (const side of sidesOf(hand)) this.rig.setLayer(side, 'gesture', name, { weight: 1, snap });
-    return this;
+    const entry = GESTURES[name];
+    if (!entry) throw new Error(`unknown gesture ${name}; gestures are ${Object.keys(GESTURES).join(', ')}`);
+    for (const side of sidesOf(hand)) {
+      this.rig.stopGesture(side);
+      if (!isDynamic(entry)) {
+        this.rig.setLayer(side, 'gesture', entry.pose, { weight: 1, snap });
+        continue;
+      }
+      this.rig.clearLayer(side, 'gesture');
+      if (entry.object) {
+        this.release(side);
+        this.rig.setPose(side, this.rig.preShapePose(side, entry.object, entry.grip), { snap: true });
+        this.rig.step(0);
+        this.grasp(side, entry.object, entry.grip);
+      }
+      this.rig.startGesture(side, name, compileGesture(entry), { snap });
+    }
+    return this.applyNow(snap);
   }
   stopGesture(hand = 'both') {
     for (const side of sidesOf(hand)) { this.rig.stopGesture(side); this.rig.clearLayer(side, 'gesture'); }
     return this;
   }
+  // Counting 1 to 5 (0 is a closed hand): style 'index' counts from the index
+  // finger, 'thumb' from the thumb.
+  count(hand, n, style = 'index', { snap = false } = {}) {
+    const name = countPoseName(n, style);
+    for (const side of sidesOf(hand)) { this.rig.stopGesture(side); this.rig.setLayer(side, 'gesture', name, { weight: 1, snap }); }
+    return this.applyNow(snap);
+  }
+  // Any combination of extended digits: showFingers('right', ['middle']),
+  // showFingers('left', ['index', 'little']).
+  showFingers(hand, set, { snap = false } = {}) {
+    const name = setPoseName(set);
+    for (const side of sidesOf(hand)) { this.rig.stopGesture(side); this.rig.setLayer(side, 'gesture', name, { weight: 1, snap }); }
+    return this.applyNow(snap);
+  }
+  static registerGesture(name, entry) { return registerGesture(name, entry); }
 
   // Arms: IK targets --------------------------------------------------------
   // target: { pos: [x,y,z] wrist in world, rot: quaternion of the hand frame
@@ -228,6 +265,7 @@ export class Hands {
 export function create(options = {}) { return new Hands(options); }
 
 export { Rig, defaultArmTargets, GRIPS, gripFor, handRotation, FINGERS, DIGITS, OBJECTS, SKIN_TONES, SLEEVE_COLOURS, DEFAULTS, POSES, STEP };
+export { GESTURES, registerGesture, compileGesture, gestureChannels, gestureArm, COUNTING, countPoseName, setPoseName, fingerSetPose };
 export { Skeleton, XR_JOINT_NAMES, ARM_JOINT_NAMES, SIDES } from './skeleton.js';
 export { Clock, RATES } from './clock.js';
 export { buildArmMesh, colorize } from './mesh.js';
@@ -235,3 +273,4 @@ export { buildStone, buildSachet } from './stones.js';
 export { v3, quat, m4, deg, toDeg, hashNumbers } from './math.js';
 export { mulberry32 } from './rng.js';
 export { createThreeView, makeSkinMaterial } from './three-view.js';
+export { limitMargin, penetration, objectPenetration, handCapsules } from './measure.js';

@@ -5,11 +5,13 @@ import { isolationChecks } from './isolation.js';
 import { structureChecks } from './structure.js';
 import { solverChecks } from './solvers.js';
 import { budgetChecks } from './budget.js';
+import { fingerChecks } from './fingers.js';
 
 export const CHECKS = [
   ...servedChecks,
   ...isolationChecks,
   ...structureChecks,
   ...solverChecks,
+  ...fingerChecks,
   ...budgetChecks,
 ];

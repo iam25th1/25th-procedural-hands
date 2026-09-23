@@ -10,6 +10,10 @@ function hand(spec) {
   const F = (f, mcp, abd, pip, dip = null) => { p[f].mcp = [deg(mcp), deg(abd)]; p[f].pip = deg(pip); p[f].dip = dip == null ? null : deg(dip); };
   const T = (cmcFlex, cmcAbd, mcp, ip, twist = 0, mcpAbd = 0) => { p.thumb.cmc = [deg(cmcFlex), deg(cmcAbd), deg(twist)]; p.thumb.mcp = [deg(mcp), deg(mcpAbd)]; p.thumb.ip = deg(ip); };
   spec(F, T, p);
+  // Fingers authored straight beside folded ones are held straight on
+  // purpose, against the pull of their folded neighbours.
+  p.effort = {};
+  if (FINGERS.some((f) => p[f].pip > deg(45))) for (const f of FINGERS) if (p[f].mcp[0] <= 0 && p[f].pip <= 0) p.effort[f] = 1;
   return p;
 }
 
@@ -113,6 +117,12 @@ export const POSES = {
     F('index', 6, 8, 14, 6); F('middle', 30, 0, 38); F('ring', 36, 2, 44); F('little', 38, 6, 46);
     T(-18, 20, -4, -6);
   }),
+  // Fingertips resting on a surface for drumming: knuckles raised, fingers
+  // arched down, the thumb alongside.
+  drum: hand((F, T) => {
+    F('index', 28, 4, 48); F('middle', 30, 0, 50); F('ring', 30, 3, 48); F('little', 28, 8, 44);
+    T(8, 10, 10, 10);
+  }),
   // Open, ready to receive: used at the start of grabs (anticipation).
   ready: hand((F, T) => {
     F('index', 5, 8, 8); F('middle', 6, 0, 10); F('ring', 8, 6, 12); F('little', 10, 12, 14);
@@ -122,3 +132,66 @@ export const POSES = {
 
 export const POSE_NAMES = Object.keys(POSES);
 export { fingerSpread };
+
+// Finger sets: any combination of extended digits, as a pose. Extended
+// fingers are straight with a natural spread, folded fingers curl as in a
+// fist, an extended thumb swings out of the palm and a folded one rests
+// across the folded fingers nearest to it. So "middle only" and "index and
+// little" are data, not code: fingerSetPose(['middle']) and
+// fingerSetPose(['index', 'little']).
+const EXTENDED_SPREAD = { index: 10, middle: 0, ring: 8, little: 16 };
+const FOLDED = { index: [88, 0, 100, 68], middle: [90, 0, 100, 70], ring: [90, 0, 100, 70], little: [88, 0, 98, 68] };
+
+export function setPoseName(set) {
+  const on = new Set(set);
+  for (const d of on) if (!['thumb', ...FINGERS].includes(d)) throw new Error(`unknown digit ${d}`);
+  return `set:${['thumb', ...FINGERS].filter((d) => on.has(d)).join('+') || 'none'}`;
+}
+
+export function fingerSetPose(set) {
+  const on = new Set(set);
+  const folded = FINGERS.filter((f) => !on.has(f));
+  const pose = hand((F, T) => {
+    for (const f of FINGERS) {
+      if (on.has(f)) F(f, 0, EXTENDED_SPREAD[f], 0, 0);
+      else F(f, ...FOLDED[f]);
+    }
+    if (on.has('thumb')) {
+      // All fingers folded: the thumb stands up (thumbs up); otherwise it
+      // swings out in the palm plane.
+      if (folded.length === FINGERS.length) T(-29, 4, -5, -5);
+      else T(-29, -10, 0, 0);
+    } else if (folded.length === 0) {
+      T(52, 0, 45, 50);
+    } else {
+      T(44, 8, 38, 45);
+    }
+  });
+  // Extended fingers are held straight on purpose against their folded
+  // neighbours.
+  pose.effort = {};
+  for (const f of FINGERS) if (on.has(f)) pose.effort[f] = 1;
+  // The thumb rests on the folded fingers nearest to it: the first run of
+  // folded fingers from the index side, at most two.
+  const rest = [];
+  if (!on.has('thumb')) {
+    for (const f of FINGERS) {
+      if (on.has(f)) { if (rest.length) break; continue; }
+      rest.push(f);
+      if (rest.length === 2) break;
+    }
+  }
+  return { pose, thumbRest: rest };
+}
+
+// Counting 1 to 5 in both common styles.
+export const COUNTING = {
+  index: [['index'], ['index', 'middle'], ['index', 'middle', 'ring'], ['index', 'middle', 'ring', 'little'], ['thumb', 'index', 'middle', 'ring', 'little']],
+  thumb: [['thumb'], ['thumb', 'index'], ['thumb', 'index', 'middle'], ['thumb', 'index', 'middle', 'ring'], ['thumb', 'index', 'middle', 'ring', 'little']],
+};
+
+export function countPoseName(n, style = 'index') {
+  if (!COUNTING[style]) throw new Error(`counting style is 'index' or 'thumb', got ${style}`);
+  if (!Number.isInteger(n) || n < 0 || n > 5) throw new Error(`count must be 0 to 5, got ${n}`);
+  return n === 0 ? setPoseName([]) : setPoseName(COUNTING[style][n - 1]);
+}
