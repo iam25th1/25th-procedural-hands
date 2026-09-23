@@ -1,0 +1,124 @@
+// Named hand poses as per joint data, in degrees. flex positive toward the
+// palm; abd positive spreads away from the middle finger (thumb: radial
+// abduction). dip null means it follows the PIP through the coupling.
+import { deg } from './math.js';
+import { FINGERS } from './skeleton.js';
+import { emptyHandPose } from './fingers.js';
+
+function hand(spec) {
+  const p = emptyHandPose();
+  const F = (f, mcp, abd, pip, dip = null) => { p[f].mcp = [deg(mcp), deg(abd)]; p[f].pip = deg(pip); p[f].dip = dip == null ? null : deg(dip); };
+  const T = (cmcFlex, cmcAbd, mcp, ip, twist = 0, mcpAbd = 0) => { p.thumb.cmc = [deg(cmcFlex), deg(cmcAbd), deg(twist)]; p.thumb.mcp = [deg(mcp), deg(mcpAbd)]; p.thumb.ip = deg(ip); };
+  spec(F, T, p);
+  return p;
+}
+
+const fingerSpread = { index: 1, middle: 0, ring: 1, little: 1 };
+
+export const POSES = {
+  // Relaxed hand: fingers gently curled, thumb resting beside the index.
+  relaxed: hand((F, T) => {
+    F('index', 18, 3, 24); F('middle', 22, 0, 30); F('ring', 26, 2, 34); F('little', 28, 6, 36);
+    T(12, 8, 12, 12);
+  }),
+  open: hand((F, T) => {
+    for (const f of FINGERS) F(f, 0, 0, 0, 0);
+    // Flat hand: the thumb lies close to the palm plane, swept out radially.
+    T(-12, -12, 0, 0);
+  }),
+  spread: hand((F, T) => {
+    F('index', 0, 18, 0, 0); F('middle', 0, 0, 0, 0); F('ring', 0, 12, 0, 0); F('little', 0, 24, 0, 0);
+    T(-29, -10, 0, 0);
+  }),
+  // Fist with the thumb outside, wrapped across the index and middle.
+  fist: hand((F, T) => {
+    F('index', 88, 0, 100, 68); F('middle', 90, 0, 100, 70); F('ring', 90, 0, 100, 70); F('little', 88, 0, 98, 68);
+    T(48, 8, 40, 55);
+  }),
+  point: hand((F, T) => {
+    F('index', 0, 0, 0, 0); F('middle', 85, 0, 100, 68); F('ring', 90, 0, 100, 70); F('little', 88, 0, 98, 68);
+    T(38, 6, 34, 45);
+  }),
+  // Thumb and index tips meet; the other three stay open and a little spread.
+  ok: hand((F, T) => {
+    F('index', 48, 4, 62, 45); F('middle', 8, 0, 12); F('ring', 6, 4, 10); F('little', 4, 10, 8);
+    T(40, 38, 26, 22);
+  }),
+  thumbsUp: hand((F, T) => {
+    F('index', 88, 0, 100, 68); F('middle', 90, 0, 100, 70); F('ring', 90, 0, 100, 70); F('little', 88, 0, 98, 68);
+    T(-29, 4, -5, -5);
+  }),
+  v: hand((F, T) => {
+    F('index', 0, 16, 0, 0); F('middle', 0, -14, 0, 0); F('ring', 90, 0, 100, 70); F('little', 88, 0, 98, 68);
+    T(44, 8, 38, 45);
+  }),
+  count1: hand((F, T) => {
+    F('index', 0, 0, 0, 0); F('middle', 88, 0, 100, 68); F('ring', 90, 0, 100, 70); F('little', 88, 0, 98, 68);
+    T(44, 8, 38, 45);
+  }),
+  count2: hand((F, T) => {
+    F('index', 0, 10, 0, 0); F('middle', 0, -8, 0, 0); F('ring', 90, 0, 100, 70); F('little', 88, 0, 98, 68);
+    T(44, 8, 38, 45);
+  }),
+  count3: hand((F, T) => {
+    F('index', 0, 12, 0, 0); F('middle', 0, 0, 0, 0); F('ring', 0, 10, 0, 0); F('little', 88, 0, 98, 68);
+    T(44, 8, 38, 45);
+  }),
+  count4: hand((F, T) => {
+    F('index', 0, 12, 0, 0); F('middle', 0, 0, 0, 0); F('ring', 0, 8, 0, 0); F('little', 0, 16, 0, 0);
+    T(52, 0, 45, 50);
+  }),
+  count5: hand((F, T) => {
+    F('index', 0, 16, 0, 0); F('middle', 0, 0, 0, 0); F('ring', 0, 10, 0, 0); F('little', 0, 22, 0, 0);
+    T(-29, -10, 0, 0);
+  }),
+  // Hook: fingers curled at PIP and DIP, MCP nearly straight (carrying a bag handle).
+  hook: hand((F, T) => {
+    F('index', 12, 0, 82, 55); F('middle', 14, 0, 86, 58); F('ring', 14, 0, 86, 58); F('little', 12, 2, 80, 54);
+    T(20, 5, 25, 20);
+  }),
+  // Lateral pinch: thumb pad presses the side of the index middle phalanx.
+  lateral: hand((F, T) => {
+    F('index', 42, 0, 62, 42); F('middle', 55, 0, 78, 52); F('ring', 62, 0, 84, 56); F('little', 64, 2, 84, 56);
+    T(22, 6, 30, 42);
+  }),
+  // Pre-shapes for the grasp solver (the solver curls from here to contact).
+  preCylinder: hand((F, T) => {
+    F('index', 30, 2, 30); F('middle', 30, 0, 32); F('ring', 32, 1, 34); F('little', 34, 3, 36);
+    T(10, 40, 5, 5);
+  }),
+  preSphere: hand((F, T) => {
+    F('index', 20, 10, 25); F('middle', 22, 0, 28); F('ring', 24, 8, 30); F('little', 26, 16, 32);
+    T(15, 50, 10, 10);
+  }),
+  prePinch: hand((F, T) => {
+    F('index', 30, 2, 40); F('middle', 55, 0, 70, 48); F('ring', 62, 2, 80, 54); F('little', 66, 4, 84, 56);
+    T(28, 36, 12, 8);
+  }),
+  // Index and middle pads side by side (index adducted, middle toward the index, middle flexed a little more so the pads line up).
+  // Index and middle curled enough that the object sits in front of the
+  // palm at the thumb's reach; the thumb starts opposed and nearly straight.
+  // Open hand with the thumb raised out of the palm plane, so a flat sachet
+  // can slide across the palm under it before the thumb comes down on top.
+  preSachet: hand((F, T) => {
+    for (const f of FINGERS) F(f, 4, 0, 6, 4);
+    T(10, 35, 10, 10);
+  }),
+  preTripod: hand((F, T) => {
+    F('index', 50, -3, 60); F('middle', 56, 3, 64); F('ring', 62, 2, 80, 54); F('little', 66, 4, 84, 56);
+    T(40, 10, 20, 20);
+  }),
+  // Just let go of the pouch: thumb and index sprung open, others loose.
+  released: hand((F, T) => {
+    F('index', 6, 8, 14, 6); F('middle', 30, 0, 38); F('ring', 36, 2, 44); F('little', 38, 6, 46);
+    T(-18, 20, -4, -6);
+  }),
+  // Open, ready to receive: used at the start of grabs (anticipation).
+  ready: hand((F, T) => {
+    F('index', 5, 8, 8); F('middle', 6, 0, 10); F('ring', 8, 6, 12); F('little', 10, 12, 14);
+    T(-15, 12, 0, 0);
+  }),
+};
+
+export const POSE_NAMES = Object.keys(POSES);
+export { fingerSpread };
