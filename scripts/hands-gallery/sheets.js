@@ -31,7 +31,10 @@ export const CORE = [
   },
   {
     key: '03-gestures', title: 'Gestures: fist, open, spread, point, OK, thumbs up, V, beckon, wave',
-    frames: ['fist', 'open', 'spread', 'point', 'ok', 'thumbsUp', 'v', 'beckon', 'wave'].map((g) => hands(g, { hand: 'both', gesture: g, cam: 'front', t: ['beckon', 'wave'].includes(g) ? 0.6 : 0 })),
+    // OK from the front hides its ring behind the fingers: that one is a right hand at three-quarter.
+    frames: ['fist', 'open', 'spread', 'point', 'ok', 'thumbsUp', 'v', 'beckon', 'wave'].map((g) => (g === 'ok'
+      ? hands('ok, three-quarter', { hand: 'right', gesture: g, cam: 'three' })
+      : hands(g, { hand: 'both', gesture: g, cam: 'front', t: ['beckon', 'wave'].includes(g) ? 0.6 : 0 }))),
   },
   {
     key: '04-pinch-tripod', title: 'Pad pinch and tripod on three sizes',
@@ -59,10 +62,12 @@ export const CORE = [
   {
     key: '12-slingshot', title: 'Slingshot draw and release',
     frames: [
-      ...[0, 0.5, 1.0, 1.4].map((t) => ({ name: `draw ${t.toFixed(2)} s`, params: { scene: 'slingshot', action: 'draw', t, cam: 'orbit' } })),
-      ...[0.05, 0.15, 0.4, 1.0].map((t) => ({ name: `release ${t.toFixed(2)} s`, params: { scene: 'slingshot', action: 'release', t, cam: 'orbit' } })),
-      { name: 'full draw, first person', params: { scene: 'slingshot', action: 'fullDrawHold', t: 0.5, cam: 'fp' } },
-      { name: 'release, first person', params: { scene: 'slingshot', action: 'release', t: 0.1, cam: 'fp' } },
+      ...[0, 0.7, 1.4].map((t) => ({ name: `draw ${t.toFixed(2)} s`, params: { scene: 'slingshot', action: 'draw', t, cam: 'orbit' } })),
+      // The release is fast: frames 25 ms apart through the snap, so the strip shows it move, not jump.
+      ...[0.05, 0.075, 0.1, 0.125, 0.15, 0.4, 1.0].map((t) => ({ name: `release ${t.toFixed(3)} s`, params: { scene: 'slingshot', action: 'release', t, cam: 'orbit' } })),
+      // From above: first person lines the drawing hand up with the fork, so the draw reads as overlap there.
+      { name: 'full draw, from above', params: { scene: 'slingshot', action: 'fullDrawHold', t: 0.5, cam: 'orbit', yaw: 1.35, pitch: 1.1 } },
+      { name: 'release, from above', params: { scene: 'slingshot', action: 'release', t: 0.1, cam: 'orbit', yaw: 1.35, pitch: 1.1 } },
     ],
   },
 ];

@@ -260,8 +260,8 @@ export const SCENARIOS = {
     ],
   },
   throwCatch: {
-    label: 'Throw and catch', group: 'manipulation', station: 'ledge', duration: 5.4,
-    setup: (c) => { c.state.catchPoint = c.P(-0.2, -0.3, -0.33); },
+    label: 'Throw and catch', group: 'manipulation', station: 'ledge', duration: 4.8,
+    setup: (c) => { c.state.catchPoint = c.P(-0.09, -0.3, -0.31); },
     keys: [
       ...pick(0, 'right', (c) => c.body('ball'), 'spherical', DOWN, { lift: 0.08 }),
       // Turn palm up, ball cupped, and ready the catching hand.
@@ -271,8 +271,8 @@ export const SCENARIOS = {
       [2.2, aim('right', [-0.02, -0.16, -0.34], PALM_UP)],
       [2.32, (c) => { c.hands.release('right'); c.hands.planCatch('left', c.body('ball'), 'spherical', { hint: c.rot('left', ...PALM_UP), near: c.state.catchPoint }); }],
       [2.4, home('right')],
-      ...place(3.7, 'left', 'ball'),
-      [4.9, home('left')],
+      // Caught: the left hand brings the ball up and holds it, clear of the iron on the table.
+      [3.2, carryTo('left', [-0.1, -0.24, -0.3])],
     ],
   },
   slipHeavy: {

@@ -20,3 +20,15 @@ Cosmetic nits from the gallery review, not blocking this run. Each line names th
 - cap-inHandRoll (desktop): the near forearm crosses much of the frame during the roll.
 - 12 slingshot first person: the drawing hand's thumbnail is large and close in the release frame.
 - cap-hook, grips-hands-scene: the thumb rests straight up along the strap instead of relaxed.
+- 01 anatomy: a crease at the thumb base in the side and three-quarter views.
+- 02 counting: folded fingers read as dark stubs; the extended thumb is stiff and flat with a seam at its base.
+- 03 gestures: in thumbs up the thumb reads as a separate peg; beckon fingers are only half curled at the frame's moment.
+- 04 pinch and tripod: the stone is mostly hidden inside the hand in some frames; the three stone sizes are hard to tell apart at sheet scale.
+- 05 power and spherical: the folded forearm with a rounded elbow reads as a stump at powerGrip 1.60 s; a dark post crosses the left edge on wide screens.
+- 06 two-hand and handover: the right hand is mostly hidden behind the box at twoHand 2.50 s and 3.20 s.
+- 07 grab, carry, place: the lift is only just off the table; the strip ends before the release.
+- 08 throw and catch: the ball is in the air for only about two frames of the strip.
+- 09 push and drag: the pushing hand is seen edge on, its fingertips standing above the crate outline; the idle hand stays curled against its sleeve.
+- 10 props: the switch toggle's change of state is small at sheet scale.
+- 11 climb: the sleeve top looks crumpled when it turns upright at 9.30 s.
+- 12 slingshot: the stone stays on the ground, so the pouch is drawn empty; the fork turns a lot at release 1.00 s.
