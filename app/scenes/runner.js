@@ -30,11 +30,14 @@ export function createSandbox({ seed = 1, station = 'ledge', reducedMotion = fal
 const MAX_WAIT = 2; // seconds a script may wait in all
 
 // Play a scenario: returns a player with step() and the timeline state.
-export function startScenario(id, { seed = 1, reducedMotion = false, sandbox = null } = {}) {
+// planSource: answers costly solves from a recorded run (see plans.js); it
+// is attached before the settling steps so the whole run goes through it.
+export function startScenario(id, { seed = 1, reducedMotion = false, sandbox = null, planSource = null } = {}) {
   const sc = SCENARIOS[id];
   if (!sc) throw new Error(`unknown scenario ${id}`);
   const sb = sandbox || createSandbox({ seed, station: sc.station, reducedMotion });
   const ctx = makeContext(sb, sc);
+  if (planSource) sb.hands.interaction.planSource = planSource;
   // Let the world settle before the first key.
   for (let i = 0; i < 12; i++) sb.hands.step();
   const t0 = sb.hands.time;
@@ -66,8 +69,8 @@ export function startScenario(id, { seed = 1, reducedMotion = false, sandbox = n
   return player;
 }
 
-export function runScenario(id, { seed = 1, onStart = null, onStep = null, reducedMotion = false } = {}) {
-  const p = startScenario(id, { seed, reducedMotion });
+export function runScenario(id, { seed = 1, onStart = null, onStep = null, reducedMotion = false, planSource = null } = {}) {
+  const p = startScenario(id, { seed, reducedMotion, planSource });
   if (onStart) onStart(p);
   while (!p.done) {
     p.step();

@@ -11,7 +11,7 @@ import * as THREE from '/vendor/three.module.js';
 import { animate, set } from '/vendor/anime.esm.js';
 import { createView } from '/render/view.js';
 import { Clock } from '/hands/src/clock.js';
-import { createController, SCENE_LABELS, setSkinTone } from './controllers.js';
+import { createController, SCENE_LABELS, setSkinTone, setPlanTable } from './controllers.js';
 import { MONK_TONES, DEFAULT_SKIN_TONE } from '/hands/src/index.js';
 import { createRecorder } from './recorder.js';
 import { attachInput } from './input.js';
@@ -56,6 +56,11 @@ export function startApp({ canvas, shot }) {
   let skin = load('skin', DEFAULT_SKIN_TONE);
   if (!MONK_TONES.some((t) => t.id === skin)) skin = DEFAULT_SKIN_TONE;
   setSkinTone(skin);
+  // The recorded plan table, in the background: a scripted run started once
+  // it is here skips its costly solves (same results, no stall). Without it
+  // (stale, missing, offline) every solve runs live.
+  let planLoaded = false;
+  fetch('/scenes/plans.json').then((r) => (r.ok ? r.json() : null)).then((t) => { if (t) { setPlanTable(t); planLoaded = true; } }).catch(() => {});
   let bucket = aspectBucket(screenAspect());
   let flash = null; // { text, kind, until } a short note in the status line
   let lastResult = null;
@@ -75,6 +80,7 @@ export function startApp({ canvas, shot }) {
     if (recorder.replaying) recorder.cancelReplay();
     state.scene = kind;
     build(kind, state.reduced);
+    resync();
     sceneSeg.set(kind);
     panels.rebuild(kind);
     frameCamera();
@@ -85,8 +91,11 @@ export function startApp({ canvas, shot }) {
   function applyAction(a) {
     const r = ctl.dispatch(a);
     if (a.type === 'reduced') setReducedUi(Boolean(a.value));
-    if (r && r.reframe) frameCamera();
+    if (r && r.reframe) { frameCamera(); resync(); }
   }
+  // A scene or scenario was rebuilt: the time that took is not sim time to
+  // make up, so the next frame does not run a burst of catch-up steps.
+  function resync() { clock.discardBacklog(); last = performance.now(); }
 
   function act(action) {
     if (recorder.replaying) { note('Replaying: wait for it to finish'); return; }
@@ -480,6 +489,8 @@ export function startApp({ canvas, shot }) {
     get recording() { return recorder.recording; },
     get replaying() { return recorder.replaying; },
     get result() { return lastResult; },
+    get plansLoaded() { return Boolean(planLoaded); },
+    planStats: () => (ctl.planStats ? ctl.planStats() : null),
     // The camera's position and its own right and up vectors, world space.
     camera() {
       const e = view.camera.matrixWorld.elements;

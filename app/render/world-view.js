@@ -26,8 +26,23 @@ export const PALETTE = {
 
 const KIND_COLOUR = { pebble: null, rock: null, ball: PALETTE.ball, handle: PALETTE.handle, dowel: PALETTE.dowel, card: PALETTE.card, box: PALETTE.box, iron: PALETTE.iron, bag: PALETTE.canvas, crate: PALETTE.woodLight };
 
+// Materials are pooled by their parameters and never disposed with the view:
+// a rebuilt scene reuses them, so their GPU programs stay compiled and the
+// first frame after a switch does not pay for compiling them again.
+const materials = new Map();
+let stoneMat = null;
+function stoneMaterial() {
+  if (!stoneMat) { stoneMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }); stoneMat.userData.shared = true; }
+  return stoneMat;
+}
 function material(color, roughness = 0.8, metalness = 0) {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness });
+  const key = `${color}|${roughness}|${metalness}`;
+  if (!materials.has(key)) {
+    const m = new THREE.MeshStandardMaterial({ color, roughness, metalness });
+    m.userData.shared = true;
+    materials.set(key, m);
+  }
+  return materials.get(key);
 }
 
 function shapeGeometry(s, detail = 1) {
@@ -115,7 +130,7 @@ export function createWorldView(world, { seed = 1 } = {}) {
     node.name = b.name;
     let main;
     if (b.kind === 'pebble' || b.kind === 'rock') {
-      main = new THREE.Mesh(stoneGeometry(b.kind, b.r, stoneSeed++), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }));
+      main = new THREE.Mesh(stoneGeometry(b.kind, b.r, stoneSeed++), stoneMaterial());
     } else {
       const metal = b.kind === 'iron';
       main = new THREE.Mesh(shapeGeometry(b), material(KIND_COLOUR[b.kind] ?? PALETTE.box, metal ? 0.45 : 0.75, metal ? 0.55 : 0));

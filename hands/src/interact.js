@@ -34,6 +34,15 @@ const SLIP_FRAMES = 2;
 const LOOSEN_AFTER = 0.15; // s the fingers stay put after a slip before closing on nothing
 
 // Resolve a grasp target to a world grasp shape (what the solver closes on).
+// The inputs of a plan, as a string: which hand and grip, the object's shape
+// and where it lies, the hint, the grip point and whether to avoid the
+// surroundings. A recorded plan is only used where its fingerprint matches.
+export function planFingerprint(side, grip, obj, hint, at, avoid) {
+  const nums = [obj.pos, obj.rot, hint || [], at].flat();
+  const dims = ['r', 'h', 'hx', 'hy', 'hz', 'round'].map((k) => (typeof obj[k] === 'number' ? obj[k] : ''));
+  return `${side}|${grip}|${obj.shape}|${dims.join(',')}|${avoid ? 1 : 0}|${nums.join(',')}`;
+}
+
 export function targetShape(target) {
   if (target instanceof Body) return target.graspShape();
   if (target && target.body instanceof Body) return partShape(target.body.partWorld(target.part));
@@ -153,7 +162,42 @@ export class Interaction {
   // hint: preferred hand rotation (fingers and palm); at: grip point in the
   // object's frame (a cylinder gripped off centre); approach: metres to stop
   // short along the palm normal.
-  reachPose(side, target, grip, { hint = null, at = [0, 0, 0], avoid = true } = {}) {
+  // A plan source (this.planSource, set by whoever runs a scripted
+  // sequence) can hand back the result of a costly solve it recorded from an
+  // identical earlier run of the same sequence: the solve is skipped and the
+  // result is the same to the last bit. It answers in call order, and only
+  // when the kind and the inputs' fingerprint match; with none set, or no
+  // answer, the solve runs here (and a recording source keeps the result).
+  cached(kind, fp, compute) {
+    const src = this.planSource;
+    if (!src) return compute();
+    const hit = src.take(kind, fp);
+    if (hit !== undefined) return hit;
+    const v = compute();
+    src.put(kind, fp, v);
+    return v;
+  }
+
+  reachPose(side, target, grip, opts = {}) {
+    if (!this.planSource) return this.solveReachPose(side, target, grip, opts);
+    const { hint = null, at = [0, 0, 0], avoid = true } = opts;
+    const obj = targetShape(target);
+    // The object in the answer is the live one, as a fresh solve returns it.
+    const got = this.cached('reachPose', planFingerprint(side, grip, obj, hint, at, avoid), () => {
+      const pose = this.solveReachPose(side, target, grip, opts);
+      return { pos: pose.pos.slice(), rot: pose.rot.slice(), pole: pose.pole ? pose.pole.slice() : null };
+    });
+    const pose = { pos: got.pos.slice(), rot: got.rot.slice(), obj };
+    if (got.pole) pose.pole = got.pole.slice();
+    return pose;
+  }
+
+  // The rig's pre-shape for a grip, through the plan source.
+  preShape(side, obj, grip, env, open) {
+    return this.cached('preShape', `${side}|${grip}|${open}|${[obj.pos, obj.rot].flat().join(',')}|${env.length}`, () => this.rig.preShapePose(side, obj, grip, env, open));
+  }
+
+  solveReachPose(side, target, grip, { hint = null, at = [0, 0, 0], avoid = true } = {}) {
     const obj = targetShape(target);
     if (!obj) throw new Error('reach: unknown target');
     const sk = this.scratch;
@@ -257,6 +301,10 @@ export class Interaction {
   // Deepest the hand, held in `handPose`, reaches into the surroundings or
   // the object anywhere on the straight line from pose + dir * dist in to pose.
   pathCost(side, pose, handPose, envW, dir, dist) {
+    return this.cached('pathCost', `${side}|${[pose.pos, pose.rot, dir].flat().join(',')}|${dist}|${envW.length}`, () => this.solvePathCost(side, pose, handPose, envW, dir, dist));
+  }
+
+  solvePathCost(side, pose, handPose, envW, dir, dist) {
     const sk = this.scratch;
     let worst = 0;
     const obj = { ...pose.obj };
@@ -275,6 +323,10 @@ export class Interaction {
   // (turning as it goes) from wrist pose a to b, its fingers changing from
   // shape sa to sb on the way.
   transitCost(side, a, b, sa, sb, envW) {
+    return this.cached('transitCost', `${side}|${[a.pos, a.rot, b.pos, b.rot].flat().join(',')}|${envW.length}`, () => this.solveTransitCost(side, a, b, sa, sb, envW));
+  }
+
+  solveTransitCost(side, a, b, sa, sb, envW) {
     const sk = this.scratch;
     let worst = 0;
     // Position and turn travel on their own springs, so the turn may be
@@ -406,14 +458,14 @@ export class Interaction {
       : this.reachPose(side, target, grip, { hint, at });
     this.plans[side] = { target, grip, at: now.pos.slice(), pose };
     const envW = this.environment(pose.obj, target);
-    let handPose = open === false ? null : (GRIPS[grip].approachPose || this.rig.preShapePose(side, { ...pose.obj }, grip, this.toScratch(side, pose, envW), open));
+    let handPose = open === false ? null : (GRIPS[grip].approachPose || this.preShape(side, { ...pose.obj }, grip, this.toScratch(side, pose, envW), open));
     // The opened hand must fit round the object where the grip will be: if
     // a digit would already be inside it, open wider.
     if (handPose && !GRIPS[grip].approachPose) {
       const withObj = [...envW, { ...pose.obj }];
       for (const wide of [open * 1.6, open * 2.4]) {
         if (this.pathCost(side, pose, handPose, withObj, [0, 1, 0], 0) <= 0.0006) break;
-        handPose = this.rig.preShapePose(side, { ...pose.obj }, grip, this.toScratch(side, pose, envW), wide);
+        handPose = this.preShape(side, { ...pose.obj }, grip, this.toScratch(side, pose, envW), wide);
       }
     }
     // The straight line in to the grip pose must not sweep the hand through
@@ -433,7 +485,7 @@ export class Interaction {
       let best = null;
       // No clear way in with the hand this open: open it wider (a fist round
       // a thin shaft comes in with the fingers well open).
-      const shapes = GRIPS[grip].approachPose ? [handPose] : [handPose, ...[1.6, 2.4, 3.6].map((k) => () => this.rig.preShapePose(side, { ...pose.obj }, grip, this.toScratch(side, pose, envW), open * k))];
+      const shapes = GRIPS[grip].approachPose ? [handPose] : [handPose, ...[1.6, 2.4, 3.6].map((k) => () => this.preShape(side, { ...pose.obj }, grip, this.toScratch(side, pose, envW), open * k))];
       for (let si = 0; si < shapes.length && !(best && best.cost <= 0.0006); si++) {
         const hp = typeof shapes[si] === 'function' ? shapes[si]() : shapes[si];
         for (const d of cands) {

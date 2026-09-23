@@ -29,6 +29,7 @@ The server prints the sandbox URL on this machine and on the local network (open
 | `npm test` | `node --test`: module, physics, server and isolation tests |
 | `npm run hands:check` | The acceptance suite: every check with its worst measured value against its limit |
 | `npm run hands:matrix` | The capability matrix: one row per capability, the checks and sheet that prove it, PASS or FAIL |
+| `npm run hands:plans` | Rebuilds the recorded plan table the sandbox replays scripted actions from (needed after any change to `hands/src` or `app/scenes`; `hands:check` fails while it is stale) |
 | `npm run hands:gallery` | Renders the sheets in a real browser at 390x844, 844x390 and 1440x900 into `artifacts/gallery/` |
 | `npm run gate` | check, test, hands:check, hands:matrix and `npm audit --audit-level=high`: every commit passes it |
 

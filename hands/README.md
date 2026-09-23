@@ -140,9 +140,19 @@ A grasp contact is a phalanx capsule (segment $a\,b$, radius $r$) touching the o
 
 $$ -\delta_{\text{squish}} \le d(\mathbf p) - r \le 0.3\,\text{mm}, \qquad d = \min_{\mathbf p \in [a,b]} \operatorname{sdf}_{\text{object}}(\mathbf p), \quad \delta_{\text{squish}} = 0.45\,\text{mm} $$
 
+## Recorded plans
+
+The grasp search (where the hand grips an object, how it pre-shapes, which way it comes in and whether the way there is clear) is the costly part of a reach: 0.3 to 2.4 s for one plan in a browser. Run inside one fixed step, that froze the page for as long when a scripted action started. Two things take it off the frame:
+
+- The solver is cheaper with the same results to the last bit: while it probes, only the moving hand's joints are updated, and surroundings a bound shows cannot come within reach are skipped (`envMin` in `grasp.js`). Worst plans fell by about half.
+- `Interaction.planSource` can answer the costly solves (`reachPose`, `preShapePose`, `pathCost`, `transitCost`) from a run recorded earlier. `app/scenes/plans.js` has the recorder and the player; `npm run hands:plans` plays every scenario from the sandbox's seed, reduced motion off and on, and writes `app/scenes/plans.json` (about 235 KB) with the hash of the sources it came from. The dev server serves it only while that hash still matches (`server/plan-hash.js`), so a table from older code is never used. The player answers only while each call matches the recorded one (its kind and a fingerprint of its inputs rounded to 1e-7) and stops at the first difference or as soon as anything outside the script touches the run; from then on every solve runs live.
+
+Under Node a replay is bit for bit the live run, and `hands:check` proves it for every scenario. Two JavaScript engines can round a sine or a power differently in the last bit, so a browser replaying the Node recording sees inputs a few units in the last place away; the fingerprint rounding lets it use the recorded answer, the solve for inputs within 0.1 micrometre.
+
 ## How to add a capability
 
 1. Put what it needs in the sandbox world (`app/scenes/sandbox-world.js`): a body, a static, a prop with its parts, or a rope.
 2. Script it as a scenario in `app/scenes/capabilities.js`: time-keyed calls on the public API (`reach`, `grasp`, `intent`, `carry`, `setDown`, `release`, `moveTo`), in station coordinates. A key that returns `WAIT` holds the script until the hand has arrived.
 3. Say what it must achieve in `app/scenes/expectations.js` (what to measure each frame and what counts as done).
-4. `npm run hands:check` then plays it frame by frame with every clean-play rule (penetration, grip, continuity, contact-only motion, floating) and gives it its own `capability:` row; add it to `scripts/hands-matrix/capabilities.js` with that row and a sheet, and it appears in the sandbox's action palette and matrix panel.
+4. `npm run hands:plans` rebuilds the recorded plan table (below), which every change to `hands/src` or `app/scenes` needs; `hands:check` fails while it is stale.
+5. `npm run hands:check` then plays it frame by frame with every clean-play rule (penetration, grip, continuity, contact-only motion, floating) and gives it its own `capability:` row; add it to `scripts/hands-matrix/capabilities.js` with that row and a sheet, and it appears in the sandbox's action palette and matrix panel.

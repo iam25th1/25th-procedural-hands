@@ -63,6 +63,7 @@ House rules: CLAUDE.md applies in full (security first; no em dashes anywhere; l
 - Move camera uses a direct mapping, on touch and mouse alike: drag right and the camera moves right, left moves left, up moves up, down moves down (in first person the view turns right and looks up). Settings has Invert X, Invert Y and a sensitivity slider, all defaulting to that direct mapping. The camera moves only from user input.
 - Mobile first: touch drags the hand target, buttons are at least 44 px, portrait and landscape both lay out cleanly, nothing sits under the notch or the home indicator.
 - Tokens: Tar #15171A panels, Lagos Yellow #F2B705 primary accent, Chalk #F1F0EB text, Zinc #8C969B secondary, Pepper #D63A26 alerts. Alfa Slab One for display, Barlow Condensed 600/800 for UI with tabular numbers. No ALL-CAPS eyebrow labels, middle-dot meta strings or arrows in button text.
+- Switching actions never stalls the page: the costly grasp search runs from a recorded plan table built from the current sources (served only while it matches them, with a check that every scenario replays bit for bit), so a switch costs at most one missed frame; scene rebuilds reuse arm meshes and GPU materials, and the clock does not rush to make up the time a rebuild took.
 - One injected clock drives everything (pause, single step, speed) with seeded randomness, plus a shot mode (URL params for scene, capability, time, camera angle, UI hidden) so any frame renders identically for screenshots.
 
 === COMMIT 7 - Checks, matrix, gallery, docs ===

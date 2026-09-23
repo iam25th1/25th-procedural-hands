@@ -12,6 +12,7 @@ import { createThreeView } from '/hands/src/three-view.js';
 import { SLEEVE_COLOURS, DEFAULTS } from '/hands/src/defaults.js';
 import { createWorldView } from '/render/world-view.js';
 import { createSandbox, startScenario } from '/scenes/runner.js';
+import { planPlayer, planKey } from '/scenes/plans.js';
 import { SCENARIOS } from '/scenes/capabilities.js';
 import { STATIONS } from '/scenes/sandbox-world.js';
 import { createHandsScene, GRIP_OBJECTS } from '/scenes/hands-scene.js';
@@ -24,6 +25,14 @@ const views = new Set(); // every live hands view, to recolour in place
 export function setSkinTone(id) {
   LOOK.skinTone = id;
   for (const v of views) v.recolor({ skinTone: id });
+}
+// The recorded plan table (see app/scenes/plans.js), once it has loaded.
+let planTable = null;
+export function setPlanTable(table) { planTable = table; }
+function plansFor(id, seed, reduced) {
+  if (!planTable || planTable.seed !== seed) return null;
+  const list = planTable.runs[planKey(id, reduced)];
+  return list ? planPlayer(list) : null;
 }
 function lookedAfter(view) { views.add(view); const dispose = view.dispose; view.dispose = () => { views.delete(view); dispose(); }; return view; }
 const sidesOf = (hand) => (hand === 'both' ? ['left', 'right'] : [hand]);
@@ -58,7 +67,7 @@ function disposeTree(obj) {
   obj.traverse((o) => {
     if (o.geometry) o.geometry.dispose();
     const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
-    for (const m of mats) m.dispose();
+    for (const m of mats) if (!m.userData || !m.userData.shared) m.dispose();
   });
 }
 
@@ -196,6 +205,7 @@ function sandboxController({ seed, reducedMotion }) {
   let reduced = reducedMotion;
   let sb = createSandbox({ seed, station: 'ledge', reducedMotion: reduced });
   let player = null;
+  let plans = null; // the plan player of the scenario running, if any
   let worldView = null;
   let handsView = null;
   const group = new THREE.Group();
@@ -215,17 +225,24 @@ function sandboxController({ seed, reducedMotion }) {
   mount();
 
   function apply(a) {
-    if (applyFingers(sb.hands, a)) { if (a.type === 'reduced') reduced = Boolean(a.value); return false; }
+    if (applyFingers(sb.hands, a)) {
+      if (a.type === 'reduced') reduced = Boolean(a.value);
+      // The run has left its script: every later solve runs live.
+      if (plans) plans.stop();
+      return false;
+    }
     switch (a.type) {
       case 'scenario':
         unmount();
-        player = startScenario(a.id, { seed, reducedMotion: reduced });
+        plans = plansFor(a.id, seed, reduced);
+        player = startScenario(a.id, { seed, reducedMotion: reduced, planSource: plans });
         sb = player.sb;
         mount();
         return true;
       case 'station':
         unmount();
         player = null;
+        plans = null;
         sb = createSandbox({ seed, station: a.station, reducedMotion: reduced });
         mount();
         return true;
@@ -238,6 +255,8 @@ function sandboxController({ seed, reducedMotion }) {
     group,
     get hands() { return sb.hands; },
     get station() { return sb.station; },
+    // For the headless checks: how the running scenario's recorded plans went.
+    planStats() { return plans ? { used: plans.used, of: plans.size, stopped: plans.stopped, miss: plans.miss } : null; },
     get status() {
       if (player) return `${player.sc.label}${player.done ? ', done' : ''}`;
       return STATIONS[sb.station].label;

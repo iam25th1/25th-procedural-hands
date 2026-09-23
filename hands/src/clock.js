@@ -46,6 +46,15 @@ export class Clock {
     return steps;
   }
 
+  // Drop wall time that has built up but not yet been stepped (after a
+  // deliberate pause of the page, such as a scene being rebuilt): the sim
+  // carries on from where it is instead of rushing through the backlog.
+  // The frame count and so the timeline are unchanged.
+  discardBacklog() {
+    this.acc = 0;
+    return this;
+  }
+
   step() {
     this.frame += 1;
     this.time = this.frame * STEP;

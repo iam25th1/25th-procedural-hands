@@ -22,6 +22,27 @@ export function makeSkinMaterial() {
   return material;
 }
 
+// Built arm meshes, kept: a mesh is a pure function of the side, the level of
+// detail and the skeleton's rest pose, and building one (loft, nails, skin
+// weights) costs tens of milliseconds, so a scene rebuilt from the same
+// skeleton reuses it. Its arrays are only ever read.
+const meshCache = new Map();
+function cachedArmMesh(skel, side, lod) {
+  const rest = skel.sides[side].joints.map((j) => [j.restWorldPos, j.restWorldRot, j.radius].flat().join(',')).join(';');
+  const key = `${side}|${lod}|${rest}`;
+  if (!meshCache.has(key)) meshCache.set(key, buildArmMesh(skel, side, { lod }));
+  return meshCache.get(key);
+}
+
+// One skin material (and one flat one) for every view: disposing a view never
+// frees it, so the GPU program behind it stays compiled across scene rebuilds
+// instead of being released and compiled again on the next draw.
+let sharedSkin = null;
+let sharedFlat = null;
+const skinMaterial = (flat) => (flat
+  ? (sharedFlat || (sharedFlat = new THREE.MeshBasicMaterial({ vertexColors: true })))
+  : (sharedSkin || (sharedSkin = makeSkinMaterial())));
+
 function armView(skel, side, opts) {
   const joints = skel.sides[side].joints;
   const tmp = new Array(16);
@@ -32,12 +53,12 @@ function armView(skel, side, opts) {
     return bone;
   });
   const skeleton = new THREE.Skeleton(bones);
-  const material = opts.flat ? new THREE.MeshBasicMaterial({ vertexColors: true }) : makeSkinMaterial();
+  const material = skinMaterial(opts.flat);
   let colours = { skinTone: opts.skinTone, shirt: opts.sleeveColour };
   let current = null;
 
   function build(lod) {
-    const mesh = buildArmMesh(skel, side, { lod });
+    const mesh = cachedArmMesh(skel, side, lod);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3));
@@ -80,8 +101,8 @@ function armView(skel, side, opts) {
       current.sm.geometry.attributes.aRough.needsUpdate = true;
     },
     dispose() {
+      // The material is shared (see skinMaterial) and stays.
       current.sm.geometry.dispose();
-      material.dispose();
       skeleton.dispose();
     },
   };

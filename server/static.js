@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { planSourceHash, PLAN_TABLE } from './plan-hash.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -121,6 +122,21 @@ export function createStaticHandler() {
       return send(res, 400, headers, 'Bad request');
     }
     if (pathname === '/healthz') return send(res, 200, headers, 'ok');
+    // The recorded plan table: served only while it was built from the
+    // sources as they are now (see plan-hash.js); otherwise the app solves
+    // every plan itself.
+    if (pathname === '/scenes/plans.json') {
+      let body;
+      try {
+        body = fs.readFileSync(PLAN_TABLE);
+        const table = JSON.parse(body.toString('utf8'));
+        if (table.sourceHash !== planSourceHash()) return send(res, 404, headers, 'Plan table is stale: run npm run hands:plans');
+      } catch {
+        return send(res, 404, headers, 'Not found');
+      }
+      res.writeHead(200, { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': body.length, 'Cache-Control': 'no-cache' });
+      return res.end(req.method === 'HEAD' ? undefined : body);
+    }
     const hit = resolvePath(pathname);
     if (!hit) return send(res, 404, headers, 'Not found');
     fs.stat(hit.file, (err, st) => {

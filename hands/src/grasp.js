@@ -50,6 +50,44 @@ export function capsuleObjectDistance(obj, a, b, r, samples = 6) {
   return best;
 }
 
+// Radius of a sphere round an object's centre that holds all of it.
+export function boundRadius(obj) {
+  switch (obj.shape) {
+    case 'sphere': return obj.r;
+    case 'cylinder': return Math.hypot(obj.r, obj.h);
+    case 'box':
+    case 'pillow': return Math.hypot(obj.hx, obj.hy, obj.hz);
+    default: return Infinity;
+  }
+}
+
+// The least capsuleObjectDistance from a capsule to any of the shapes, with
+// every shape skipped whose bound shows it cannot come under `cutoff`: a
+// signed distance changes by at most the distance moved, so no point of the
+// capsule can be nearer the surface than (its axis to the centre) minus the
+// bound radius minus the capsule radius. Any true minimum below the cutoff
+// comes back exactly; at or above it, the answer is at least the cutoff.
+// shapes: [{ e, R }] with R = boundRadius(e).
+export function envMin(shapes, a, b, r, cutoff = Infinity, samples = 6) {
+  let d = Infinity;
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+  const l2 = ux * ux + uy * uy + uz * uz;
+  for (const { e, R } of shapes) {
+    const lim = Math.min(d, cutoff);
+    // Distance from the shape's centre to the capsule axis (no allocation:
+    // this runs for every shape on every probe of the solver).
+    const p = e.pos;
+    let t = l2 < 1e-12 ? 0 : ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy + (p[2] - a[2]) * uz) / l2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const dx = p[0] - (a[0] + ux * t), dy = p[1] - (a[1] + uy * t), dz = p[2] - (a[2] + uz * t);
+    // 1 nm to spare, so rounding can never skip a shape that counts.
+    if (Math.sqrt(dx * dx + dy * dy + dz * dz) - R - r - 1e-9 >= lim) continue;
+    d = Math.min(d, capsuleObjectDistance(e, a, b, r, samples));
+  }
+  return d;
+}
+export const bounded = (env) => env.map((e) => ({ e, R: boundRadius(e) }));
+
 // Capsules of a hand's other digits (phalanges and metacarpals) that a
 // digit must not pass through. Returns [{ a, b, r, name }].
 export function obstacleCapsules(skel, side, excludeDigit) {
@@ -132,7 +170,7 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null, env = [])
   const grip = GRIPS[gripKey];
   const pose = clonePose(startPose || POSES[prePoseFor(grip, obj)]);
   const contacts = [];
-  const apply = () => { applyChannels(skel, side, poseChannels(pose)); skel.update(); };
+  const apply = () => { applyChannels(skel, side, poseChannels(pose)); skel.updateSide(side); };
   apply();
   if (grip.fixed) return { pose, contacts, gripKey };
 
@@ -158,16 +196,17 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null, env = [])
     contacts.push({ digit: cp.joint.digit, segment: cp.joint.segment, joint: cp.joint.name, point: best.p, depth: -best.d });
   };
 
-  const envDist = (name) => {
+  // The surroundings with their bounds, so far shapes are skipped (exact:
+  // see envMin).
+  const envB = bounded(env);
+  const envDist = (name, cutoff = Infinity) => {
     if (!env.length) return Infinity;
     const cp = capsule(name);
-    let d = Infinity;
-    for (const e of env) d = Math.min(d, capsuleObjectDistance(e, cp.a, cp.b, cp.r));
-    return d;
+    return envMin(envB, cp.a, cp.b, cp.r, cutoff);
   };
   const minDist = (capsNames) => {
     let dmin = Infinity;
-    for (const n of capsNames) dmin = Math.min(dmin, dist(n), envDist(n));
+    for (const n of capsNames) { dmin = Math.min(dmin, dist(n)); dmin = Math.min(dmin, envDist(n, dmin)); }
     return dmin;
   };
   // Curl a channel until the given capsules touch or the limit is hit. The
@@ -448,7 +487,8 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null, env = [])
   if (env.length) {
     for (const digit of ['thumb', ...FINGERS]) {
       const names = digit === 'thumb' ? ['thumb-phalanx-proximal', 'thumb-phalanx-distal'] : ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => `${XR_PREFIX[digit]}-${seg}`);
-      const envDeep = () => { let d = Infinity; for (const n of names) d = Math.min(d, envDist(n)); return Math.max(0, -d - 0.2 * MM); };
+      // Only depths past 0.2 mm count, so shapes that cannot reach that far in are skipped.
+      const envDeep = () => { let d = Infinity; for (const n of names) d = Math.min(d, envDist(n, Math.min(d, -0.2 * MM))); return Math.max(0, -d - 0.2 * MM); };
       if (envDeep() <= 0) continue;
       const lim = (n) => skel.joint(side, n).limits.flex;
       const dofs = digit === 'thumb'
@@ -764,7 +804,7 @@ export function preShape(skel, side, obj, gripKey) {
     for (const f of fingers.length ? fingers : ['index']) { p[f].mcp[0] *= k; p[f].pip *= k; }
     p.thumb.cmc[0] *= k; p.thumb.mcp[0] *= k; p.thumb.ip *= k;
     applyChannels(skel, side, poseChannels(p));
-    skel.update();
+    skel.updateSide(side);
     return p;
   };
   let lo = 0;
@@ -788,7 +828,7 @@ export { clamp, pointSegmentDistance };
 // angles as the clearance allows. Applies the pose on the skeleton side.
 export function settleThumb(skel, side, pose) {
   const out = clonePose(pose);
-  const apply = () => { applyChannels(skel, side, poseChannels(out)); skel.update(); };
+  const apply = () => { applyChannels(skel, side, poseChannels(out)); skel.updateSide(side); };
   apply();
   const cmc = skel.joint(side, 'thumb-metacarpal');
   const mcp = skel.joint(side, 'thumb-phalanx-proximal');
@@ -849,7 +889,7 @@ export function openedGraspPose(skel, side, obj, gripKey, env = [], wide = 1) {
   // finger opening toward the panel a knob sits on stops short of it).
   const envDeep = (digit) => {
     if (!env.length) return 0;
-    applyChannels(skel, side, poseChannels(out)); skel.update();
+    applyChannels(skel, side, poseChannels(out)); skel.updateSide(side);
     const names = digit === 'thumb' ? ['thumb-phalanx-proximal', 'thumb-phalanx-distal'] : ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => `${XR_PREFIX[digit]}-${seg}`);
     let d = Infinity;
     for (const n of names) { const j = skel.joint(side, n); for (const e of env) d = Math.min(d, capsuleObjectDistance(e, j.worldPos, capsuleEnd(j), j.radius)); }
@@ -902,7 +942,7 @@ export function openedGraspPose(skel, side, obj, gripKey, env = [], wide = 1) {
 // band, without pressing more than a millimetre into any digit or the palm.
 export function restThumbOn(skel, side, pose, fingers, obj = null, env = []) {
   const out = clonePose(pose);
-  const apply = () => { applyChannels(skel, side, poseChannels(out)); skel.update(); };
+  const apply = () => { applyChannels(skel, side, poseChannels(out)); skel.updateSide(side); };
   apply();
   const cmc = skel.joint(side, 'thumb-metacarpal');
   const mcp = skel.joint(side, 'thumb-phalanx-proximal');

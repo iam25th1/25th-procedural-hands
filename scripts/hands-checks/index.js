@@ -11,6 +11,7 @@ import { physicsChecks } from './physics.js';
 import { sandboxBudgetChecks } from './sandbox-budget.js';
 import { uiChecks } from './ui.js';
 import { skinChecks } from './skin.js';
+import { planChecks } from './plans.js';
 
 export const CHECKS = [
   ...servedChecks,
@@ -21,6 +22,7 @@ export const CHECKS = [
   ...physicsChecks,
   ...manipulationChecks,
   ...scenarioChecks,
+  ...planChecks,
   ...budgetChecks,
   ...sandboxBudgetChecks,
   ...uiChecks,

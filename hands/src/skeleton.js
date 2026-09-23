@@ -457,6 +457,28 @@ export class Skeleton {
     return this;
   }
 
+  // Forward kinematics for one side only, the same arithmetic as update():
+  // for solvers that move one hand's channels and read only that hand.
+  updateSide(side) {
+    const tq = [0, 0, 0, 1];
+    const tp = [0, 0, 0];
+    for (const j of this.sides[side].joints) {
+      if (!j.parent) {
+        v3.add(j.worldPos, j.restLocalPos, j.localPos);
+        quat.multiply(j.worldRot, j.restLocalRot, j.localRot);
+        continue;
+      }
+      const P = j.parent;
+      v3.add(tp, j.restLocalPos, j.localPos);
+      quat.rotate(tp, P.worldRot, tp);
+      v3.add(j.worldPos, P.worldPos, tp);
+      quat.multiply(tq, j.restLocalRot, j.localRot);
+      quat.multiply(j.worldRot, P.worldRot, tq);
+      quat.normalize(j.worldRot, j.worldRot);
+    }
+    return this;
+  }
+
   // Flattened joint transforms for hashing: world position and rotation.
   transformValues() {
     const out = [];
