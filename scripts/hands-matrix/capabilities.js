@@ -13,6 +13,21 @@ const C = {
   limits: 'limits: no joint passes its limit (poses and 10000 seeded blends)',
 };
 
+// Manipulation and physics checks (npm run hands:check).
+const S = (label) => `capability: ${label}`;
+const M = {
+  pen: 'manipulation: no hand to object penetration beyond 1 mm in any capability scenario',
+  grasps: 'manipulation: every grasp a scenario asks for takes hold',
+  grip: 'manipulation: a held object never leaves the grip (contacts within 2 mm, the hand on what it follows within 5 mm)',
+  climb: 'climbing: at least one hand attached from the first grip to the last letting go',
+  contact: 'contact: pushed and pulled objects move only through contact, and nothing at rest floats',
+  continuity: 'continuity: every scenario under 20 rad/s per joint, wrist under 4 cm a frame, no self-penetration over 1 mm, inside limits',
+  strength: 'strength: too heavy a load or too hard a jerk slips, the fingers come off it; nothing else slips',
+  weight: 'weight: a heavier load lowers the wrist further (pebble < rock < iron shot)',
+  replay: 'determinism: a scripted 30 s sandbox run hashes identically when replayed',
+  solver: 'budget: solver time per frame with the sandbox loaded (hands, interaction and world)',
+};
+
 export const CAPABILITIES = [
   { group: 'fingers', name: 'Curl 0 to 1 per finger', checks: [C.fullRange], sheet: 'fingers-control' },
   { group: 'fingers', name: 'Curl 0 to 1 per joint', checks: [C.fullRange], sheet: 'fingers-control' },
@@ -30,4 +45,35 @@ export const CAPABILITIES = [
     ['Point', '03-gestures'], ['OK', '03-gestures'], ['Thumbs up', '03-gestures'], ['V', '03-gestures'], ['Beckon', '03-gestures'],
     ['Wave', '03-gestures'], ['Finger drum', 'gestures-all'], ['Pebble roll', 'gestures-all'],
   ].map(([name, sheet]) => ({ group: 'gestures', name, checks: [C.gestures], sheet })),
+  // Grasp and manipulation (commit 4).
+  { group: 'manipulation', name: 'Grab', checks: [S('Grab, lift, carry, place'), M.grasps], sheet: '07-grab-carry-place' },
+  { group: 'manipulation', name: 'Hold under motion', checks: [S('Grab, lift, carry, place'), M.grip], sheet: '07-grab-carry-place' },
+  { group: 'manipulation', name: 'Carry', checks: [S('Grab, lift, carry, place')], sheet: '07-grab-carry-place' },
+  { group: 'manipulation', name: 'Place', checks: [S('Grab, lift, carry, place'), M.contact], sheet: '07-grab-carry-place' },
+  { group: 'manipulation', name: 'Release', checks: [S('Grab, lift, carry, place'), M.pen], sheet: '07-grab-carry-place' },
+  { group: 'manipulation', name: 'Throw', checks: [S('Throw and catch')], sheet: '08-throw-catch' },
+  { group: 'manipulation', name: 'Catch', checks: [S('Throw and catch')], sheet: '08-throw-catch' },
+  { group: 'grips', name: 'Pad pinch', checks: [S('Pad pinch on three sizes')], sheet: '04-pinch-tripod' },
+  { group: 'grips', name: 'Tripod', checks: [S('Tripod on three sizes')], sheet: '04-pinch-tripod' },
+  { group: 'grips', name: 'Lateral pinch', checks: [S('Lateral pinch')], sheet: 'cap-lateralPinch' },
+  { group: 'grips', name: 'Hook', checks: [S('Hook: a bag by its strap')], sheet: 'cap-hook' },
+  { group: 'grips', name: 'Power cylinder grip', checks: [S('Power grip on a handle')], sheet: '05-power-spherical' },
+  { group: 'grips', name: 'Spherical grip', checks: [S('Spherical grip on a ball')], sheet: '05-power-spherical' },
+  { group: 'manipulation', name: 'Two-hand grip on one object', checks: [S('Two-hand grip on one box')], sheet: '06-two-hand-handover' },
+  { group: 'manipulation', name: 'Handover between hands', checks: [S('Handover between hands')], sheet: '06-two-hand-handover' },
+  { group: 'manipulation', name: 'In-hand roll', checks: [S('In-hand roll')], sheet: 'cap-inHandRoll' },
+  { group: 'manipulation', name: 'In-hand spin', checks: [S('In-hand spin')], sheet: 'cap-inHandSpin' },
+  { group: 'props', name: 'Press a button', checks: [S('Press a button')], sheet: '10-props' },
+  { group: 'props', name: 'Flip a switch', checks: [S('Flip a switch')], sheet: '10-props' },
+  { group: 'props', name: 'Pull a lever', checks: [S('Pull a lever')], sheet: '10-props' },
+  { group: 'props', name: 'Turn a knob', checks: [S('Turn a knob')], sheet: '10-props' },
+  { group: 'props', name: 'Open and close a drawer', checks: [S('Open and close a drawer')], sheet: '10-props' },
+  { group: 'props', name: 'Push a crate', checks: [S('Push a crate'), M.contact], sheet: '09-push-drag' },
+  { group: 'props', name: 'Drag a crate', checks: [S('Drag a crate'), M.contact], sheet: '09-push-drag' },
+  { group: 'climbing', name: 'Hang from a rung', checks: [S('Hang from a rung'), M.climb], sheet: 'cap-hang' },
+  { group: 'climbing', name: 'Climb hand over hand', checks: [S('Climb hand over hand'), M.climb], sheet: '11-climb' },
+  { group: 'climbing', name: 'Hold a rope', checks: [S('Hold a rope'), M.climb], sheet: 'cap-rope' },
+  { group: 'strength', name: 'Grip strength and slip', checks: [M.strength, S('Slip: too heavy for the grip'), S('Slip: accelerated too hard')], sheet: 'cap-slipHeavy' },
+  { group: 'strength', name: 'Weight reads in the arms', checks: [M.weight], sheet: 'cap-slipJerk' },
+  { group: 'manipulation', name: 'Every manipulation clean: no penetration, grips hold, continuous', checks: [M.pen, M.grip, M.continuity], sheet: '07-grab-carry-place' },
 ];

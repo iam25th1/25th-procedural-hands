@@ -95,8 +95,10 @@ export const POSES = {
     F('index', 20, 10, 25); F('middle', 22, 0, 28); F('ring', 24, 8, 30); F('little', 26, 16, 32);
     T(15, 50, 10, 10);
   }),
+  // Fingers that take no part in a pinch fold in tight, so they stay clear
+  // of the surface a small object is picked from.
   prePinch: hand((F, T) => {
-    F('index', 30, 2, 40); F('middle', 55, 0, 70, 48); F('ring', 62, 2, 80, 54); F('little', 66, 4, 84, 56);
+    F('index', 30, 2, 28); F('middle', 80, 0, 98, 66); F('ring', 86, 2, 100, 68); F('little', 86, 4, 98, 66);
     T(28, 36, 12, 8);
   }),
   // Index and middle pads side by side (index adducted, middle toward the index, middle flexed a little more so the pads line up).
@@ -109,7 +111,7 @@ export const POSES = {
     T(10, 35, 10, 10);
   }),
   preTripod: hand((F, T) => {
-    F('index', 50, -3, 60); F('middle', 56, 3, 64); F('ring', 62, 2, 80, 54); F('little', 66, 4, 84, 56);
+    F('index', 30, -3, 18, 8); F('middle', 34, 3, 20, 10); F('ring', 86, 2, 100, 68); F('little', 86, 4, 98, 66);
     T(40, 10, 20, 20);
   }),
   // Just let go of the pouch: thumb and index sprung open, others loose.
@@ -122,6 +124,18 @@ export const POSES = {
   drum: hand((F, T) => {
     F('index', 28, 4, 48); F('middle', 30, 0, 50); F('ring', 30, 3, 48); F('little', 28, 8, 44);
     T(8, 10, 10, 10);
+  }),
+  // Flat hand for pressing on a face: fingers almost straight, the thumb
+  // alongside the index.
+  press: hand((F, T) => {
+    F('index', 4, 2, 6); F('middle', 4, 0, 6); F('ring', 4, 1, 6); F('little', 4, 4, 6);
+    T(-20, -42, 2, 2);
+  }),
+  // Flat fingers with the thumb tucked alongside: reaching over a handle to
+  // hook it.
+  flat: hand((F, T) => {
+    F('index', 12, 0, 4, 2); F('middle', 14, 0, 4, 2); F('ring', 14, 0, 4, 2); F('little', 12, 2, 4, 2);
+    T(-8, -12, 4, 4);
   }),
   // Open, ready to receive: used at the start of grabs (anticipation).
   ready: hand((F, T) => {

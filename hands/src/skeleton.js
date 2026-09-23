@@ -226,6 +226,19 @@ export function buildSide(side, offset = 0) {
   return { side, joints, byName };
 }
 
+// Far end of a digit bone's collision capsule. The tip joint sits on the
+// skin at the end of the finger (WebXR), so a distal phalanx capsule ends one
+// radius short of it: its rounded end then meets the skin instead of
+// reaching past the fingertip.
+export function capsuleEnd(j, out = [0, 0, 0]) {
+  const c = j.children[0].worldPos;
+  if (j.segment !== 'phalanx-distal') return v3.copy(out, c);
+  const d = [c[0] - j.worldPos[0], c[1] - j.worldPos[1], c[2] - j.worldPos[2]];
+  const L = Math.hypot(d[0], d[1], d[2]) || 1;
+  const k = Math.max(0, L - j.radius) / L;
+  return v3.set(out, j.worldPos[0] + d[0] * k, j.worldPos[1] + d[1] * k, j.worldPos[2] + d[2] * k);
+}
+
 // Pose rotation from channels: q = Rz(twist) * Ry(abd) * Rx(-flex), with abd
 // and twist mirrored for the left side so the same numbers mean the same
 // anatomical motion on both hands.
@@ -417,6 +430,8 @@ export class Skeleton {
       j.channels.flex = 0; j.channels.abd = 0; j.channels.twist = j.twistOffset || 0;
       quat.identity(j.localRot);
       v3.set(j.localPos, 0, 0, 0);
+      // The arm solver's pronation branch memory belongs to the pose being reset.
+      j.lastPronation = undefined;
     }
     return this.update();
   }
@@ -463,7 +478,7 @@ export class Skeleton {
       if (j.kind !== 'hand' || !j.digit || j.segment === 'tip') continue;
       const child = j.children[0];
       if (!child) continue;
-      out.push({ joint: j, a: j.worldPos, b: child.worldPos, r: j.radius, digit: j.digit, segment: j.segment, side });
+      out.push({ joint: j, a: j.worldPos, b: capsuleEnd(j), r: j.radius, digit: j.digit, segment: j.segment, side });
     }
     return out;
   }

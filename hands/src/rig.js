@@ -13,9 +13,9 @@ import { Spring } from './springs.js';
 import { POSES, fingerSetPose } from './poses.js';
 import { poseChannels, clonePose, DIGIT_OF_JOINT, fingerControlChannels, enslaveNeighbours } from './fingers.js';
 import { solveArm, handRotation } from './ik.js';
-import { solveGrasp, placeObject, attachToHand, attachedWorld, preShape, settleThumb, restThumbOn, openedGraspPose, GRIPS } from './grasp.js';
+import { solveGrasp, placeObject, attachToHand, attachedWorld, preShape, settleThumb, restThumbOn, openedGraspPose, capsuleObjectDistance, GRIPS } from './grasp.js';
 import { deg } from './math.js';
-import { guardThumb, guardFingers } from './selfcontact.js';
+import { guardThumb, guardFingers, guardEnvironment } from './selfcontact.js';
 
 // Poses solved as grips on a virtual object rather than authored angles.
 export const POSE_GRIPS = {
@@ -68,7 +68,11 @@ export function resolveNamedPose(side, name) {
 
 // Spring stiffness per channel family (rad/s). Fingers settle a little after
 // the wrist and arm because they are softer.
+const FINGER_MAX_RATE = 22; // rad/s
 export const OMEGA = { finger: 24, thumb: 26, wristSwing: 30, armPos: 16, armRot: 18, layer: 12 };
+// Weight reads in the arms: metres of wrist drop per newton carried, capped.
+export const LOAD_SAG = 0.0022;
+export const LOAD_SAG_MAX = 0.07;
 export const SECONDARY_LAG = 0.022; // seconds of wrist angular velocity that leaks into finger flexion
 
 const HAND_CHANNEL_JOINTS = [
@@ -104,7 +108,7 @@ export function defaultArmTargets() {
 // Critically damped spring on orientation: the error is the rotation vector
 // from the current to the target orientation, integrated semi implicitly,
 // with the angular speed capped so a large turn stays continuous.
-class RotSpring {
+export class RotSpring {
   constructor(omega, q) {
     this.w = omega;
     this.q = q.slice();
@@ -146,6 +150,12 @@ class ArmState {
     this.reactSprings = [0, 0, 0].map(() => new Spring(OMEGA.armPos * 1.5, 0)); // reaction offset (jump, land, crouch, dash, flinch)
     this.last = null;
     this.follow = null; // () => { pos, rot, pole? }: the wrist tracks this exactly (a hand holding a shared object or a fixed rung)
+    this.load = 0; // newtons carried: weight reads in the arm
+    this.sag = new Spring(8, 0);
+    // Busy hands hold still: idle sway and finger drift fade out while the
+    // hand reaches for, holds or works something, and fade back after.
+    this.calm = new Spring(6, 0);
+    this.envPush = [0, 0, 0]; // held off a surface the hand would pass into (set by the world interaction)
   }
   set(target, snap = false) {
     if (target.pos) { this.target.pos = target.pos.slice(); this.pos.forEach((s, i) => { s.target = target.pos[i]; if (snap) s.snap(target.pos[i]); }); }
@@ -164,6 +174,9 @@ class ArmState {
       const t = this.follow();
       if (t) this.set(t, true);
     }
+    this.sag.target = Math.min(LOAD_SAG_MAX, LOAD_SAG * this.load);
+    this.sag.step(dt);
+    this.calm.step(dt);
     for (const s of this.pos) s.step(dt);
     for (const s of this.poleSprings) s.step(dt);
     for (const s of this.reactSprings) s.step(dt);
@@ -172,7 +185,10 @@ class ArmState {
   smoothedPos() {
     if (this.follow) return [this.pos[0].x, this.pos[1].x, this.pos[2].x];
     const r = this.react;
-    return [this.pos[0].x + this.offset[0] + r[0], this.pos[1].x + this.offset[1] + r[1], this.pos[2].x + this.offset[2] + r[2]];
+    // A carried load lowers the wrist and draws it in toward the body.
+    const sag = this.sag.x;
+    const e = this.envPush;
+    return [this.pos[0].x + this.offset[0] + r[0] + e[0], this.pos[1].x + this.offset[1] + r[1] - sag + e[1], this.pos[2].x + this.offset[2] + r[2] + 0.4 * sag + e[2]];
   }
   smoothedRot() { return this.rot.q.slice(); }
 }
@@ -185,7 +201,8 @@ class HandState {
     this.springs = {};
     for (const name of HAND_CHANNEL_JOINTS) {
       const w = name.startsWith('thumb') ? OMEGA.thumb : OMEGA.finger;
-      this.springs[name] = { flex: new Spring(w, 0), abd: new Spring(w, 0), twist: new Spring(w, 0) };
+      // A finger never snaps faster than a real one closes (about 15 rad/s).
+      this.springs[name] = { flex: new Spring(w, 0, FINGER_MAX_RATE), abd: new Spring(w, 0, FINGER_MAX_RATE), twist: new Spring(w, 0, FINGER_MAX_RATE) };
     }
     this.base = clonePose(POSES.relaxed);
     this.attached = null; // { obj, attachment, gripKey, contacts }
@@ -233,6 +250,8 @@ export class Rig {
   setBody(pos) {
     v3.copy(this.body, pos);
     for (const side of ['left', 'right']) v3.copy(this.skel.joint(side, 'shoulder').localPos, pos);
+    // The arm solve reads the shoulders where they are now, not a step ago.
+    this.skel.update();
   }
 
   // Temporarily stiffen a hand's finger springs (release window) or restore.
@@ -324,11 +343,26 @@ export class Rig {
     return h.attached;
   }
 
+  // Grasp an object where it is: no re-placement. The closure starts from
+  // the pose the hand already holds (a pre-shape set while reaching) and the
+  // object is attached with its actual transform in the wrist frame, so the
+  // moment of contact never moves it.
+  graspWhere(side, obj, key, { startPose = null, env = [] } = {}) {
+    const h = this.hands[side];
+    const start = startPose || clonePose(h.base);
+    const result = solveGrasp(this.skel, side, obj, key, start, env);
+    h.base = result.pose;
+    h.attached = { obj: { ...obj }, attachment: attachToHand(this.skel, side, obj), gripKey: key, contacts: result.contacts, preShape: null, pose: clonePose(result.pose) };
+    this.step(0);
+    return h.attached;
+  }
+
   // The scaled pre-shape a grasp will start from, so an action can move the
   // hand there first and the grasp then closes from exactly that pose.
-  preShapePose(side, obj, gripKey) {
+  preShapePose(side, obj, gripKey, env = [], wide = 1) {
     this.scratch = this.scratch || new Skeleton();
-    return openedGraspPose(this.scratch, side, obj, gripKey);
+    this.scratch.reset();
+    return openedGraspPose(this.scratch, side, obj, gripKey, env, wide);
   }
 
   // Where a grasp of this object would place it, in the wrist frame, from
@@ -487,8 +521,10 @@ export class Rig {
 
   // Idle life: slow breathing sway on the arms and tiny finger drift, damped
   // under reduced motion. Strain tremor at full draw adds a fast small jitter.
+  setBusy(side, busy) { this.arms[side].calm.target = busy ? 1 : 0; }
+
   idleOffsets(side) {
-    const k = (this.reduced ? 0.25 : 1) * this.idle.amount;
+    const k = (this.reduced ? 0.25 : 1) * this.idle.amount * (1 - this.arms[side].calm.x);
     const t = this.time;
     const ph = this.phases;
     const arm = this.arms[side];
@@ -572,7 +608,7 @@ export class Rig {
       if (hand.lastWristRot && dt > 0) {
         const dq = quat.multiply([0, 0, 0, 1], quat.conjugate([0, 0, 0, 1], hand.lastWristRot), wr.worldRot);
         const ang = quat.twistAngle(dq, [1, 0, 0]);
-        lag = clamp((-ang / dt) * SECONDARY_LAG, -deg(10), deg(10)) * (this.reduced ? 0.4 : 1);
+        lag = clamp((-ang / dt) * SECONDARY_LAG, -deg(10), deg(10)) * (this.reduced ? 0.4 : 1) * (1 - arm.calm.x);
       }
       hand.lastWristRot = wr.worldRot.slice();
       hand.lag = lag;
@@ -595,8 +631,21 @@ export class Rig {
       }
       skel.update();
       hand.guarded = guardFingers(skel, side, hand.springs) | guardThumb(skel, side, hand.springs);
+      // Surfaces around the hand (set by whoever owns a world).
+      if (this.environment) hand.guarded |= guardEnvironment(skel, side, hand.springs, this.environment(side));
+      else if (hand.attached) {
+        // No world around the hand: still, the fingers closing on what it
+        // holds stop at its surface.
+        const held = this.attachedObject(side);
+        hand.guarded |= guardEnvironment(skel, side, hand.springs, [{ distance: (a, b, r) => capsuleObjectDistance(held, a, b, r, 8) + 0.0005 }]);
+      }
     }
     skel.update();
+    // A held object turning in the grip (in-hand roll and spin).
+    for (const side of ['left', 'right']) {
+      const a = this.hands[side].attached;
+      if (a && a.spin && dt > 0) a.attachment.rot = quat.normalize([0, 0, 0, 1], quat.multiply([0, 0, 0, 1], a.attachment.rot, quat.fromAxisAngle([0, 0, 0, 1], a.spin.axis, a.spin.rate * dt)));
+    }
     for (const c of this.controllers) if (c.post) c.post(dt, this);
     this.solverMs = globalThis.performance ? performance.now() - t0 : 0;
     return this;

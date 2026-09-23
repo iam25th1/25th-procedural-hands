@@ -60,8 +60,8 @@ export const GESTURES = {
     force: true,
     arm: { pos: [0.17, -0.22, -0.36], finger: [-0.35, 0.1, -0.93], palm: [-0.2, -0.3, -0.9], pole: [0.6, -0.7, 0.05] },
     osc: [
-      { digits: ['thumb'], joints: { cmc: 8 }, channel: 'twist', hz: 1.1, wave: 'sin' },
-      { digits: ['thumb'], joints: { ip: 2 }, hz: 1.1, phase: 1.1, wave: 'sin' },
+      { digits: ['thumb'], joints: { cmc: 3 }, channel: 'twist', hz: 1.1, wave: 'sin' },
+      { digits: ['thumb'], joints: { ip: 1 }, hz: 1.1, phase: 1.1, wave: 'sin' },
       { digits: ['index'], joints: { mcp: -0.5 }, hz: 1.1, wave: 'sin' },
       { digits: ['index'], joints: { mcp: 0.5 }, channel: 'abd', hz: 1.1, phase: Math.PI / 2, wave: 'sin' },
       { digits: ['index'], joints: { dip: 2 }, hz: 1.1, phase: 0.9, wave: 'sin' },

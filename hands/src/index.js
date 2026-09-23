@@ -13,9 +13,13 @@ import { Rig, defaultArmTargets } from './rig.js';
 import { STEP } from './clock.js';
 import { GRIPS, gripFor } from './grasp.js';
 import { handRotation } from './ik.js';
-import { v3, quat } from './math.js';
-import { FINGERS, DIGITS } from './skeleton.js';
+import { v3, quat, hashNumbers } from './math.js';
+import { FINGERS, DIGITS, Skeleton as SkeletonClass, XR_PREFIX } from './skeleton.js';
+import { poseChannels, applyChannels } from './fingers.js';
+import { handCapsules as handCapsulesOf } from './measure.js';
 import { DEFAULTS, OBJECTS, SKIN_TONES, SLEEVE_COLOURS } from './defaults.js';
+import { World, Body, Prop, Rope } from './physics.js';
+import { Interaction, targetShape } from './interact.js';
 import { POSES, COUNTING, countPoseName, setPoseName, fingerSetPose } from './poses.js';
 import { GESTURES, registerGesture, compileGesture, isDynamic, gestureChannels, gestureArm } from './gestures.js';
 
@@ -40,6 +44,9 @@ export class Hands {
     this.options = o;
     this.rig = new Rig({ seed: o.seed, reduced: o.reducedMotion, targets: o.targets || null });
     this.listeners = new Map(EVENTS.map((e) => [e, new Set()]));
+    // A physics world to act on: pass one, or true for a fresh one.
+    this.world = o.world === true ? new World({ seed: o.seed }) : (o.world || null);
+    this.interaction = this.world ? new Interaction(this, this.world, { strength: o.strength ?? 1 }) : null;
     this.acc = 0;
     this.disposed = false;
   }
@@ -72,7 +79,16 @@ export class Hands {
   }
   step() {
     this.assertLive();
+    if (this.bodyMove) {
+      const m = this.bodyMove;
+      const u = Math.min(1, (this.rig.time + STEP - m.t0) / m.dur);
+      const k = u * u * (3 - 2 * u);
+      this.rig.setBody(v3.lerp([0, 0, 0], m.from, m.to, k));
+      if (u >= 1) this.bodyMove = null;
+    }
+    if (this.interaction) this.interaction.pre(STEP);
     this.rig.step(STEP);
+    if (this.interaction) this.interaction.post(STEP);
     return this;
   }
 
@@ -146,7 +162,7 @@ export class Hands {
         continue;
       }
       this.rig.clearLayer(side, 'gesture');
-      if (entry.object) {
+      if (entry.object && !this.rig.hands[side].attached) {
         this.release(side);
         this.rig.setPose(side, this.rig.preShapePose(side, entry.object, entry.grip), { snap: true });
         this.rig.step(0);
@@ -180,7 +196,30 @@ export class Hands {
   // target: { pos: [x,y,z] wrist in world, rot: quaternion of the hand frame
   // (WebXR: -Z along the fingers, -Y out of the palm), pole: elbow hint }.
   setTarget(hand, target, { snap = false } = {}) {
-    for (const side of sidesOf(hand)) this.rig.setArmTarget(side, target, { snap });
+    for (const side of sidesOf(hand)) {
+      if (this.interaction) this.interaction.via[side] = null;
+      this.rig.setArmTarget(side, target, { snap });
+    }
+    return this;
+  }
+  // Has the hand got where it was sent (no detour left, wrist within tol
+  // metres of its target and nearly still)?
+  arrived(hand, tol = 0.004) {
+    const side = sidesOf(hand)[0];
+    if (this.interaction && this.interaction.via[side]) return false;
+    const a = this.rig.arms[side];
+    const w = this.rig.skel.joint(side, 'wrist').worldPos;
+    const speed = Math.hypot(...a.pos.map((s) => s.v));
+    // Near the target and nearly still; or stopped as close as the arm can get.
+    return (v3.dist(w, a.target.pos) <= tol && speed < 0.05) || (speed < 0.005 && v3.dist(w, a.target.pos) <= 0.03);
+  }
+  // Move a free hand to a wrist pose along a way clear of what is around it
+  // (in a world); without a world this is setTarget.
+  moveTo(hand, target) {
+    for (const side of sidesOf(hand)) {
+      if (this.interaction) this.interaction.moveTo(side, target);
+      else this.rig.setArmTarget(side, target);
+    }
     return this;
   }
   // Point the hand: fingers along fingerDir, palm facing palmDir.
@@ -189,12 +228,25 @@ export class Hands {
     const a = this.rig.arms[hand];
     return { pos: a.target.pos.slice(), rot: a.target.rot.slice(), pole: a.target.pole.slice() };
   }
-  setBody(pos) { this.rig.setBody(pos); return this; }
+  setBody(pos) { this.bodyMove = null; this.rig.setBody(pos); return this; }
+  // Move the body anchor (both shoulders) to pos over `seconds`, eased:
+  // hanging, pulling up a rung. The camera never follows it on its own.
+  moveBody(pos, seconds = 1) {
+    this.bodyMove = { from: this.rig.body.slice(), to: pos.slice(), t0: this.rig.time, dur: Math.max(STEP, seconds) };
+    return this;
+  }
+  // A busy hand holds still: idle sway and finger drift fade out.
+  setBusy(hand, busy) { for (const side of sidesOf(hand)) this.rig.setBusy(side, busy); return this; }
 
   // Grasp and attachment ----------------------------------------------------
   // Pre-shape to the object, place it in the grip relative to the hand as it
   // is now, close every digit to contact, and attach it.
-  grasp(hand, object, gripType = null) {
+  grasp(hand, object, gripType = null, opts = {}) {
+    if (this.interaction && isWorldTarget(object)) {
+      const key = gripType || gripFor(targetShape(object));
+      if (!GRIPS[key]) throw new Error(`unknown grip ${key}; grips are ${Object.keys(GRIPS).join(', ')}`);
+      return this.interaction.grasp(sidesOf(hand)[0], object, key, opts);
+    }
     const key = gripType || gripFor(object);
     if (!GRIPS[key]) throw new Error(`unknown grip ${key}; grips are ${Object.keys(GRIPS).join(', ')}`);
     const out = [];
@@ -233,6 +285,7 @@ export class Hands {
   release(hand, { velocity = null } = {}) {
     const out = [];
     for (const side of sidesOf(hand)) {
+      if (this.interaction && this.interaction.hold[side]) { out.push(this.interaction.release(side, { velocity })); continue; }
       const obj = this.rig.attachedObject(side);
       if (!obj) continue;
       this.rig.release(side);
@@ -241,15 +294,121 @@ export class Hands {
     }
     return out.length <= 1 ? out[0] || null : out;
   }
-  held(hand) { return this.rig.attachedObject(hand); }
+  held(hand) {
+    // A dragged body is where the physics has it, not where the hand is.
+    const rec = this.interaction && this.interaction.hold[hand];
+    if (rec && rec.tethers) return targetShape(rec.part ? { body: rec.body, part: rec.part } : rec.body);
+    return this.rig.attachedObject(hand);
+  }
+  // What a hand holds in the world: { kind: 'body' | 'prop' | 'rope' | 'fixed', ... } or null.
+  holding(hand) { return this.interaction ? this.interaction.hold[hand] : null; }
+
+  // World interaction -------------------------------------------------------
+  // Reach toward a world target (a Body, { prop, part }, { rope, at } or
+  // { fixed }) so that `grip` will land on it where it lies; pre-shapes the
+  // hand. Returns the wrist pose it aims for.
+  reach(hand, target, grip, opts = {}) {
+    if (!this.interaction) throw new Error('reach needs a world: create({ world })');
+    return this.interaction.reach(sidesOf(hand)[0], target, grip || gripFor(targetShape(target)), opts);
+  }
+  // Carry a held body with every hand on it following the body (two hands on
+  // one object): target { pos, rot } for the body itself.
+  carry(body, target) {
+    if (!this.interaction) throw new Error('carry needs a world: create({ world })');
+    return this.interaction.carry(body, target);
+  }
+  // Hold a hand open and ready where a ball of `radius` will be caught.
+  readyCatch(hand, point, grip = 'spherical', { hint = null, radius = 0.035 } = {}) {
+    return this.reach(hand, { shape: 'sphere', r: radius, pos: point }, grip, { hint });
+  }
+  // Plan and carry out a catch of a free body (see Interaction.planCatch).
+  planCatch(hand, body, grip = 'spherical', opts = {}) {
+    if (!this.interaction) throw new Error('planCatch needs a world: create({ world })');
+    return this.interaction.planCatch(sidesOf(hand)[0], body, grip, opts);
+  }
+  // Where the wrist wants to go while it holds a prop part (the prop is
+  // driven toward it and the hand follows the part); otherwise an IK target.
+  intent(hand, target) {
+    for (const side of sidesOf(hand)) { if (this.interaction) this.interaction.setIntent(side, target); else this.rig.setArmTarget(side, target); }
+    return this;
+  }
   contacts(hand) { const a = this.rig.hands[hand].attached; return a ? a.contacts.slice() : []; }
+
+  // Where a digit's tip is in the wrist frame when the hand holds `pose`
+  // (for aiming a fingertip at a button or a switch), and its pad radius.
+  // A wrist pose that puts a digit's tip (as it is in `pose`) on `point`,
+  // turned as near `rot` as the arm can actually take: the turn is tried as
+  // given, then tilted and rolled a little each way, and the first the arm
+  // reaches without strain wins. Returns { pos, rot, pole }.
+  fingertipPose(hand, pose, point, rot, digit = 'index') {
+    const side = sidesOf(hand)[0];
+    const tl = this.tipLocal(side, pose, digit).tip;
+    const at = (q) => ({ pos: v3.sub([0, 0, 0], point, quat.rotate([0, 0, 0], q, tl)), rot: q });
+    if (!this.interaction) return at(rot);
+    const turn = (q, axis, degs) => quat.normalize([0, 0, 0, 1], quat.multiply([0, 0, 0, 1], quat.fromAxisAngle([0, 0, 0, 1], quat.rotate([0, 0, 0], rot, axis), (degs * Math.PI) / 180), q));
+    const tries = [rot];
+    for (const a of [15, 30, 45]) for (const axis of [[1, 0, 0], [0, 0, 1], [0, 1, 0]]) for (const sgn of [1, -1]) tries.push(turn(rot, axis, sgn * a));
+    let best = null;
+    for (const q of tries) {
+      const p = at(q);
+      const fit = this.interaction.armFit(side, p);
+      const cost = (fit.posErr > 0.002 ? 1 + fit.posErr : 0) * 1000 + (fit.rotErr > 0.02 ? 1 + fit.rotErr : 0) * 1000 + quat.angleBetween(q, rot) * 10 + Math.max(0, 12 - fit.room);
+      if (!best || cost < best.cost) best = { cost, ...p, pole: fit.pole };
+      if (cost < 1) break;
+    }
+    return { pos: best.pos, rot: best.rot, pole: best.pole };
+  }
+
+  tipLocal(hand, pose, digit = 'index') {
+    const side = sidesOf(hand)[0];
+    const sk = this.scratchSkeleton || (this.scratchSkeleton = new SkeletonClass());
+    sk.reset();
+    applyChannels(sk, side, poseChannels(this.rig.resolvePose(side, pose)));
+    sk.update();
+    const pre = digit === 'thumb' ? 'thumb' : XR_PREFIX[digit];
+    const tip = sk.joint(side, `${pre}-tip`);
+    const dist = sk.joint(side, `${pre}-phalanx-distal`);
+    const wr = sk.joint(side, 'wrist');
+    const inv = quat.conjugate([0, 0, 0, 1], wr.worldRot);
+    return {
+      tip: quat.rotate([0, 0, 0], inv, v3.sub([0, 0, 0], tip.worldPos, wr.worldPos)),
+      dir: quat.rotate([0, 0, 0], inv, v3.sub([0, 0, 0], tip.worldPos, dist.worldPos)),
+      radius: dist.radius,
+    };
+  }
+  // Turn a held object in the grip about an axis in its own frame at `rate`
+  // rad/s (in-hand roll and spin); 0 stops it.
+  spin(hand, axis, rate) {
+    for (const side of sidesOf(hand)) {
+      const a = this.rig.hands[side].attached;
+      if (!a) continue;
+      a.spin = rate ? { axis: v3.normalize([0, 0, 0], axis), rate } : null;
+    }
+    return this;
+  }
+
+  // Set down what the hand holds on a surface at height `surface`: the hand
+  // lowers until the object (or a finger under it) meets it, then stops.
+  // surface: a height, or null to set it on whatever is under it.
+  setDown(hand, surface = null, opts = {}) {
+    if (!this.interaction) throw new Error('setDown needs a world: create({ world })');
+    return this.interaction.setDown(sidesOf(hand)[0], { surface, ...opts });
+  }
+  // Lowest point of a hand's digits and palm (for setting things down so the
+  // fingers under an object stop at the surface).
+  lowestPoint(hand) {
+    let lo = Infinity;
+    for (const c of handCapsulesOf(this.rig.skel, hand)) lo = Math.min(lo, c.a[1] - c.r, c.b[1] - c.r);
+    return lo;
+  }
 
   // Read back ---------------------------------------------------------------
   joint(hand, name) {
     const j = this.rig.skel.joint(hand, name);
     return { pos: j.worldPos.slice(), rot: j.worldRot.slice(), channels: { ...j.channels } };
   }
-  hash() { return this.rig.hash(); }
+  // One number for the whole state: every joint, and the world when there is one.
+  hash() { return this.world ? hashNumbers([...this.rig.skel.transformValues(), ...this.world.stateValues()]) : this.rig.hash(); }
 
   // Teardown ----------------------------------------------------------------
   dispose() {
@@ -260,6 +419,10 @@ export class Hands {
     this.rig = null;
   }
   assertLive() { if (this.disposed) throw new Error('hands instance was disposed'); }
+}
+
+function isWorldTarget(o) {
+  return o instanceof Body || Boolean(o && (o.body instanceof Body || o.prop instanceof Prop || o.rope instanceof Rope || o.fixed));
 }
 
 export function create(options = {}) { return new Hands(options); }
@@ -273,4 +436,5 @@ export { buildStone, buildSachet } from './stones.js';
 export { v3, quat, m4, deg, toDeg, hashNumbers } from './math.js';
 export { mulberry32 } from './rng.js';
 export { createThreeView, makeSkinMaterial } from './three-view.js';
+export { World, Body, Prop, Rope, Interaction, targetShape };
 export { limitMargin, penetration, objectPenetration, handCapsules } from './measure.js';

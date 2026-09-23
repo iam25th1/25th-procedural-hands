@@ -29,11 +29,13 @@ export class Spring {
     const e = Math.exp(-w * dt);
     let x = this.target + (A + B * dt) * e;
     let v = (B - w * (A + B * dt)) * e;
-    if (Math.abs(v) > this.maxRate) {
+    // Neither the speed at the end of the step nor the distance covered in
+    // it may pass the cap (a stiff spring covers ground fast and ends slow).
+    if (Math.abs(v) > this.maxRate || Math.abs(x - this.x) > this.maxRate * dt) {
       // Move at the capped rate toward where the spring wanted to go.
       const dir = Math.sign(x - this.x) || Math.sign(v);
-      x = this.x + dir * this.maxRate * dt;
-      v = dir * this.maxRate;
+      x = this.x + dir * Math.min(Math.abs(x - this.x), this.maxRate * dt);
+      v = dir * Math.min(Math.abs(v), this.maxRate);
     }
     this.x = x;
     this.v = v;

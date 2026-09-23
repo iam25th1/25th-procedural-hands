@@ -5,6 +5,7 @@
 import { segmentDistance, toDeg } from './math.js';
 import { capsuleObjectDistance } from './grasp.js';
 import { MM } from './anatomy.js';
+import { capsuleEnd } from './skeleton.js';
 
 // Smallest margin (degrees) between every measured channel and its limit;
 // negative means a joint is past its limit.
@@ -32,8 +33,7 @@ export function handCapsules(skel, side) {
   const out = [];
   for (const j of skel.sides[side].joints) {
     if (j.kind !== 'hand' || !j.digit || j.segment === 'tip') continue;
-    const c = j.children[0];
-    out.push({ a: j.worldPos, b: c.worldPos, r: j.radius, digit: j.digit, segment: j.segment, name: j.name, side });
+    out.push({ a: j.worldPos, b: capsuleEnd(j), r: j.radius, digit: j.digit, segment: j.segment, name: j.name, side });
   }
   return out;
 }

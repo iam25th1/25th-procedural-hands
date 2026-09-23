@@ -5,7 +5,7 @@
 // records the contacts and returns the pose plus the object's transform in
 // the hand frame so it can be attached.
 import { v3, quat, clamp, deg, pointSegmentDistance, segmentDistance } from './math.js';
-import { FINGERS, XR_PREFIX } from './skeleton.js';
+import { FINGERS, XR_PREFIX, capsuleEnd } from './skeleton.js';
 import { POSES } from './poses.js';
 import { clonePose, poseChannels, applyChannels } from './fingers.js';
 import { MM } from './anatomy.js';
@@ -56,8 +56,7 @@ export function obstacleCapsules(skel, side, excludeDigit) {
   const out = [];
   for (const j of skel.sides[side].joints) {
     if (j.kind !== 'hand' || !j.digit || j.segment === 'tip' || j.digit === excludeDigit) continue;
-    const c = j.children[0];
-    out.push({ a: j.worldPos, b: c.worldPos, r: j.radius, name: j.name });
+    out.push({ a: j.worldPos, b: capsuleEnd(j), r: j.radius, name: j.name });
   }
   return out;
 }
@@ -79,14 +78,22 @@ export function objectRadius(obj) {
 
 // Grip types from the taxonomy the rig implements, with the digits that
 // close, the closing order and the pre-shape.
+// capacity: the largest load in newtons the grip holds before the object
+// slips (friction times grip force, design values in the range of measured
+// adult grip and pinch strength: power grip about 300 to 450 N of squeeze,
+// pinches 50 to 100 N, with a skin friction coefficient near 0.8 and a
+// margin because nobody holds at full strength).
 export const GRIPS = {
-  powerCylinder: { pre: 'preCylinder', digits: ['index', 'middle', 'ring', 'little', 'thumb'], taxonomy: 'medium wrap (3)', thumbPad: true, thumbOver: true },
-  spherical: { pre: 'preSphere', digits: ['index', 'middle', 'ring', 'little', 'thumb'], taxonomy: 'power sphere (11)' },
-  tipPinch: { pre: 'prePinch', digits: ['index', 'thumb'], taxonomy: 'tip pinch (24)', tip: true, steer: true },
-  padPinch: { pre: 'prePinch', digits: ['index', 'thumb'], taxonomy: 'palmar pinch (9)', steer: true },
-  tripod: { pre: 'preTripod', digits: ['index', 'middle', 'thumb'], taxonomy: 'tripod (14)', steer: true },
-  lateral: { pre: 'lateral', digits: ['thumb'], taxonomy: 'lateral (16)', steer: true },
-  hook: { pre: 'hook', digits: [], taxonomy: 'hook', fixed: true },
+  powerCylinder: { pre: 'preCylinder', digits: ['index', 'middle', 'ring', 'little', 'thumb'], taxonomy: 'medium wrap (3)', thumbPad: true, thumbOver: true, capacity: 160 },
+  spherical: { pre: 'preSphere', digits: ['index', 'middle', 'ring', 'little', 'thumb'], taxonomy: 'power sphere (11)', capacity: 110 },
+  tipPinch: { pre: 'prePinch', digits: ['index', 'thumb'], taxonomy: 'tip pinch (24)', tip: true, steer: true, capacity: 10 },
+  padPinch: { pre: 'prePinch', digits: ['index', 'thumb'], taxonomy: 'palmar pinch (9)', steer: true, capacity: 16 },
+  tripod: { pre: 'preTripod', digits: ['index', 'middle', 'thumb'], taxonomy: 'tripod (14)', steer: true, capacity: 22 },
+  lateral: { pre: 'lateral', digits: ['thumb'], support: ['index'], taxonomy: 'lateral (16)', steer: true, capacity: 30 },
+  // The hand arrives flat over a handle, then curls its fingers round it.
+  hook: { pre: 'hook', digits: ['index', 'middle', 'ring', 'little'], taxonomy: 'hook', hook: true, capacity: 220, approachPose: 'flat' },
+  // Flat hand pressed on a face: two of these squeeze a box between the palms.
+  press: { pre: 'press', digits: ['index', 'middle', 'ring', 'little'], taxonomy: 'palm press (two-hand squeeze)', capacity: 45 },
 };
 
 // Suggest a grip from shape and size.
@@ -119,7 +126,9 @@ function prePoseFor(grip, obj) {
   return obj && obj.shape === 'pillow' ? 'preSachet' : grip.pre;
 }
 
-export function solveGrasp(skel, side, obj, gripKey, startPose = null) {
+// env: other shapes (the table under an object, its neighbours) the digits
+// stop against without taking hold of them.
+export function solveGrasp(skel, side, obj, gripKey, startPose = null, env = []) {
   const grip = GRIPS[gripKey];
   const pose = clonePose(startPose || POSES[prePoseFor(grip, obj)]);
   const contacts = [];
@@ -129,8 +138,7 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null) {
 
   const capsule = (name) => {
     const j = skel.joint(side, name);
-    const c = j.children[0];
-    return { a: j.worldPos, b: c.worldPos, r: j.radius, joint: j };
+    return { a: j.worldPos, b: capsuleEnd(j), r: j.radius, joint: j };
   };
   const dist = (name) => {
     const cp = capsule(name);
@@ -150,9 +158,16 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null) {
     contacts.push({ digit: cp.joint.digit, segment: cp.joint.segment, joint: cp.joint.name, point: best.p, depth: -best.d });
   };
 
+  const envDist = (name) => {
+    if (!env.length) return Infinity;
+    const cp = capsule(name);
+    let d = Infinity;
+    for (const e of env) d = Math.min(d, capsuleObjectDistance(e, cp.a, cp.b, cp.r));
+    return d;
+  };
   const minDist = (capsNames) => {
     let dmin = Infinity;
-    for (const n of capsNames) dmin = Math.min(dmin, dist(n));
+    for (const n of capsNames) dmin = Math.min(dmin, dist(n), envDist(n));
     return dmin;
   };
   // Curl a channel until the given capsules touch or the limit is hit. The
@@ -190,7 +205,7 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null) {
       // Medium wrap: the thumb lies over the index, which is wrapped round
       // the handle, both thumb phalanges resting on it and neither passing
       // through the handle; the pad is then on the handle through the finger.
-      const r = restThumbOn(skel, side, pose, ['index'], obj);
+      const r = restThumbOn(skel, side, pose, ['index'], obj, env);
       pose.thumb = r.pose.thumb;
       apply();
       if (r.rested) {
@@ -393,7 +408,9 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null) {
     const mid = `${p}-phalanx-intermediate`;
     const dis = `${p}-phalanx-distal`;
     // MCP until any phalanx touches, then PIP (DIP follows), then DIP alone.
-    let r = curl((v) => { pose[digit].mcp[0] = v; }, () => pose[digit].mcp[0], mcpMax, [prox, mid, dis]);
+    // A hook keeps its knuckles where the pre-pose put them and curls only
+    // the PIP and DIP around the handle.
+    let r = grip.hook ? { touched: false } : curl((v) => { pose[digit].mcp[0] = v; }, () => pose[digit].mcp[0], mcpMax, [prox, mid, dis]);
     const proxTouched = r.touched && dist(prox) <= PAD_SQUISH + 0.3 * MM;
     if (!r.touched || proxTouched) {
       r = curl((v) => { pose[digit].pip = v; }, () => pose[digit].pip, pipMax, [mid, dis]);
@@ -413,8 +430,9 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null) {
       if (digit === 'thumb') continue;
       const p = XR_PREFIX[digit];
       const names = [`${p}-phalanx-proximal`, `${p}-phalanx-intermediate`, `${p}-phalanx-distal`];
+      const objDeep = () => { let d = Infinity; for (const n of names) d = Math.min(d, dist(n)); return d; };
       for (const key of ['pip', 'mcp']) {
-        for (let i = 0; i < 40 && minDist(names) < -PAD_SQUISH; i++) {
+        for (let i = 0; i < 40 && objDeep() < -PAD_SQUISH; i++) {
           if (key === 'pip') pose[digit].pip = Math.max(0, pose[digit].pip - STEP / 3);
           else pose[digit].mcp[0] = Math.max(0, pose[digit].mcp[0] - STEP / 3);
           apply();
@@ -423,6 +441,150 @@ export function solveGrasp(skel, side, obj, gripKey, startPose = null) {
       }
     }
     if (!moved) break;
+  }
+  // Surfaces around the object: a digit pressing into the table is moved
+  // whichever way lifts it off (opening a finger that points down would
+  // only push it further in), the least it takes.
+  if (env.length) {
+    for (const digit of ['thumb', ...FINGERS]) {
+      const names = digit === 'thumb' ? ['thumb-phalanx-proximal', 'thumb-phalanx-distal'] : ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => `${XR_PREFIX[digit]}-${seg}`);
+      const envDeep = () => { let d = Infinity; for (const n of names) d = Math.min(d, envDist(n)); return Math.max(0, -d - 0.2 * MM); };
+      if (envDeep() <= 0) continue;
+      const lim = (n) => skel.joint(side, n).limits.flex;
+      const dofs = digit === 'thumb'
+        ? [{ get: () => pose.thumb.mcp[0], set: (v) => { pose.thumb.mcp[0] = v; }, lim: lim('thumb-phalanx-proximal') }, { get: () => pose.thumb.ip, set: (v) => { pose.thumb.ip = v; }, lim: lim('thumb-phalanx-distal') }, { get: () => pose.thumb.cmc[0], set: (v) => { pose.thumb.cmc[0] = v; }, lim: skel.joint(side, 'thumb-metacarpal').limits.flex }]
+        : [
+          { get: () => pose[digit].mcp[0], set: (v) => { pose[digit].mcp[0] = v; }, lim: lim(names[0]) },
+          { get: () => pose[digit].pip, set: (v) => { pose[digit].pip = v; }, lim: lim(names[1]) },
+          { get: () => (pose[digit].dip ?? (2 / 3) * pose[digit].pip), set: (v) => { pose[digit].dip = v; }, lim: lim(names[2]) },
+        ];
+      const objPress = () => { let d = Infinity; for (const n of names) d = Math.min(d, dist(n)); return Math.max(0, -d - PAD_SQUISH); };
+      for (let it = 0; it < 120 && envDeep() > 0; it++) {
+        let best = null;
+        for (const d of dofs) {
+          const cur = d.get();
+          for (const dv of [STEP / 2, -STEP / 2]) {
+            const v = Math.min(d.lim[1], Math.max(d.lim[0], cur + dv));
+            if (v === cur) continue;
+            d.set(v); apply();
+            const c = envDeep() * 50 + objPress() * 50;
+            if (!best || c < best.c) best = { c, d, v };
+            d.set(cur);
+          }
+        }
+        apply();
+        if (!best) break;
+        best.d.set(best.v);
+        apply();
+      }
+    }
+  }
+  // Digits that take no part in the grip keep clear of the object: a finger
+  // opens until it no longer reaches into it, the thumb moves the least it
+  // can to clear it.
+  // Neighbouring fingers pull each other along, so moving a spare finger
+  // must not draw a gripping one off the object: capsules touching now stay
+  // touching.
+  const gripCaps = grip.digits.filter((d) => d !== 'thumb').flatMap((d) => ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => `${XR_PREFIX[d]}-${seg}`)).filter((n) => dist(n) <= PAD_SQUISH + 0.3 * MM);
+  const lifted = () => gripCaps.reduce((a, n) => a + Math.max(0, dist(n) - PAD_SQUISH), 0);
+  for (const digit of ['thumb', ...FINGERS]) {
+    if (grip.digits.includes(digit) || (grip.support || []).includes(digit)) continue;
+    const names = digit === 'thumb' ? ['thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal'] : ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => `${XR_PREFIX[digit]}-${seg}`);
+    // 2.6 mm: a spare finger that grazes a light object on the way in knocks it off its perch.
+    const depth = () => Math.max(0, -minDist(names) + 2.6 * MM) + (digit === 'thumb' ? 0 : lifted());
+    if (depth() <= 0) continue;
+    if (digit !== 'thumb') {
+      // Curl in or open out, whichever takes the finger clear (a spare
+      // finger pointing at the table clears it by curling, not by opening).
+      const p = XR_PREFIX[digit];
+      const lims = ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => skel.joint(side, `${p}-${seg}`).limits.flex);
+      const get = [() => pose[digit].mcp[0], () => pose[digit].pip, () => (pose[digit].dip ?? (2 / 3) * pose[digit].pip)];
+      const set = [(v) => { pose[digit].mcp[0] = v; }, (v) => { pose[digit].pip = v; }, (v) => { pose[digit].dip = v; }];
+      const descend = () => {
+        for (let i = 0; i < 160 && depth() > 0; i++) {
+          let best = null;
+          for (let k = 0; k < 3; k++) {
+            const cur = get[k]();
+            for (const dv of [STEP / 2, -STEP / 2]) {
+              const v = Math.min(lims[k][1], Math.max(lims[k][0], cur + dv));
+              if (v === cur) continue;
+              set[k](v); apply();
+              const d = depth();
+              if (!best || d < best.d) best = { d, k, v };
+              set[k](cur);
+            }
+          }
+          apply();
+          if (!best) break;
+          set[best.k](best.v);
+          apply();
+        }
+        return depth();
+      };
+      // The descent can stall with the finger wrapped under the object; then
+      // start again from a full curl and from a loose, near straight finger
+      // and keep whichever ends clear (or least deep).
+      const from = get.map((g) => g());
+      let best = { d: descend(), v: get.map((g) => g()) };
+      if (best.d > 0) {
+        for (const start of [lims.map((l) => l[1]), lims.map((l) => Math.max(l[0], Math.min(l[1], 0.25)))]) {
+          start.forEach((v, k) => set[k](v)); apply();
+          const d = descend();
+          const v = get.map((g) => g());
+          const moved = v.reduce((a, x, k) => a + Math.abs(x - from[k]), 0);
+          if (d < best.d - 1e-5 || (d <= 0 && best.d <= 0 && moved < best.moved)) best = { d, v, moved };
+        }
+        best.v.forEach((v, k) => set[k](v)); apply();
+      }
+      continue;
+    }
+    const cmc = skel.joint(side, 'thumb-metacarpal');
+    const mcpJ = skel.joint(side, 'thumb-phalanx-proximal');
+    const ipJ = skel.joint(side, 'thumb-phalanx-distal');
+    const start = [pose.thumb.cmc[0], pose.thumb.cmc[1], pose.thumb.mcp[0], pose.thumb.ip];
+    const dofs = [
+      { get: () => pose.thumb.cmc[0], set: (v) => { pose.thumb.cmc[0] = v; }, lim: cmc.limits.flex },
+      { get: () => pose.thumb.cmc[1], set: (v) => { pose.thumb.cmc[1] = v; }, lim: cmc.limits.abd },
+      { get: () => pose.thumb.mcp[0], set: (v) => { pose.thumb.mcp[0] = v; }, lim: mcpJ.limits.flex },
+      { get: () => pose.thumb.ip, set: (v) => { pose.thumb.ip = v; }, lim: ipJ.limits.flex },
+    ];
+    const others = () => obstacleCapsules(skel, side, 'thumb');
+    const selfPen = () => {
+      let d = Infinity;
+      for (const n of ['thumb-phalanx-proximal', 'thumb-phalanx-distal']) { const cp = capsule(n); d = Math.min(d, capsuleSetDistance(others(), cp.a, cp.b, cp.r)); }
+      return Math.max(0, -d - 0.5 * MM);
+    };
+    const cost = () => 400 * depth() / MM + 400 * selfPen() / MM + dofs.reduce((a, d, i) => a + Math.abs(d.get() - start[i]), 0) / deg(1);
+    let best = cost();
+    for (let it = 0; it < 160 && depth() > 0; it++) {
+      let improved = false;
+      for (const d of dofs) {
+        const cur = d.get();
+        let bestV = cur;
+        for (const dv of [STEP, -STEP]) {
+          const v = Math.min(d.lim[1], Math.max(d.lim[0], cur + dv));
+          if (v === cur) continue;
+          d.set(v); apply();
+          const c = cost();
+          if (c < best - 1e-9) { best = c; bestV = v; }
+          d.set(cur);
+        }
+        if (bestV !== cur) { d.set(bestV); apply(); improved = true; }
+      }
+      if (!improved) break;
+    }
+    apply();
+  }
+  // A gripping finger drawn off the object by a spare neighbour closes onto
+  // it again (and the spare one follows it a little: that is the coupling).
+  for (const digit of grip.digits) {
+    if (digit === 'thumb') continue;
+    const p = XR_PREFIX[digit];
+    const caps = ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => `${p}-${seg}`);
+    if (!caps.some((n) => gripCaps.includes(n)) || caps.some((n) => dist(n) <= PAD_SQUISH + 0.3 * MM)) continue;
+    const lim = (n) => skel.joint(side, n).limits.flex[1];
+    const r = curl((v) => { pose[digit].pip = v; }, () => pose[digit].pip, lim(caps[1]), caps);
+    if (!r.touched) curl((v) => { pose[digit].mcp[0] = v; }, () => pose[digit].mcp[0], lim(caps[0]), caps);
   }
   const via = contacts.filter((c) => c.via);
   contacts.length = 0;
@@ -502,18 +664,61 @@ export function placeObject(skel, side, obj, gripKey) {
       const radial = quat.rotate([0, 0, 0], j.worldRot, [-s, 0, 0]);
       const palmar = quat.rotate([0, 0, 0], j.worldRot, [0, -1, 0]);
       const dir = v3.normalize([0, 0, 0], v3.add([0, 0, 0], radial, v3.scale([0, 0, 0], palmar, 0.35)));
-      return { pos: v3.addScaled([0, 0, 0], mid, dir, j.radius + R - 0.0006), rot: [0, 0, 0, 1] };
+      if (obj.shape !== 'box') return { pos: v3.addScaled([0, 0, 0], mid, dir, j.radius + R - 0.0006), rot: [0, 0, 0, 1] };
+      // A flat object (a key) lies with its face on the finger's side, its
+      // long axis out past the knuckles, held near its back end.
+      const fwd = v3.normalize([0, 0, 0], v3.reject([0, 0, 0], quat.rotate([0, 0, 0], wr.worldRot, [0, 0, -1]), dir));
+      // The object's longer flat axis (X or Z) runs out along fwd.
+      const longX = obj.hx > obj.hz;
+      const rot = longX
+        ? quat.fromBasis([0, 0, 0, 1], fwd, dir, v3.cross([0, 0, 0], fwd, dir))
+        : quat.fromBasis([0, 0, 0, 1], v3.cross([0, 0, 0], dir, fwd), dir, fwd);
+      const hold = Math.max(0, (longX ? obj.hx : obj.hz) - 0.009);
+      const pos = v3.addScaled([0, 0, 0], v3.addScaled([0, 0, 0], mid, dir, j.radius + obj.hy - 0.0006), fwd, hold);
+      // The proximal phalanx is thicker than the middle one: the face rests
+      // on whichever side stands out further.
+      for (let k = 0; k < 3; k++) {
+        let deep = 0;
+        for (const seg of ['phalanx-proximal', 'phalanx-intermediate']) {
+          const c = skel.joint(side, `index-finger-${seg}`);
+          deep = Math.max(deep, -capsuleObjectDistance({ ...obj, pos, rot }, c.worldPos, capsuleEnd(c), c.radius));
+        }
+        if (deep <= 0.0006) break;
+        v3.addScaled(pos, pos, dir, deep - 0.0005);
+      }
+      return { pos, rot };
+    }
+    case 'press': {
+      // A flat face against the palm: the object's own Y runs along the palm
+      // normal, its face on the most palmar point of the palm and the thenar
+      // as the hand is shaped now.
+      const half = obj.shape === 'sphere' ? obj.r : (obj.hy ?? R);
+      const inv = quat.conjugate([0, 0, 0, 1], wr.worldRot);
+      let depth = 0.0185;
+      for (const j of skel.sides[side].joints) {
+        if (j.kind !== 'hand' || j.segment !== 'metacarpal') continue;
+        for (const p of [j.worldPos, j.children[0].worldPos]) {
+          const l = quat.rotate([0, 0, 0], inv, v3.sub([0, 0, 0], p, wr.worldPos));
+          depth = Math.max(depth, -l[1] + j.radius);
+        }
+      }
+      return { pos: local(0.002, -(depth + half + 0.0003), -0.066), rot: wr.worldRot.slice() };
     }
     case 'hook': {
-      // A handle across the curled fingers, hanging from the middle phalanges.
-      const a = skel.joint(side, 'index-finger-phalanx-intermediate');
-      const b = skel.joint(side, 'pinky-finger-phalanx-intermediate');
-      const pa = v3.lerp([0, 0, 0], a.worldPos, a.children[0].worldPos, 0.5);
-      const pb = v3.lerp([0, 0, 0], b.worldPos, b.children[0].worldPos, 0.5);
+      // A handle under the proximal phalanges just short of the PIP joints:
+      // the hand arrives with its fingers flat over it, then curls the middle
+      // and end phalanges down round its far side. The PIP joints sit where
+      // the knuckles put them whether the fingers are flat or curled.
+      const a = skel.joint(side, 'index-finger-phalanx-proximal');
+      const b = skel.joint(side, 'pinky-finger-phalanx-proximal');
+      const pa = skel.joint(side, 'index-finger-phalanx-intermediate').worldPos;
+      const pb = skel.joint(side, 'pinky-finger-phalanx-intermediate').worldPos;
       const centre = v3.lerp([0, 0, 0], pa, pb, 0.5);
       const palmar = quat.rotate([0, 0, 0], a.worldRot, [0, -1, 0]);
+      const back = quat.rotate([0, 0, 0], a.worldRot, [0, 0, 1]);
       const axis = v3.normalize([0, 0, 0], v3.sub([0, 0, 0], pb, pa));
-      return { pos: v3.addScaled([0, 0, 0], centre, palmar, a.radius + R - 0.0006), rot: quat.fromTo([0, 0, 0, 1], [0, 0, 1], axis) };
+      const pos = v3.addScaled([0, 0, 0], v3.addScaled([0, 0, 0], centre, palmar, (a.radius + b.radius) / 2 + R + 0.0008), back, R * 0.6);
+      return { pos, rot: quat.fromTo([0, 0, 0, 1], [0, 0, 1], axis) };
     }
     default:
       return { pos: local(0, -0.03, -0.07), rot: [0, 0, 0, 1] };
@@ -593,7 +798,7 @@ export function settleThumb(skel, side, pose) {
     let d = Infinity;
     for (const n of thumbCaps) {
       const j = skel.joint(side, n);
-      d = Math.min(d, capsuleSetDistance(obs, j.worldPos, j.children[0].worldPos, j.radius));
+      d = Math.min(d, capsuleSetDistance(obs, j.worldPos, capsuleEnd(j), j.radius));
     }
     return d;
   };
@@ -631,29 +836,61 @@ export function settleThumb(skel, side, pose) {
 // The pose a hand should be in just before it grasps: the solved contact
 // pose opened by a margin on every closing digit, so the springs then close
 // straight onto the surface without sweeping through the object first.
-export function openedGraspPose(skel, side, obj, gripKey) {
+// env: shapes around the object in the same frame as this skeleton's hand.
+export function openedGraspPose(skel, side, obj, gripKey, env = [], wide = 1) {
   const grip = GRIPS[gripKey];
   const pre = preShape(skel, side, obj, gripKey);
   const placed = placeObject(skel, side, obj, gripKey);
-  const solved = solveGrasp(skel, side, { ...obj, ...placed }, gripKey, pre.pose).pose;
+  const solved = solveGrasp(skel, side, { ...obj, ...placed }, gripKey, pre.pose, env).pose;
   const out = clonePose(solved);
   const open = (v, d, lim) => Math.max(lim[0], v - d);
+  // Each digit opens as far as asked, or as far as the surroundings allow (a
+  // finger opening toward the panel a knob sits on stops short of it).
+  const envDeep = (digit) => {
+    if (!env.length) return 0;
+    applyChannels(skel, side, poseChannels(out)); skel.update();
+    const names = digit === 'thumb' ? ['thumb-phalanx-proximal', 'thumb-phalanx-distal'] : ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => `${XR_PREFIX[digit]}-${seg}`);
+    let d = Infinity;
+    for (const n of names) { const j = skel.joint(side, n); for (const e of env) d = Math.min(d, capsuleObjectDistance(e, j.worldPos, capsuleEnd(j), j.radius)); }
+    return Math.max(0, -d);
+  };
+  const before = clonePose(out);
+  const limitDigit = (digit) => {
+    if (envDeep(digit) <= 0.0002) return;
+    // Back off toward the solved pose until clear.
+    const target = clonePose(out);
+    for (let k = 7; k >= 0; k--) {
+      const u = k / 8;
+      const mix = (a, b) => a + (b - a) * u;
+      if (digit === 'thumb') {
+        out.thumb.cmc = before.thumb.cmc.map((v, i) => mix(v, target.thumb.cmc[i]));
+        out.thumb.mcp = before.thumb.mcp.map((v, i) => mix(v, target.thumb.mcp[i]));
+        out.thumb.ip = mix(before.thumb.ip, target.thumb.ip);
+      } else {
+        out[digit].mcp = before[digit].mcp.map((v, i) => mix(v, target[digit].mcp[i]));
+        out[digit].pip = mix(before[digit].pip, target[digit].pip);
+        if (target[digit].dip != null) out[digit].dip = mix(before[digit].dip ?? (2 / 3) * before[digit].pip, target[digit].dip);
+      }
+      if (envDeep(digit) <= 0.0002) return;
+    }
+  };
   for (const digit of grip.digits) {
     if (digit === 'thumb') {
       const cmc = skel.joint(side, 'thumb-metacarpal');
       const mcp = skel.joint(side, 'thumb-phalanx-proximal');
       const ip = skel.joint(side, 'thumb-phalanx-distal');
-      out.thumb.cmc[0] = open(out.thumb.cmc[0], deg(14), cmc.limits.flex);
+      out.thumb.cmc[0] = open(out.thumb.cmc[0], deg(14) * wide, cmc.limits.flex);
       out.thumb.cmc[1] = Math.min(cmc.limits.abd[1], out.thumb.cmc[1] + deg(8));
-      out.thumb.mcp[0] = open(out.thumb.mcp[0], deg(10), mcp.limits.flex);
-      out.thumb.ip = open(out.thumb.ip, deg(10), ip.limits.flex);
+      out.thumb.mcp[0] = open(out.thumb.mcp[0], deg(10) * wide, mcp.limits.flex);
+      out.thumb.ip = open(out.thumb.ip, deg(10) * wide, ip.limits.flex);
       continue;
     }
     const p = XR_PREFIX[digit];
-    out[digit].mcp[0] = open(out[digit].mcp[0], deg(8), skel.joint(side, `${p}-phalanx-proximal`).limits.flex);
-    out[digit].pip = open(out[digit].pip, deg(12), skel.joint(side, `${p}-phalanx-intermediate`).limits.flex);
-    if (out[digit].dip != null) out[digit].dip = open(out[digit].dip, deg(8), skel.joint(side, `${p}-phalanx-distal`).limits.flex);
+    out[digit].mcp[0] = open(out[digit].mcp[0], deg(8) * wide, skel.joint(side, `${p}-phalanx-proximal`).limits.flex);
+    out[digit].pip = open(out[digit].pip, deg(12) * wide, skel.joint(side, `${p}-phalanx-intermediate`).limits.flex);
+    if (out[digit].dip != null) out[digit].dip = open(out[digit].dip, deg(8) * wide, skel.joint(side, `${p}-phalanx-distal`).limits.flex);
   }
+  for (const digit of grip.digits) limitDigit(digit);
   return out;
 }
 
@@ -662,7 +899,7 @@ export function openedGraspPose(skel, side, obj, gripKey) {
 // descent over CMC sweep and abduction, MCP and IP brings the thumb's two
 // phalanges onto the nearest phalanx of each named finger, inside the pad
 // band, without pressing more than a millimetre into any digit or the palm.
-export function restThumbOn(skel, side, pose, fingers, obj = null) {
+export function restThumbOn(skel, side, pose, fingers, obj = null, env = []) {
   const out = clonePose(pose);
   const apply = () => { applyChannels(skel, side, poseChannels(out)); skel.update(); };
   apply();
@@ -670,7 +907,7 @@ export function restThumbOn(skel, side, pose, fingers, obj = null) {
   const mcp = skel.joint(side, 'thumb-phalanx-proximal');
   const ip = skel.joint(side, 'thumb-phalanx-distal');
   const thumbCaps = ['thumb-phalanx-proximal', 'thumb-phalanx-distal'];
-  const cap = (n) => { const j = skel.joint(side, n); return { a: j.worldPos, b: j.children[0].worldPos, r: j.radius }; };
+  const cap = (n) => { const j = skel.joint(side, n); return { a: j.worldPos, b: capsuleEnd(j), r: j.radius }; };
   const targets = fingers.map((f) => ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map((seg) => `${XR_PREFIX[f]}-${seg}`));
   const distTo = (names) => {
     let d = Infinity;
@@ -684,9 +921,13 @@ export function restThumbOn(skel, side, pose, fingers, obj = null) {
     return d;
   };
   const objDist = () => {
-    if (!obj) return Infinity;
+    if (!obj && !env.length) return Infinity;
     let d = Infinity;
-    for (const tn of thumbCaps) { const t = cap(tn); d = Math.min(d, capsuleObjectDistance(obj, t.a, t.b, t.r)); }
+    for (const tn of [...thumbCaps, 'thumb-metacarpal']) {
+      const t = cap(tn);
+      if (obj && tn !== 'thumb-metacarpal') d = Math.min(d, capsuleObjectDistance(obj, t.a, t.b, t.r));
+      for (const e of env) d = Math.min(d, capsuleObjectDistance(e, t.a, t.b, t.r) + PAD_SQUISH);
+    }
     return d;
   };
   const objective = () => {

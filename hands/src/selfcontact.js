@@ -7,13 +7,14 @@
 // over that digit instead, and the springs carry on from there.
 import { segmentDistance, deg } from './math.js';
 import { MM } from './anatomy.js';
+import { capsuleEnd } from './skeleton.js';
 
 const ALLOW = { 'thumb-phalanx-proximal': 0.7 * MM, 'thumb-phalanx-distal': 1.8 * MM };
 const THUMB = ['thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal'];
 const STEPS = [deg(1.5), deg(0.5)];
 const MAX_ITER = 6;
 
-function capsule(j) { return { a: j.worldPos, b: j.children[0].worldPos, r: j.radius }; }
+function capsule(j) { return { a: j.worldPos, b: capsuleEnd(j), r: j.radius }; }
 
 export function thumbViolation(skel, side) {
   const S = skel.sides[side];
@@ -134,6 +135,75 @@ export function guardFingers(skel, side, springs) {
       sb.abd.x = Math.min(jb.limits.abd[1], Math.max(jb.limits.abd[0], sb.abd.x + db * deg(0.25)));
       sa.abd.v = 0; sb.abd.v = 0;
       set();
+    }
+  }
+  return moved;
+}
+
+// Fingers rest on what they meet: after the springs move a hand, any digit
+// that presses into a static surface (a table, a panel, a rung it is not
+// holding) is opened, joint by joint, the least it takes to lie on it.
+// shapes: [{ distance(a, b, r) -> signed metres }] near the hand.
+const ENV_ALLOW = 0.3 * MM;
+const DIGIT_JOINTS = {
+  thumb: ['thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal'],
+  index: ['index-finger-phalanx-proximal', 'index-finger-phalanx-intermediate', 'index-finger-phalanx-distal'],
+  middle: ['middle-finger-phalanx-proximal', 'middle-finger-phalanx-intermediate', 'middle-finger-phalanx-distal'],
+  ring: ['ring-finger-phalanx-proximal', 'ring-finger-phalanx-intermediate', 'ring-finger-phalanx-distal'],
+  little: ['pinky-finger-phalanx-proximal', 'pinky-finger-phalanx-intermediate', 'pinky-finger-phalanx-distal'],
+};
+
+function digitDepth(skel, side, names, shapes) {
+  let worst = 0;
+  const S = skel.sides[side];
+  for (const n of names) {
+    const j = S.byName.get(n);
+    const a = j.worldPos;
+    const b = capsuleEnd(j);
+    for (const s of shapes) {
+      const d = -s.distance(a, b, j.radius) - ENV_ALLOW;
+      if (d > worst) worst = d;
+    }
+  }
+  return worst;
+}
+
+export function guardEnvironment(skel, side, springs, shapes, skip = {}) {
+  if (!shapes.length) return false;
+  let moved = false;
+  for (const [digit, names] of Object.entries(DIGIT_JOINTS)) {
+    if (skip[digit]) continue;
+    if (digitDepth(skel, side, names, shapes) <= 0) continue;
+    moved = true;
+    const joints = names.map((n) => skel.sides[side].byName.get(n));
+    // Degrees of freedom the guard may use: every flexion, and for the thumb
+    // its palmar abduction at the CMC as well.
+    const dofs = joints.map((j, k) => ({ j, s: springs[names[k]].flex, lim: j.limits.flex }));
+    if (digit === 'thumb') dofs.push({ j: joints[0], s: springs[names[0]].abd, lim: joints[0].limits.abd });
+    const apply = (j) => { const sp = springs[j.name]; skel.setChannels(j, sp.flex.x, sp.abd.x, sp.twist.x); skel.update(); };
+    for (let it = 0; it < 16; it++) {
+      const depth = digitDepth(skel, side, names, shapes);
+      if (depth <= 0) break;
+      // Move whichever joint, either way, lifts the digit off the surface
+      // most (opening a finger that points down would push it further in).
+      let best = null;
+      for (const d of dofs) {
+        const keep = d.s.x;
+        for (const dv of [deg(0.75), -deg(0.75)]) {
+          const v = Math.min(d.lim[1], Math.max(d.lim[0], keep + dv));
+          if (v === keep) continue;
+          d.s.x = v;
+          apply(d.j);
+          const dd = digitDepth(skel, side, names, shapes);
+          if (!best || dd < best.d) best = { d: dd, dof: d, v };
+        }
+        d.s.x = keep;
+        apply(d.j);
+      }
+      if (!best || best.d >= depth) break;
+      best.dof.s.x = best.v;
+      best.dof.s.v = 0;
+      apply(best.dof.j);
     }
   }
   return moved;
