@@ -36,3 +36,6 @@ Cosmetic nits from the gallery review, not blocking this run. Each line names th
 - 07 grab, carry, place: the idle hand rests close to the small iron pieces throughout.
 - 09 push and drag: the idle hand hovers as a loose fist above the crate in every frame.
 - 10 props (phone portrait): the idle left hand is large and cut by the corner in the knob frames.
+- 12 slingshot: the loaded pebble (25 mm) sits inside the pinch, and at release it leaves at about 42 m/s, 2 m down range by the first release frame, so no stone shows at sheet scale.
+- 05 power and spherical: at sphericalGrip 1.70 s the little fingertip rests against the rock lying beside the ball.
+- 06 two-hand and handover: at handover 4.60 s the releasing fingers lie close over the other sleeve.
