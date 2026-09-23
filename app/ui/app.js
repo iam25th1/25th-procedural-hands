@@ -9,7 +9,7 @@
 // choice, Recentre). Nothing animates it.
 import * as THREE from '/vendor/three.module.js';
 import { animate, set } from '/vendor/anime.esm.js';
-import { createView } from '/render/view.js';
+import { createView, fovFor } from '/render/view.js';
 import { Clock } from '/hands/src/clock.js';
 import { createController, SCENE_LABELS, setSkinTone, setPlanTable } from './controllers.js';
 import { MONK_TONES, DEFAULT_SKIN_TONE } from '/hands/src/index.js';
@@ -18,7 +18,7 @@ import { attachInput } from './input.js';
 import { createPanels, TABS } from './panels.js';
 import { cameraSettings, dragOrbit, dragLook, lookDirection } from './camera-map.js';
 import { load, save } from './store.js';
-import { liveSupported, startLive, offlineSupported, probeOffline, renderOffline, videoName, askWhereToSave, saveVideo } from '/capture/video.js';
+import { liveSupported, startLive, offlineSupported, probeOffline, renderOffline, videoName, askWhereToSave, saveVideo, OUTPUT_SIZES } from '/capture/video.js';
 import { el, button, segmented, toggle } from './dom.js';
 import { createPlanner, LOOKAHEAD } from '/plan/planner.js';
 
@@ -437,8 +437,13 @@ export function startApp({ canvas, shot }) {
   // (every frame through WebCodecs at 60 fps).
   let live = null; // { rec, startedAt }
   let rendering = null; // { abort }
-  let offlineProbe = null;
-  if (offlineSupported()) probeOffline().then((p) => { offlineProbe = p; }).catch(() => {});
+  // Which encoder each output size will use, asked ahead of time so a click
+  // can name the file (and ask where to save it) straight away.
+  const offlineProbes = {};
+  if (offlineSupported()) for (const o of OUTPUT_SIZES) probeOffline(o.width, o.height).then((p) => { offlineProbes[o.key] = p; }).catch(() => {});
+  let renderSize = load('videoSize', OUTPUT_SIZES[0].key);
+  if (!OUTPUT_SIZES.some((o) => o.key === renderSize)) renderSize = OUTPUT_SIZES[0].key;
+  const sizeSeg = segmented(OUTPUT_SIZES.map((o) => [o.key, o.label]), renderSize, (v) => { renderSize = v; save('videoSize', v); }, { label: 'Size', className: 'chips' });
   const liveBtn = button('Record video', 'rec', () => (live ? stopLive() : startLiveVideo()));
   liveBtn.disabled = !liveSupported();
   let renderLength = 'action';
@@ -450,6 +455,8 @@ export function startApp({ canvas, shot }) {
     ccBtn.hidden = on;
     capBtn.hidden = !on;
     if (on) capBtn.textContent = text;
+    capBtn.title = rendering ? 'Press to cancel the render' : 'Press to stop recording';
+    capBtn.setAttribute('aria-label', rendering ? `${capBtn.textContent}, press to cancel` : `${capBtn.textContent}, press to stop`);
   }
 
   function startLiveVideo() {
@@ -497,13 +504,15 @@ export function startApp({ canvas, shot }) {
   async function renderVideo() {
     if (live || rendering) return;
     if (recorder.recording || recorder.replaying) { note('Finish recording or replaying actions first', 'alert'); return; }
-    const ext = offlineProbe ? offlineProbe.ext : 'webm';
+    const out = OUTPUT_SIZES.find((o) => o.key === renderSize) || OUTPUT_SIZES[0];
+    const probe = offlineProbes[out.key];
+    const ext = probe ? probe.ext : 'mp4';
     const name = videoName(state.scene, renderLength === 'action' ? actionLabel() : `${renderLength}s`, ext);
-    const handle = await askWhereToSave(name, offlineProbe ? offlineProbe.mime : 'video/webm', ext);
+    const handle = await askWhereToSave(name, probe ? probe.mime : 'video/mp4', ext);
     if (handle === 'cancelled') { note('Not rendered: no place chosen'); return; }
     rendering = { abort: { aborted: false } };
-    setOpen(false, true);
-    view.resize(true);
+    // The camera as the user left it, to put back afterwards.
+    const kept = { orbit: orbit ? { ...orbit, target: orbit.target.slice() } : null, eye, look: { ...look }, framedDist };
     // What to render: this action from its start (played again from the
     // same seed), or a fixed length of the scene as it is now.
     let frames;
@@ -513,16 +522,20 @@ export function startApp({ canvas, shot }) {
     } else {
       frames = (renderLength === 'action' ? 5 : Number(renderLength)) * 60;
     }
-    // Output: the view's shape, long edge 1920 pixels, even sides.
-    const { width, height } = view.size;
-    const k = 1920 / Math.max(width, height);
-    const W = Math.max(2, Math.round((width * k) / 2) * 2);
-    const H = Math.max(2, Math.round((height * k) / 2) * 2);
+    // Output: exactly the chosen size, whatever the view's size on screen or
+    // the control centre's state. The drawing buffer is set to it (the
+    // canvas keeps its place on the page, shown letterboxed meanwhile), the
+    // camera takes that shape and the field of view for it, and nothing is
+    // offset for the top bar: the file has no interface over it.
+    const W = out.width;
+    const H = out.height;
+    canvas.classList.add('rendering');
     view.renderer.setPixelRatio(1);
     view.renderer.setSize(W, H, false);
     view.camera.aspect = W / H;
+    view.camera.fov = fovFor(W / H);
+    view.camera.clearViewOffset();
     view.camera.updateProjectionMatrix();
-    applyViewOffset();
     applyCamera();
     showCapture(true, 'Rendering 0%');
     try {
@@ -530,7 +543,7 @@ export function startApp({ canvas, shot }) {
         canvas,
         frames,
         drawFrame: async () => { await planner.until(clock.frame + 1); clock.step(); ctl.sync(); view.render(); },
-        onProgress: (done, of) => { capBtn.textContent = `Rendering ${Math.floor((done / of) * 100)}%, press to cancel`; panels.showVideo({ mode: 'offline', state: `rendering ${done} of ${of} frames` }); },
+        onProgress: (done, of) => { showCapture(true, `Rendering ${Math.floor((done / of) * 100)}%`); panels.showVideo({ mode: 'offline', state: `rendering ${done} of ${of} frames` }); },
         abort: rendering.abort,
       });
       const how = await saveVideo(file.blob, name, handle);
@@ -542,8 +555,13 @@ export function startApp({ canvas, shot }) {
     } finally {
       rendering = null;
       showCapture(false);
+      canvas.classList.remove('rendering');
       view.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
       view.resize(true);
+      orbit = kept.orbit;
+      eye = kept.eye;
+      look = kept.look;
+      framedDist = kept.framedDist;
       applyViewOffset();
       applyCamera();
       resync();
@@ -566,7 +584,7 @@ export function startApp({ canvas, shot }) {
     seed: () => seed,
   }, drawer);
   panels.setSequenceControls(recBtn, replayBtn);
-  panels.setVideoControls({ liveBtn, lengthSeg: lengthSeg.el, renderBtn, liveOk: liveSupported(), offlineOk: offlineSupported() });
+  panels.setVideoControls({ liveBtn, lengthSeg: lengthSeg.el, sizeSeg: sizeSeg.el, renderBtn, liveOk: liveSupported(), offlineOk: offlineSupported() });
 
   function syncTabs() {
     for (const [key, b] of tabBtns) {

@@ -35,3 +35,4 @@ Cosmetic nits from the gallery review, not blocking this run. Each line names th
 - 10 props (phone portrait): the idle left hand is large and cut by the corner in the knob frames.
 - 05 power and spherical: at sphericalGrip 1.70 s the little fingertip rests against the rock lying beside the ball.
 - 06 two-hand and handover: at handover 4.60 s the releasing fingers lie close over the other sleeve.
+- Interface (phone portrait): a long status note, such as "Downloaded" with a video's file name, runs under Move camera instead of ending in an ellipsis; the top bar's first column grows to fit it. Seen while checking the offline render sizes.

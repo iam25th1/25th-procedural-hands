@@ -41,6 +41,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--tar); 
 h1, h2, h3 { font-family: var(--font-head); font-weight: 400; margin: 0; }
 .view { position: fixed; top: 0; left: 0; width: calc(100vw - var(--stage-right)); height: calc(100dvh - var(--stage-bottom)); display: block; touch-action: none; }
 .ui-hidden .view { width: 100vw; height: 100dvh; }
+/* An offline render draws at the output size, not the view's: shown
+   letterboxed in the view's place meanwhile, never stretched. */
+.view.rendering { object-fit: contain; background: var(--tar); }
 .topbar { position: fixed; top: 0; left: 0; right: var(--stage-right); display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: calc(var(--safe-top) + var(--gap)) calc(var(--safe-right) + var(--gap)) var(--gap) calc(var(--safe-left) + var(--gap)); pointer-events: none; }
 .brand { font-size: 20px; color: var(--yellow); padding: 6px 10px; background: var(--tar); border-radius: var(--radius); }
 .status { margin: 0; padding: 6px 10px; background: var(--tar); border-radius: var(--radius); color: var(--zinc); }

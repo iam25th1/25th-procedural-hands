@@ -8,7 +8,8 @@
 // Offline: the quality path. The scene is stepped off the injected clock one
 // fixed 1/60 s step per frame and every frame goes through a WebCodecs
 // VideoEncoder, whatever the display rate: nothing is dropped and the file
-// is 60 fps. The encoded frames are muxed here (webm.js, mp4.js).
+// is 60 fps, at the output size chosen (OUTPUT_SIZES), whatever the size of
+// the view on screen. The encoded frames are muxed here (webm.js, mp4.js).
 //
 // Files are saved with showSaveFilePicker where the browser has it, else as
 // a download; either way the user chooses what happens to them.
@@ -75,11 +76,23 @@ export function startLive(canvas) {
 
 // Offline ---------------------------------------------------------------------
 
+// The sizes an offline render can be made at, 16:9.
+export const OUTPUT_SIZES = [
+  { key: '1080p', label: '1920 x 1080', width: 1920, height: 1080 },
+  { key: '1440p', label: '2560 x 1440', width: 2560, height: 1440 },
+];
+
+// Tried in order. H.264 in MP4 first: every player opens it, QuickTime
+// included, which opens no WebM at all. VP9 in WebM where there is no H.264
+// encoder, then VP8. Levels fit the size at 60 fps: H.264 5.1 (up to
+// 2560 x 1440 at 60 and beyond), VP9 4.1 up to 1080p60 and 5.0 above.
+// AV1 is not offered here: the browser's AV1 encoder gives no decoder
+// configuration record (av1C), which both WebM and MP4 need for AV1.
 const OFFLINE_CODECS = [
-  { codec: 'vp09.00.41.08', label: 'VP9', container: 'webm', codecId: 'V_VP9', mime: 'video/webm' },
-  { codec: 'avc1.640033', label: 'H.264 High', container: 'mp4', mime: 'video/mp4', avc: true },
-  { codec: 'avc1.4d0033', label: 'H.264 Main', container: 'mp4', mime: 'video/mp4', avc: true },
-  { codec: 'vp8', label: 'VP8', container: 'webm', codecId: 'V_VP8', mime: 'video/webm' },
+  { codec: () => 'avc1.640033', label: 'H.264 High', container: 'mp4', mime: 'video/mp4', avc: true },
+  { codec: () => 'avc1.4d0033', label: 'H.264 Main', container: 'mp4', mime: 'video/mp4', avc: true },
+  { codec: (w, h) => (w * h <= 2228224 ? 'vp09.00.41.08' : 'vp09.00.50.08'), label: 'VP9', container: 'webm', codecId: 'V_VP9', mime: 'video/webm' },
+  { codec: () => 'vp8', label: 'VP8', container: 'webm', codecId: 'V_VP8', mime: 'video/webm' },
 ];
 
 export function offlineSupported() {
@@ -88,10 +101,10 @@ export function offlineSupported() {
 
 async function pickOffline(width, height, bitrate) {
   for (const c of OFFLINE_CODECS) {
-    const config = { codec: c.codec, width, height, bitrate, framerate: FPS, latencyMode: 'quality', ...(c.avc ? { avc: { format: 'avc' } } : {}) };
+    const config = { codec: c.codec(width, height), width, height, bitrate, framerate: FPS, latencyMode: 'quality', ...(c.avc ? { avc: { format: 'avc' } } : {}) };
     try {
       const s = await VideoEncoder.isConfigSupported(config);
-      if (s && s.supported) return { ...c, config: s.config || config };
+      if (s && s.supported) return { ...c, codecString: config.codec, config: s.config || config };
     } catch {
       // Not this one; try the next.
     }
@@ -104,7 +117,7 @@ async function pickOffline(width, height, bitrate) {
 export async function probeOffline(width = 1920, height = 1080) {
   if (!offlineSupported()) return null;
   const pick = await pickOffline(width, height, bitrateFor(width, height));
-  return pick ? { codec: pick.label, mime: pick.mime, ext: pick.container } : null;
+  return pick ? { codec: pick.label, codecString: pick.codecString, mime: pick.mime, ext: pick.container } : null;
 }
 
 // Renders `frames` frames: drawFrame(i) (it may return a promise) steps the scene and draws frame i into
@@ -157,7 +170,7 @@ export async function renderOffline({ canvas, frames, drawFrame, onProgress = ()
     if (!description) throw new Error('the H.264 encoder gave no decoder configuration');
     bytes = muxMp4({ avcC: description, width, height, fps: FPS, frames: out });
   }
-  return { mode: 'offline', codec: pick.label, mime: pick.mime, ext: pick.container, width, height, bitrate, fps: FPS, frames, blob: new Blob([bytes], { type: pick.mime }) };
+  return { mode: 'offline', codec: pick.label, codecString: pick.codecString, mime: pick.mime, ext: pick.container, width, height, bitrate, fps: FPS, frames, blob: new Blob([bytes], { type: pick.mime }) };
 }
 
 // Saving ----------------------------------------------------------------------

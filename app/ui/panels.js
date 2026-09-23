@@ -214,7 +214,7 @@ export function createPanels(app, drawer) {
   }
 
   // Capture ------------------------------------------------------------------
-  const capture = { seqRow: el('div', 'chips'), facts: el('dl', 'facts'), video: group('Video', 'Live records the view as you see it. Offline plays the scene again one 1/60 s step a frame and encodes every frame: 60 fps whatever the display does, nothing dropped. Either way you choose where the file goes.'), videoFacts: el('dl', 'facts') };
+  const capture = { seqRow: el('div', 'chips'), facts: el('dl', 'facts'), video: group('Video', 'Live records the view as you see it. Offline plays the scene again one 1/60 s step a frame and encodes every frame at the size you pick: 60 fps whatever the display does, nothing dropped. Either way you choose where the file goes.'), videoFacts: el('dl', 'facts') };
   function buildCapture() {
     panels.capture.append(capture.video.g);
     const seq = group('Actions', 'Records what you do, not video: every action with the frame it landed on, replayed from the same seed so it plays out exactly.');
@@ -252,12 +252,14 @@ export function createPanels(app, drawer) {
     panels,
     show(tab) { for (const [key] of TABS) panels[key].hidden = key !== tab; handRow.hidden = tab === 'settings' || tab === 'capture'; skinRow.hidden = handRow.hidden; if (tab === 'joints') joints.refresh(); },
     setSequenceControls(...buttons) { capture.seqRow.append(...buttons); },
-    setVideoControls({ liveBtn, lengthSeg, renderBtn, liveOk, offlineOk }) {
+    setVideoControls({ liveBtn, lengthSeg, sizeSeg, renderBtn, liveOk, offlineOk }) {
       const liveRow = el('div', 'chips');
       liveRow.append(liveBtn);
       const offRow = el('div', 'chips');
-      offRow.append(lengthSeg, renderBtn);
-      capture.video.chips.append(el('span', 'label', 'Live'), liveRow, el('span', 'label', 'Offline'), offRow);
+      offRow.append(lengthSeg);
+      const sizeRow = el('div', 'chips');
+      sizeRow.append(sizeSeg, renderBtn);
+      capture.video.chips.append(el('span', 'label', 'Live'), liveRow, el('span', 'label', 'Offline'), offRow, sizeRow);
       if (!liveOk) capture.video.g.append(el('p', 'group-note', 'This browser cannot record the view live.'));
       if (!offlineOk) capture.video.g.append(el('p', 'group-note', 'This browser has no WebCodecs video encoder, so offline rendering is not available.'));
       capture.video.g.append(capture.videoFacts);
@@ -268,7 +270,7 @@ export function createPanels(app, drawer) {
       clear(dl);
       if (!v) return;
       if (v.mode) fact(dl, 'Mode', v.mode === 'live' ? 'Live' : 'Offline, 60 fps, every frame');
-      if (v.codec) fact(dl, 'Codec', `${v.codec} (${v.mime})`);
+      if (v.codec) fact(dl, 'Codec', `${v.codec} (${v.codecString || v.mime}, ${v.mime})`);
       if (v.width) fact(dl, 'Size', `${v.width} x ${v.height}`);
       if (v.bitrate) fact(dl, 'Bitrate', `${(v.bitrate / 1e6).toFixed(1)} Mbit/s`);
       if (v.frames) fact(dl, 'Frames', String(v.frames));

@@ -212,9 +212,21 @@ The control bar at the bottom holds Controls, Pause, Step and the speed. **Contr
 **Video.** The Capture tab records the view two ways, both saved to your device (a save dialog where the browser has one, a download otherwise), named for the scene, the action and the time:
 
 - **Record video** (live) records what you see, as you see it, until you press Stop: `canvas.captureStream` into a `MediaRecorder`, in the most efficient codec the browser records (AV1, then VP9, H.264 High, H.264, VP8) at an explicit high bitrate. The Capture tab shows which codec and bitrate it used.
-- **Render video** (offline) is the quality path: it plays the action again from its start (or 5, 10 or 20 s of the scene as it is), one fixed 1/60 s step per frame off the injected clock, and encodes every frame with WebCodecs, so the file is 60 fps with nothing dropped whatever the display does. VP9 in WebM where the browser encodes it, H.264 in MP4 otherwise; the containers are written by `app/capture/webm.js` and `app/capture/mp4.js`.
+- **Render video** (offline) is the quality path: it plays the action again from its start (or 5, 10 or 20 s of the scene as it is), one fixed 1/60 s step per frame off the injected clock, and encodes every frame with WebCodecs, so the file is 60 fps with nothing dropped whatever the display does. Pick the size, **1920 x 1080** or **2560 x 1440**: the file is exactly that size whatever the size of the view on your screen and whether the control centre is open (the view shows the render letterboxed meanwhile). The containers are written by `app/capture/webm.js` and `app/capture/mp4.js`.
 
-The control centre stays closed while a video is made (it would resize the view); the bar shows the time or the progress, and pressing it stops or cancels. **Record actions** and **Replay actions**, in the same tab, record the actions you take rather than video, and replay them exactly.
+<details>
+<summary>Which codec each path uses, and why</summary>
+
+| Path | Tried in order | In Chromium on a Mac | Why that order |
+| --- | --- | --- | --- |
+| Offline (Render video) | H.264 High in MP4, H.264 Main, VP9 in WebM, VP8 | H.264 High, MP4 | MP4 with H.264 opens in every player, QuickTime included; QuickTime opens no WebM. At 0.2 bits a pixel a frame (capped at 40 Mbit/s) a newer codec buys little. |
+| Live (Record video) | AV1, VP9, H.264 High, H.264, VP8 through MediaRecorder | AV1 in WebM | The most efficient codec the browser records live. VLC and browsers play it; QuickTime does not. |
+
+AV1 is not tried offline. The browser's AV1 encoder gives no decoder configuration record (`av1C`), which both WebM and MP4 need for AV1, so the file could not be written to spec. Levels fit the size at 60 fps: H.264 level 5.1 for both sizes, VP9 level 4.1 up to 1080p and 5.0 above.
+
+</details>
+
+The control centre stays closed while a live recording runs (it would resize what is recorded); an offline render leaves it as it is. The bar shows the time or the progress, and pressing it stops or cancels. **Record actions** and **Replay actions**, in the same tab, record the actions you take rather than video, and replay them exactly.
 
 Touch drags the hand's target. In Move camera mode a drag moves the camera the way you drag: right moves it right, up moves it up, and in first person the view turns right and looks up. Settings has Invert X, Invert Y and a sensitivity slider (0.25 to 3); the defaults are the direct mapping, touch and mouse behave the same, and the choice is remembered on the device. Buttons are at least 44 px; portrait and landscape both lay out, clear of notches and home indicators. First person and inspection cameras move only from your input. There is a perf overlay, record and replay, and a reduced motion setting that follows the system's.
 
