@@ -24,7 +24,7 @@ The server prints the sandbox URL on this machine and on the local network (open
 
 | Command | What it does |
 | --- | --- |
-| `npm start` | The static dev server: whitelisted files only, strict CSP (no inline scripts, no eval), `nosniff`, `frame-ancestors 'none'` |
+| `npm start` | The static dev server: whitelisted files only, strict CSP (no inline scripts, no eval, workers only from the same origin), `nosniff`, `frame-ancestors 'none'` |
 | `npm run check` | `node --check` over every source folder, and a scan for characters the house style bans |
 | `npm test` | `node --test`: module, physics, server and isolation tests |
 | `npm run hands:check` | The acceptance suite: every check with its worst measured value against its limit |
@@ -215,6 +215,36 @@ The control bar at the bottom holds Controls, Pause, Step and the speed. **Contr
 The control centre stays closed while a video is made (it would resize the view); the bar shows the time or the progress, and pressing it stops or cancels. **Record actions** and **Replay actions**, in the same tab, record the actions you take rather than video, and replay them exactly.
 
 Touch drags the hand's target. In Move camera mode a drag moves the camera the way you drag: right moves it right, up moves it up, and in first person the view turns right and looks up. Settings has Invert X, Invert Y and a sensitivity slider (0.25 to 3); the defaults are the direct mapping, touch and mouse behave the same, and the choice is remembered on the device. Buttons are at least 44 px; portrait and landscape both lay out, clear of notches and home indicators. First person and inspection cameras move only from your input. There is a perf overlay, record and replay, and a reduced motion setting that follows the system's.
+
+**Planning off the main thread.** Where a hand grips, how it opens and which way it comes in are searches that can take a second on a phone. They never run on the page's thread. A planning worker ([`app/plan/`](app/plan)) runs its own copy of the Sandbox simulation two fixed steps ahead of the page, on the same seed and the same actions. It answers each search from the recorded plan table while an action is on its script, and solves it itself once you step off the script (a joint slider, a drag). The page takes the answers in order and never steps past the last one it has. While a plan is still being worked out, the view keeps drawing, sim time waits, and the status line says *planning the next move* with the time so far. Each frame's simulation work has an 8 ms budget, and a scene rebuild is spread over several frames. An action lands at most two steps (33 ms) after you take it, on the same frame in both copies, which is also the frame it is recorded on.
+
+```mermaid
+sequenceDiagram
+  participant U as You
+  participant P as Page (draws, steps its copy)
+  participant W as Planning worker (its own copy)
+  U->>P: action (button, slider, drag)
+  P->>W: action, stamped on frame f
+  P->>W: step to frame f + 2
+  W->>W: apply on frame f, step, search: plan table or solve
+  W-->>P: answers, in call order, and "stepped to f + 2"
+  P->>P: apply on frame f, step to f + 2 using the answers
+  Note over P: no answer yet: sim time waits, frames keep drawing, "planning the next move"
+```
+
+<details>
+<summary>What happens on and off the recorded path</summary>
+
+| Situation | Who searches | What the page does |
+| --- | --- | --- |
+| A scripted action, on its script | The worker answers from the recorded plan table | Steps at once; the worker is never behind |
+| Off the script: a slider, a drag, anything not in the script | The worker solves, off the page's thread | Keeps drawing; sim time waits while the worker works, and the status line says so |
+| The plan table is stale or missing | The worker solves every search | As above |
+| No module workers, or the worker failed | The page, from the plan table where it can | Solves the rest on its own thread (a stall of up to a second or two) |
+
+The two copies are checked to stay identical: in Node, a run answered only from the worker copy's stream ends bit for bit where the worker copy does, including after the run leaves its script, and in the browser `npm run hands:check` moves a slider mid action and fails on any frame held over 50 ms or any search the page had to run itself.
+
+</details>
 
 Shot mode renders any frame exactly from URL parameters, which is what the gallery uses: `/?shot=1&scene=sandbox&cap=throwCatch&t=2.45`.
 

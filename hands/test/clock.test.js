@@ -27,6 +27,18 @@ test('rate scales wall time, pause stops it, single steps still work', () => {
   assert.equal(c.frame, 4);
 });
 
+test('canStep holds the clock at a frame and drops the wall time it could not use', () => {
+  const c = new Clock({ seed: 1 });
+  let limit = 2;
+  assert.equal(c.advance(0.1, (f) => f <= limit), 2);
+  assert.equal(c.frame, 2);
+  assert.equal(c.acc, 0);
+  limit = 10;
+  // Once allowed again it carries on at the normal rate, with no burst of catch-up steps.
+  assert.equal(c.advance(STEP, (f) => f <= limit), 1);
+  assert.equal(c.frame, 3);
+});
+
 test('long stalls are clamped', () => {
   const c = new Clock({ seed: 1 });
   c.advance(30);

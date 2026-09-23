@@ -11,7 +11,7 @@ import { STEP, GRIPS, DIGITS } from '/hands/src/index.js';
 import { createThreeView } from '/hands/src/three-view.js';
 import { SLEEVE_COLOURS, DEFAULTS } from '/hands/src/defaults.js';
 import { createWorldView } from '/render/world-view.js';
-import { createSandbox, startScenario } from '/scenes/runner.js';
+import { createSandbox, startScenario, scenarioSteps } from '/scenes/runner.js';
 import { planPlayer, planKey } from '/scenes/plans.js';
 import { SCENARIOS } from '/scenes/capabilities.js';
 import { STATIONS } from '/scenes/sandbox-world.js';
@@ -34,6 +34,7 @@ function plansFor(id, seed, reduced) {
   const list = planTable.runs[planKey(id, reduced)];
   return list ? planPlayer(list) : null;
 }
+export { plansFor as planPlayerFor };
 function lookedAfter(view) { views.add(view); const dispose = view.dispose; view.dispose = () => { views.delete(view); dispose(); }; return view; }
 const sidesOf = (hand) => (hand === 'both' ? ['left', 'right'] : [hand]);
 const secs = (t) => Math.round(t / STEP);
@@ -201,25 +202,35 @@ function handsController({ seed, reducedMotion }) {
   };
 }
 
-function sandboxController({ seed, reducedMotion }) {
+// headless: the simulation alone, no three.js objects (the planning worker).
+// planning: where costly solves are answered, { source(id, seed, reduced) }
+// giving a plan source for scripted run `id` (null when free); see app/plan/.
+// Without it, a scripted run replays the recorded plan table and everything
+// else is solved here.
+function sandboxController({ seed, reducedMotion, headless = false, planning = null }) {
   let reduced = reducedMotion;
+  const sourceFor = (id) => (planning ? planning.source(id, seed, reduced) : (id ? plansFor(id, seed, reduced) : null));
   let sb = createSandbox({ seed, station: 'ledge', reducedMotion: reduced });
   let player = null;
-  let plans = null; // the plan player of the scenario running, if any
+  let plans = sourceFor(null); // where the running scene's plans come from, if anywhere
+  if (plans) sb.hands.interaction.planSource = plans;
   let worldView = null;
   let handsView = null;
   const group = new THREE.Group();
   const sched = scheduler();
 
   function mount() {
+    if (headless) return;
     worldView = createWorldView(sb.world, { seed });
     handsView = lookedAfter(createThreeView(sb.hands, LOOK));
     group.add(worldView.group, handsView.group);
   }
   function unmount() {
-    group.remove(worldView.group, handsView.group);
-    handsView.dispose();
-    disposeTree(worldView.group);
+    if (!headless) {
+      group.remove(worldView.group, handsView.group);
+      handsView.dispose();
+      disposeTree(worldView.group);
+    }
     sb.hands.dispose();
   }
   mount();
@@ -234,7 +245,7 @@ function sandboxController({ seed, reducedMotion }) {
     switch (a.type) {
       case 'scenario':
         unmount();
-        plans = plansFor(a.id, seed, reduced);
+        plans = sourceFor(a.id);
         player = startScenario(a.id, { seed, reducedMotion: reduced, planSource: plans });
         sb = player.sb;
         mount();
@@ -242,8 +253,9 @@ function sandboxController({ seed, reducedMotion }) {
       case 'station':
         unmount();
         player = null;
-        plans = null;
         sb = createSandbox({ seed, station: a.station, reducedMotion: reduced });
+        plans = sourceFor(null);
+        if (plans) sb.hands.interaction.planSource = plans;
         mount();
         return true;
       default: throw new Error(`the Sandbox scene has no action ${a.type}`);
@@ -258,8 +270,27 @@ function sandboxController({ seed, reducedMotion }) {
     // The scripted action last started, and how long it runs (for rendering it).
     get scenarioId() { return player ? Object.keys(SCENARIOS).find((k) => SCENARIOS[k] === player.sc) || null : null; },
     get scenarioDuration() { return player ? player.duration : 0; },
+    // Start scripted run `id` in pieces (see scenarioSteps): next() does one
+    // and answers true once the run has replaced the scene. The result is
+    // what dispatch({ type: 'scenario', id }) gives in one go.
+    scenarioJob(id) {
+      const src = sourceFor(id);
+      const g = scenarioSteps(id, { seed, reducedMotion: reduced, planSource: src });
+      return {
+        next() {
+          const r = g.next();
+          if (!r.done) return false;
+          unmount();
+          plans = src;
+          player = r.value;
+          sb = player.sb;
+          mount();
+          return true;
+        },
+      };
+    },
     // For the headless checks: how the running scenario's recorded plans went.
-    planStats() { return plans ? { used: plans.used, of: plans.size, stopped: plans.stopped, miss: plans.miss } : null; },
+    planStats() { return plans ? { used: plans.used, of: plans.size, stopped: plans.stopped, miss: plans.miss, ...(plans.live !== undefined ? { live: plans.live } : {}) } : null; },
     get status() {
       if (player) return `${player.sc.label}${player.done ? ', done' : ''}`;
       return STATIONS[sb.station].label;
@@ -277,7 +308,7 @@ function sandboxController({ seed, reducedMotion }) {
       else sb.hands.step();
       sched.tick();
     },
-    sync() { worldView.update(); handsView.update(); },
+    sync() { if (!headless) { worldView.update(); handsView.update(); } },
     frame(mode, aspect) {
       if (mode === 'fp') {
         // The eye sits at the body anchor, looking ahead and down at the hands.

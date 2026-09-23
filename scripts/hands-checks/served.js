@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { resolvePath, rewriteThreeSpecifier } from '../../server/static.js';
 
-const ENTRIES = ['/main.js', '/vendor/three.module.js', '/vendor/anime.esm.js'];
+const ENTRIES = ['/main.js', '/plan/sim-worker.js', '/vendor/three.module.js', '/vendor/anime.esm.js'];
 const IMPORT_RE = /(?:^|[\s;{}])(?:import|export)\s*(?:[^'"]*?from\s*)?['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 export function servedGraph(entries = ENTRIES) {

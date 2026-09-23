@@ -13,6 +13,7 @@ import { uiChecks } from './ui.js';
 import { skinChecks } from './skin.js';
 import { planChecks } from './plans.js';
 import { videoChecks } from './video.js';
+import { planningChecks } from './planning.js';
 
 export const CHECKS = [
   ...servedChecks,
@@ -24,6 +25,7 @@ export const CHECKS = [
   ...manipulationChecks,
   ...scenarioChecks,
   ...planChecks,
+  ...planningChecks,
   ...budgetChecks,
   ...sandboxBudgetChecks,
   ...uiChecks,

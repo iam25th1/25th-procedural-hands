@@ -32,14 +32,23 @@ const MAX_WAIT = 2; // seconds a script may wait in all
 // Play a scenario: returns a player with step() and the timeline state.
 // planSource: answers costly solves from a recorded run (see plans.js); it
 // is attached before the settling steps so the whole run goes through it.
-export function startScenario(id, { seed = 1, reducedMotion = false, sandbox = null, planSource = null } = {}) {
+export function startScenario(id, opts = {}) {
+  const g = scenarioSteps(id, opts);
+  for (;;) { const r = g.next(); if (r.done) return r.value; }
+}
+
+// The same set-up as startScenario, one piece at a time: the sandbox is
+// built, then each settling step is its own piece, and the last returns the
+// player. A page can spread the pieces over several frames; the work done,
+// and its order, is exactly startScenario's.
+export function* scenarioSteps(id, { seed = 1, reducedMotion = false, sandbox = null, planSource = null } = {}) {
   const sc = SCENARIOS[id];
   if (!sc) throw new Error(`unknown scenario ${id}`);
   const sb = sandbox || createSandbox({ seed, station: sc.station, reducedMotion });
   const ctx = makeContext(sb, sc);
   if (planSource) sb.hands.interaction.planSource = planSource;
   // Let the world settle before the first key.
-  for (let i = 0; i < 12; i++) sb.hands.step();
+  for (let i = 0; i < 12; i++) { yield; sb.hands.step(); }
   const t0 = sb.hands.time;
   if (sc.setup) sc.setup(ctx);
   const keys = sc.keys.slice().sort((a, b) => a[0] - b[0]);

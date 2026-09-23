@@ -34,11 +34,16 @@ export class Clock {
 
   // Advance by wall-clock seconds scaled by the playback rate. Long stalls
   // (tab hidden) are clamped so the sim never spirals trying to catch up.
-  advance(wallDt) {
+  // canStep(frame), when given, is asked before each step whether the step
+  // to `frame` may run now; at the first no, the rest of the wall time is
+  // dropped: sim time waits (a plan still being worked out, a frame budget
+  // spent) instead of rushing to catch up afterwards.
+  advance(wallDt, canStep = null) {
     if (!(wallDt > 0) || this.rate <= 0) return 0;
     this.acc += Math.min(wallDt, MAX_WALL_DT) * this.rate;
     let steps = 0;
     while (this.acc >= STEP - 1e-9) {
+      if (canStep && !canStep(this.frame + 1)) { this.acc = 0; break; }
       this.acc -= STEP;
       this.step();
       steps++;

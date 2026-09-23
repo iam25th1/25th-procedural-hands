@@ -20,11 +20,18 @@ import { cameraSettings, dragOrbit, dragLook, lookDirection } from './camera-map
 import { load, save } from './store.js';
 import { liveSupported, startLive, offlineSupported, probeOffline, renderOffline, videoName, askWhereToSave, saveVideo } from '/capture/video.js';
 import { el, button, segmented, toggle } from './dom.js';
+import { createPlanner, LOOKAHEAD } from '/plan/planner.js';
 
 const SPEEDS = [[0.1, '0.1x'], [0.25, '0.25x'], [1, '1x']];
 const aspectBucket = (a) => (a < 0.8 ? 0 : a < 1.3 ? 1 : 2);
 // The screen's shape, which only turning the device changes.
 const screenAspect = () => window.innerWidth / Math.max(1, window.innerHeight);
+// The most main-thread time the simulation may take in one animation frame.
+// Past it the remaining steps wait for the next frame (sim time slows)
+// rather than the frame running long.
+const SIM_BUDGET_MS = 8;
+// How long the page waits on a plan before the status line says so.
+const PLANNING_NOTE_MS = 100;
 
 export function startApp({ canvas, shot }) {
   const seed = Number.isFinite(shot.seed) ? shot.seed : 1;
@@ -57,11 +64,25 @@ export function startApp({ canvas, shot }) {
   let skin = load('skin', DEFAULT_SKIN_TONE);
   if (!MONK_TONES.some((t) => t.id === skin)) skin = DEFAULT_SKIN_TONE;
   setSkinTone(skin);
-  // The recorded plan table, in the background: a scripted run started once
-  // it is here skips its costly solves (same results, no stall). Without it
-  // (stale, missing, offline) every solve runs live.
+  // Costly solves (where a hand grips, which way it comes in) are worked
+  // out off this thread, by the planning worker (app/plan/), which answers
+  // from the recorded plan table where it can and solves the rest itself.
+  // Without module workers the page falls back to the table here and solves
+  // the rest on this thread.
   let planLoaded = false;
-  fetch('/scenes/plans.json').then((r) => (r.ok ? r.json() : null)).then((t) => { if (t) { setPlanTable(t); planLoaded = true; } }).catch(() => {});
+  const loadTableHere = () => fetch('/scenes/plans.json').then((r) => (r.ok ? r.json() : null)).then((t) => { if (t) { setPlanTable(t); planLoaded = true; } }).catch(() => {});
+  const planner = createPlanner({
+    onTable: (ok) => { planLoaded = ok; },
+    onError: (m) => console.warn(m),
+    // The worker failed: rebuild the scene with plans solved here.
+    onFail: () => { note('Planning moved to the page: the planning worker stopped', 'alert'); loadTableHere().then(() => { build(state.scene, state.reduced); resync(); frameCamera(); }); },
+  });
+  if (!planner.available) loadTableHere();
+  // Actions taken but not yet applied: each lands on a frame the worker has
+  // not passed, and applies there on both copies.
+  const pending = [];
+  let waitingSince = 0; // when the page last had to wait on a plan
+  let stepsQueued = 0; // single steps asked for while paused
   let bucket = aspectBucket(screenAspect());
   let flash = null; // { text, kind, until } a short note in the status line
   let lastResult = null;
@@ -71,7 +92,11 @@ export function startApp({ canvas, shot }) {
   // Scene ------------------------------------------------------------------
   function build(kind, reduced) {
     if (ctl) { view.root.remove(ctl.group); ctl.dispose(); }
-    ctl = createController(kind, { seed, reducedMotion: reduced });
+    pending.length = 0;
+    job = null;
+    waitingSince = 0;
+    const planning = planner.reset({ kind, seed, reduced, frame: clock.frame });
+    ctl = createController(kind, { seed, reducedMotion: reduced, planning });
     view.root.add(ctl.group);
     view.setBackdrop(kind === 'hands' ? 'plain' : 'yard');
   }
@@ -98,16 +123,67 @@ export function startApp({ canvas, shot }) {
   // make up, so the next frame does not run a burst of catch-up steps.
   function resync() { clock.discardBacklog(); last = performance.now(); }
 
-  function act(action) {
-    if (recorder.replaying) { note('Replaying: wait for it to finish'); return; }
-    const a = { hand: state.hand, ...action };
-    recorder.log(clock.frame, a);
+  function run(a) {
     try {
       applyAction(a);
     } catch (e) {
       note(String(e.message || e), 'alert');
       console.warn(e);
     }
+  }
+  function act(action) {
+    if (recorder.replaying) { note('Replaying: wait for it to finish'); return; }
+    const a = { hand: state.hand, ...action };
+    const stamp = planner.stampFor(clock.frame);
+    recorder.log(stamp, a);
+    if (!planner.active) { run(a); return; }
+    pending.push({ stamp, seq: planner.act(stamp, a), a });
+  }
+  // Apply the actions due by frame `upTo`; with `acked`, only those the
+  // worker has applied too (the clock is not stepping to them).
+  function applyPending(upTo, acked = false, inStep = false) {
+    while (!job && pending.length && pending[0].stamp <= upTo && (!acked || pending[0].seq <= planner.acked)) {
+      const p = pending.shift();
+      // Between frames, a scripted run is set up in pieces (below).
+      if (!inStep && p.a.type === 'scenario' && ctl.scenarioJob) { startJob(p.a); break; }
+      run(p.a);
+    }
+  }
+  // A scripted run set up piece by piece, each batch of pieces inside the
+  // frame budget, in tasks between frames; the clock waits until it is done.
+  // The work and its order are the same as dispatching it in one go, which
+  // is what the planning worker does, so the two copies stay identical.
+  let job = null;
+  function startJob(a) {
+    job = { a, it: ctl.scenarioJob(a.id) };
+    pumpJob();
+  }
+  function pumpJob() {
+    if (!job) return;
+    const end = performance.now() + SIM_BUDGET_MS;
+    let done = false;
+    try {
+      do { done = job.it.next(); } while (!done && performance.now() < end);
+    } catch (e) {
+      job = null;
+      note(String(e.message || e), 'alert');
+      console.warn(e);
+      return;
+    }
+    if (!done) { setTimeout(pumpJob, 0); return; }
+    job = null;
+    frameCamera();
+    resync();
+  }
+  // Actions that rebuild the scene (tens of milliseconds) do not run inside
+  // an animation frame: the clock stops at their frame and they run in a
+  // task of their own, between frames, as a click's handler would.
+  const REBUILDS = new Set(['scenario', 'station']);
+  const rebuildDue = (f) => Boolean(job) || (pending.length > 0 && pending[0].stamp <= f && REBUILDS.has(pending[0].a.type));
+  let dueTask = 0;
+  function applyDueSoon() {
+    if (dueTask || job || !pending.length || pending[0].stamp > clock.frame) return;
+    dueTask = setTimeout(() => { dueTask = 0; applyPending(clock.frame, true); }, 0);
   }
 
   function playRow(row) {
@@ -128,6 +204,7 @@ export function startApp({ canvas, shot }) {
   const median = (ring, n = ring.length) => { const a = ring.slice(-n).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
   clock.onStep((dt, t, c) => {
     const s = performance.now();
+    applyPending(c.frame - 1, false, true);
     recorder.beforeStep(c.frame - 1, applyAction);
     ctl.step();
     recorder.afterStep(c.frame, applyAction, () => ctl.hands.hash());
@@ -151,8 +228,8 @@ export function startApp({ canvas, shot }) {
       note(`Recorded ${rec.events.length} actions over ${rec.endFrame} frames`, 'good');
     } else {
       // A recording starts from a fresh scene at frame 0 so replay can too.
-      build(state.scene, state.reduced);
       clock.reset(seed);
+      build(state.scene, state.reduced);
       recorder.start({ scene: state.scene, seed, reduced: state.reduced });
       panels.rebuild(state.scene);
       frameCamera();
@@ -164,9 +241,11 @@ export function startApp({ canvas, shot }) {
     const rec = recorder.last;
     if (!rec || recorder.recording || recorder.replaying) return;
     if (rec.scene !== state.scene) { state.scene = rec.scene; sceneSeg.set(rec.scene); panels.rebuild(rec.scene); }
+    clock.reset(rec.seed);
     build(rec.scene, rec.reduced);
     setReducedUi(rec.reduced);
-    clock.reset(rec.seed);
+    // The worker plays the same actions at the same frames.
+    for (const e of rec.events) planner.act(e.f, e.a);
     frameCamera();
     recorder.beginReplay((result) => {
       lastResult = result;
@@ -267,6 +346,8 @@ export function startApp({ canvas, shot }) {
     if (flash && now < flash.until) { text = flash.text; kind = flash.kind; } else {
       flash = null;
       text = `${SCENE_LABELS[state.scene]}: ${ctl.status}`;
+      // Sim time is waiting on the planning worker: say so, with how long.
+      if (waitingSince && now - waitingSince > PLANNING_NOTE_MS) text = `${SCENE_LABELS[state.scene]}: planning the next move, ${((now - waitingSince) / 1000).toFixed(1)} s`;
       if (recorder.replaying) { const p = recorder.progress; text = `Replaying ${p.frame} of ${p.of}`; } else if (recorder.recording) text += ', recording';
       if (state.paused) text += ', paused';
     }
@@ -309,7 +390,8 @@ export function startApp({ canvas, shot }) {
   transport.setAttribute('aria-label', 'Time controls');
   const pauseBtn = button('Pause', '', () => setPaused(!state.paused));
   pauseBtn.title = 'Pause or play (keyboard: Space)';
-  const stepBtn = button('Step', '', () => { if (!state.paused) setPaused(true); clock.step(); });
+  // A single step runs once the worker has answered it (at once if it has).
+  const stepBtn = button('Step', '', () => { if (!state.paused) setPaused(true); stepsQueued += 1; });
   stepBtn.title = 'One fixed step of 1/60 s';
   const speedSeg = segmented(SPEEDS.map(([v, l]) => [String(v), l]), String(state.speed), (v) => { state.speed = Number(v); applyRate(); }, { label: 'Speed', className: 'speed' });
   transport.append(pauseBtn, stepBtn, speedSeg.el);
@@ -444,7 +526,7 @@ export function startApp({ canvas, shot }) {
       const file = await renderOffline({
         canvas,
         frames,
-        drawFrame: () => { clock.step(); ctl.sync(); view.render(); },
+        drawFrame: async () => { await planner.until(clock.frame + 1); clock.step(); ctl.sync(); view.render(); },
         onProgress: (done, of) => { capBtn.textContent = `Rendering ${Math.floor((done / of) * 100)}%, press to cancel`; panels.showVideo({ mode: 'offline', state: `rendering ${done} of ${of} frames` }); },
         abort: rendering.abort,
       });
@@ -586,7 +668,20 @@ export function startApp({ canvas, shot }) {
     const t0 = performance.now();
     let info = { calls: 0, triangles: 0 };
     try {
-      clock.advance(dt);
+      if (planner.active && stepsQueued) planner.request(clock.frame + 1);
+      while (stepsQueued && !rebuildDue(clock.frame) && (!planner.active || planner.ready >= clock.frame + 1)) { stepsQueued -= 1; clock.step(); }
+      // Step only as far as the worker has answered, and only while this
+      // frame's simulation budget lasts (always at least one step).
+      let stepped = 0;
+      let held = false;
+      clock.advance(dt, (f) => {
+        if (rebuildDue(f - 1)) return false;
+        if (planner.active && f > planner.ready) { held = true; return false; }
+        if (stepped > 0 && performance.now() - t0 > SIM_BUDGET_MS) return false;
+        stepped += 1;
+        return true;
+      });
+      if (held && !stepped) { if (!waitingSince) waitingSince = now; } else if (stepped) waitingSince = 0;
       ctl.sync();
       info = view.render();
     } catch (e) {
@@ -596,6 +691,11 @@ export function startApp({ canvas, shot }) {
     }
     const frameMs = performance.now() - t0;
     push(frameTimes, frameMs);
+    applyDueSoon();
+    // Ask the worker for the next steps now, after this frame's own steps
+    // and draw: it works while this thread is idle rather than beside it
+    // (two copies stepping at once slow each other down).
+    if (planner.active && !state.paused) planner.request(clock.frame + LOOKAHEAD);
     perfState.frames += 1;
     perfState.acc += dt;
     if (state.perf && now - perfState.lastShow > 250) {
@@ -631,10 +731,13 @@ export function startApp({ canvas, shot }) {
     get replaying() { return recorder.replaying; },
     get result() { return lastResult; },
     get plansLoaded() { return Boolean(planLoaded); },
+    // Planning off the main thread: whether it is on, how far the worker has
+    // answered, and how long the page has been waiting on it.
+    planning: () => ({ worker: planner.available, active: planner.active, ready: planner.ready, frame: clock.frame, waitingMs: waitingSince ? performance.now() - waitingSince : 0, workerStepMs: planner.workerMs.slice(-120) }),
     // The perf overlay's numbers over the last 600 steps and frames.
     perf: () => ({ stepMedian: median(stepTimes), stepMax: Math.max(0, ...stepTimes), steps: stepTimes.length, frameMedian: median(frameTimes), frames: frameTimes.length }),
     resetPerf: () => { stepTimes.length = 0; frameTimes.length = 0; },
-    planStats: () => (ctl.planStats ? ctl.planStats() : null),
+    planStats: () => (planner.active ? planner.stats() : ctl.planStats ? ctl.planStats() : null),
     // The camera's position and its own right and up vectors, world space.
     camera() {
       const e = view.camera.matrixWorld.elements;

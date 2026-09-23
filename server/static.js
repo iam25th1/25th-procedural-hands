@@ -55,7 +55,9 @@ export function securityHeaders() {
       "font-src 'self'",
       "connect-src 'self'",
       "media-src 'self'",
-      "worker-src 'none'",
+      // The planning worker (app/plan/sim-worker.js), same origin, a module
+      // script like the page's own. No blob: or data: workers.
+      "worker-src 'self'",
       "object-src 'none'",
       "base-uri 'none'",
       "form-action 'none'",

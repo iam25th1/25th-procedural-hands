@@ -27,6 +27,8 @@ const M = {
   replay: 'determinism: a scripted 30 s sandbox run hashes identically when replayed',
   solver: 'budget: sim step ms, median, sandbox loaded in Node (script keys, rig, interaction, physics)',
   solverLive: 'budget: sim step ms, median, sandbox loaded live in a browser (the perf overlay figure)',
+  planning: 'planning: switching actions and cold solves after a slider move never hold a frame; the worker answers every solve',
+  plans: 'plans: the recorded plan table matches the sources, and every scenario replayed from it ends bit for bit where the live run does',
 };
 const P = {
   rest: 'physics: sphere, box and capsule bodies fall and come to rest on the ground and on a table, then sleep',
@@ -95,4 +97,5 @@ export const CAPABILITIES = [
   { group: 'physics', name: 'Climbing moves the body anchor between hands, one hand always attached', checks: [M.climb], sheet: '11-climb' },
   { group: 'physics', name: 'Deterministic: fixed timestep, seeded, replays hash identically', checks: [P.replay, M.replay], sheet: '07-grab-carry-place' },
   { group: 'budget', name: 'Sim step time with the sandbox loaded, in Node and live', checks: [M.solver, M.solverLive], sheet: '07-grab-carry-place' },
+  { group: 'budget', name: 'Planning off the frame: recorded plans and cold solves never hold a frame', checks: [M.plans, M.planning], sheet: '07-grab-carry-place' },
 ];

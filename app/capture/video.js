@@ -107,7 +107,7 @@ export async function probeOffline(width = 1920, height = 1080) {
   return pick ? { codec: pick.label, mime: pick.mime, ext: pick.container } : null;
 }
 
-// Renders `frames` frames: drawFrame(i) steps the scene and draws frame i into
+// Renders `frames` frames: drawFrame(i) (it may return a promise) steps the scene and draws frame i into
 // the canvas (at the output size); every one is encoded. onProgress(done, of)
 // is called as it goes; abort.aborted stops it. Resolves to the file.
 export async function renderOffline({ canvas, frames, drawFrame, onProgress = () => {}, abort = { aborted: false } }) {
@@ -134,7 +134,7 @@ export async function renderOffline({ canvas, frames, drawFrame, onProgress = ()
     for (let i = 0; i < frames; i++) {
       if (abort.aborted) throw new DOMException('Rendering cancelled', 'AbortError');
       if (failure) throw failure;
-      drawFrame(i);
+      await drawFrame(i);
       const frame = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / FPS), duration: Math.round(1e6 / FPS) });
       encoder.encode(frame, { keyFrame: i % (FPS * 2) === 0 });
       frame.close();

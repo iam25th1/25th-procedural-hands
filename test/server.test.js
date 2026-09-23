@@ -59,6 +59,9 @@ test('CSP stays strict: no inline, no eval, no remote origins, framing denied, n
   assert.match(csp, /script-src 'self'(;|$)/);
   assert.match(csp, /frame-ancestors 'none'/);
   assert.doesNotMatch(csp, /unsafe-inline|unsafe-eval|https?:|\*/);
+  // Workers: same origin scripts only, never blob: or data: URLs.
+  assert.match(csp, /worker-src 'self'(;|$)/);
+  assert.doesNotMatch(csp, /blob:/);
   assert.equal(h['X-Content-Type-Options'], 'nosniff');
 });
 
