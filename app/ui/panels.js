@@ -1,7 +1,8 @@
-// The drawer's five panels: Actions (the palette for the current scene),
-// Matrix (every capability as a row that plays it), Joints (per-joint
-// sliders for all ten digits), Objects (grasp a chosen object at a chosen
-// size and grip) and Settings. Panels only call back into the app; they
+// The control centre's six panels: Actions (the palette for the current
+// scene), Matrix (every capability as a row that plays it), Joints
+// (per-joint sliders for all ten digits), Objects (grasp a chosen object at
+// a chosen size and grip), Capture (record and replay a sequence of
+// actions) and Settings. Panels only call back into the app; they
 // never touch the rig themselves, so every change goes through the
 // recorder.
 import { el, button, segmented, toggle, humanize, clear } from './dom.js';
@@ -14,7 +15,7 @@ const JOINTS = {
   thumb: [['cmc', 'Base'], ['mcp', 'Knuckle'], ['ip', 'End joint']],
   finger: [['mcp', 'Knuckle'], ['pip', 'Middle joint'], ['dip', 'End joint']],
 };
-export const TABS = [['actions', 'Actions'], ['matrix', 'Matrix'], ['joints', 'Joints'], ['objects', 'Objects'], ['settings', 'Settings']];
+export const TABS = [['actions', 'Actions'], ['matrix', 'Matrix'], ['joints', 'Joints'], ['objects', 'Objects'], ['capture', 'Capture'], ['settings', 'Settings']];
 
 function group(title, note = '') {
   const g = el('section', 'group');
@@ -199,10 +200,16 @@ export function createPanels(app, drawer) {
       line('Invert Y', 'Off: drag up and the camera moves up.', settings.invertY.el),
       sens.row,
     );
-    const recTitle = el('h2', 'group-title', 'Recording');
-    settings.facts = el('dl', 'facts');
-    wrap.append(recTitle, settings.facts);
     panels.settings.append(wrap);
+  }
+
+  // Capture ------------------------------------------------------------------
+  const capture = { seqRow: el('div', 'chips'), facts: el('dl', 'facts') };
+  function buildCapture() {
+    const seq = group('Action sequence', 'Records what you do, not video: every action with the frame it landed on, replayed from the same seed so it plays out exactly.');
+    seq.chips.replaceWith(capture.seqRow);
+    seq.g.append(capture.facts);
+    panels.capture.append(seq.g);
     showRecording(null, null);
   }
   function fact(dl, k, v, cls = '') {
@@ -210,7 +217,7 @@ export function createPanels(app, drawer) {
     dl.append(el('dd', cls, v));
   }
   function showRecording(rec, result) {
-    const dl = settings.facts;
+    const dl = capture.facts;
     clear(dl);
     if (!rec) {
       fact(dl, 'Nothing yet', 'Press Rec, act, press Stop, then Replay.');
@@ -228,10 +235,12 @@ export function createPanels(app, drawer) {
     }
   }
   buildSettings();
+  buildCapture();
 
   return {
     panels,
-    show(tab) { for (const [key] of TABS) panels[key].hidden = key !== tab; handRow.hidden = tab === 'settings'; if (tab === 'joints') joints.refresh(); },
+    show(tab) { for (const [key] of TABS) panels[key].hidden = key !== tab; handRow.hidden = tab === 'settings' || tab === 'capture'; if (tab === 'joints') joints.refresh(); },
+    setSequenceControls(...buttons) { capture.seqRow.append(...buttons); },
     rebuild(scene) { buildActions(scene); buildObjects(scene); values.left = {}; values.right = {}; joints.refresh(); },
     setHand(h) { handSeg.set(h); joints.refresh(); },
     setReduced(v) { settings.reduced.set(v); },

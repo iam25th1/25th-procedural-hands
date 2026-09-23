@@ -27,12 +27,21 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+  /* The stage is the 3D view: the whole screen less the control bar and,
+     while it is open, the control centre docked beside it. */
+  --bar-h: calc(60px + var(--safe-bottom));
+  --sheet-h: min(44dvh, 420px);
+  --side-w: 0px;
+  --stage-right: 0px;
+  --stage-bottom: var(--bar-h);
 }
+.cc-open { --stage-bottom: calc(var(--bar-h) + var(--sheet-h)); }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--tar); color: var(--chalk); font: 600 17px/1.25 var(--font-ui); font-variant-numeric: tabular-nums; -webkit-text-size-adjust: 100%; touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
 h1, h2, h3 { font-family: var(--font-head); font-weight: 400; margin: 0; }
-.view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-.topbar { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: calc(var(--safe-top) + var(--gap)) calc(var(--safe-right) + var(--gap)) var(--gap) calc(var(--safe-left) + var(--gap)); pointer-events: none; }
+.view { position: fixed; top: 0; left: 0; width: calc(100vw - var(--stage-right)); height: calc(100dvh - var(--stage-bottom)); display: block; touch-action: none; }
+.ui-hidden .view { width: 100vw; height: 100dvh; }
+.topbar { position: fixed; top: 0; left: 0; right: var(--stage-right); display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: calc(var(--safe-top) + var(--gap)) calc(var(--safe-right) + var(--gap)) var(--gap) calc(var(--safe-left) + var(--gap)); pointer-events: none; }
 .brand { font-size: 20px; color: var(--yellow); padding: 6px 10px; background: var(--tar); border-radius: var(--radius); }
 .status { margin: 0; padding: 6px 10px; background: var(--tar); border-radius: var(--radius); color: var(--zinc); }
 
@@ -41,8 +50,8 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 400; margin: 0; }
 
 /* Interactive sandbox UI (app/ui). Phone portrait first; landscape phones
    and desktop below. Every control is at least --tap square. */
-.topbar { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "brand scenes" "status status" "perf cam"; align-items: center; row-gap: 6px; }
-.brand { grid-area: brand; font-size: 16px; line-height: 1.2; white-space: nowrap; padding: 6px 8px; }
+.topbar { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "scenes cam" "status cam" "perf perf"; align-items: start; row-gap: 6px; column-gap: var(--gap); }
+.brand { grid-area: brand; display: none; font-size: 16px; line-height: 1.2; white-space: nowrap; padding: 6px 8px; }
 .status { grid-area: status; justify-self: start; max-width: 100%; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status.alert { color: var(--chalk); background: var(--pepper); }
 .status.good { color: var(--tar); background: var(--yellow); }
@@ -54,7 +63,7 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 400; margin: 0; }
 .perf dd { margin: 0; text-align: right; }
 .perf[hidden] { display: none; }
 
-.btn { min-height: var(--tap); min-width: var(--tap); padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--chalk); font: 600 16px/1.1 var(--font-ui); font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: background-color 120ms, border-color 120ms, color 120ms; }
+.btn { white-space: nowrap; min-height: var(--tap); min-width: var(--tap); padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--chalk); font: 600 16px/1.1 var(--font-ui); font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: background-color 120ms, border-color 120ms, color 120ms; }
 .btn:hover { border-color: var(--zinc); }
 .btn:focus-visible, .slider:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
 .btn.on { background: var(--yellow); border-color: var(--yellow); color: var(--tar); font-weight: 800; }
@@ -66,15 +75,26 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 400; margin: 0; }
 .seg .btn.on { background: var(--yellow); color: var(--tar); }
 .cam > .btn:not(.on), .cam > .seg { background: var(--tar); }
 
-.dock { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 1180px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "transport" "tabs" "drawer"; row-gap: 6px; padding: 0 calc(var(--safe-right) + var(--gap)) 0 calc(var(--safe-left) + var(--gap)); will-change: transform; }
-.transport { grid-area: transport; justify-self: center; display: flex; gap: 3px; padding: 3px; background: var(--tar); border-radius: calc(var(--radius) + 3px); }
-.transport .btn { padding: 0 8px; }
-.transport .sep { width: 1px; margin: 6px 2px; background: var(--line); }
-.tabs { grid-area: tabs; display: flex; gap: 2px; padding: 3px 3px 0; background: var(--tar); border-radius: calc(var(--radius) + 3px) calc(var(--radius) + 3px) 0 0; }
-.tabs .btn { flex: 1 1 0; padding: 0 4px; border-color: transparent; background: transparent; border-radius: var(--radius) var(--radius) 0 0; }
-.tabs .btn.on { background: var(--panel); color: var(--yellow); }
-.drawer { grid-area: drawer; height: min(34dvh, 340px); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; background: var(--panel); padding: 0 10px calc(14px + var(--safe-bottom)); }
-.drawer[inert] { visibility: hidden; }
+/* The control bar: one compact row at the bottom of the stage. */
+.bar { position: fixed; left: 0; right: var(--stage-right); bottom: 0; height: var(--bar-h); display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 0 calc(var(--safe-right) + var(--gap)) var(--safe-bottom) calc(var(--safe-left) + var(--gap)); background: var(--tar); border-top: 1px solid var(--line); }
+.cc-toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; }
+.cc-toggle.on { background: var(--yellow); border-color: var(--yellow); color: var(--tar); }
+.key { display: inline-block; min-width: 1.6em; padding: 1px 5px; border: 1px solid currentColor; border-radius: 5px; font: 600 13px/1.2 var(--font-ui); text-align: center; opacity: 0.8; }
+.transport { display: flex; align-items: center; gap: 3px; }
+.transport .btn { padding: 0 9px; }
+.speed .btn { padding: 0 7px; }
+@media (pointer: coarse) { .key { display: none; } }
+
+/* The control centre. Portrait: a sheet above the bar, the stage above it.
+   Landscape and desktop: a column at the right, the stage beside it. */
+.centre { position: fixed; left: 0; right: 0; bottom: var(--bar-h); height: var(--sheet-h); display: grid; grid-template-rows: auto auto minmax(0, 1fr); background: var(--panel); border-top: 1px solid var(--line); padding: 0 calc(var(--safe-right) + 10px) 0 calc(var(--safe-left) + 10px); will-change: transform, opacity; }
+.centre[inert] { visibility: hidden; }
+.centre-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding: 6px 0; }
+.centre-title { font-size: 18px; color: var(--yellow); white-space: nowrap; }
+.tabs { display: flex; gap: 2px; padding: 3px; background: var(--tar); border-radius: calc(var(--radius) + 3px); overflow-x: auto; scrollbar-width: none; }
+.tabs .btn { flex: 1 0 auto; padding: 0 8px; border-color: transparent; background: transparent; }
+.tabs .btn.on { background: var(--yellow); color: var(--tar); font-weight: 800; }
+.drawer { min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 0 0 12px; }
 .hand-row { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px; padding: 8px 0; background: var(--panel); }
 .hand-row .label { color: var(--zinc); }
 .hand-row[hidden] { display: none; }
@@ -108,31 +128,39 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 400; margin: 0; }
 .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .setting .label { color: var(--chalk); }
 .setting .hint { display: block; color: var(--zinc); font-size: 15px; }
-.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; }
+.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 10px 0 0; }
 .facts dt { color: var(--zinc); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
 .facts .match { color: var(--yellow); }
 .facts .mismatch { color: var(--pepper); }
 
-/* Phones in landscape: tabs and transport share one row and the sheet stays
-   under about 45 percent of the height. */
+/* Landscape phones and wide screens: the centre docks at the right, full
+   height, and the stage and the bar take the rest. */
+@media (orientation: landscape), (min-width: 900px) {
+  :root { --side-w: min(340px, 44vw); }
+  .cc-open { --stage-right: var(--side-w); --stage-bottom: var(--bar-h); }
+  .centre { left: auto; top: 0; bottom: 0; right: 0; width: var(--side-w); height: auto; border-top: 0; border-left: 1px solid var(--line); padding: calc(var(--safe-top) + 4px) calc(var(--safe-right) + 10px) calc(var(--safe-bottom) + 6px) 10px; }
+  .brand { display: block; }
+  /* In the column the six tabs sit in two rows of three. */
+  .tabs { flex-wrap: wrap; overflow: visible; }
+  .tabs .btn { flex: 1 0 30%; }
+}
 @media (orientation: landscape) and (max-height: 560px) {
+  :root { --bar-h: calc(54px + var(--safe-bottom)); }
   .topbar { grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "brand scenes cam" "status status perf"; row-gap: 4px; }
   .perf { justify-self: end; grid-template-columns: repeat(10, auto); }
-  .dock { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "tabs transport" "drawer drawer"; column-gap: 8px; }
-  .transport { align-self: end; margin-bottom: 3px; }
-  .drawer { height: calc(45dvh - 56px); }
+  .cam { flex-wrap: nowrap; }
   .hand-row { position: static; padding: 4px 0; }
-  .digits, .matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* With the centre docked the stage is narrow: no brand, two rows. */
+  .cc-open .brand { display: none; }
+  .cc-open .topbar { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "scenes cam" "status perf"; }
 }
 @media (min-width: 900px) and (min-height: 561px) {
-  .topbar { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "brand scenes status cam" "perf perf perf perf"; }
+  :root { --side-w: 400px; }
+  .topbar { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "brand scenes status cam" "perf perf perf perf"; align-items: center; }
   .status { justify-self: center; }
-  .dock { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "tabs transport" "drawer drawer"; column-gap: 12px; }
-  .transport { align-self: end; margin-bottom: 3px; }
-  .drawer { height: min(36dvh, 340px); }
-  .digits { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
-  .matrix { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+  .cam { flex-wrap: nowrap; }
+  .matrix { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Reduced motion: no UI animation at all. The class starts from

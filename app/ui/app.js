@@ -21,6 +21,8 @@ import { el, button, segmented, toggle } from './dom.js';
 
 const SPEEDS = [[0.1, '0.1x'], [0.25, '0.25x'], [1, '1x']];
 const aspectBucket = (a) => (a < 0.8 ? 0 : a < 1.3 ? 1 : 2);
+// The screen's shape, which only turning the device changes.
+const screenAspect = () => window.innerWidth / Math.max(1, window.innerHeight);
 
 export function startApp({ canvas, shot }) {
   const seed = Number.isFinite(shot.seed) ? shot.seed : 1;
@@ -32,8 +34,14 @@ export function startApp({ canvas, shot }) {
   const state = {
     scene: ['hands', 'sandbox'].includes(shot.scene) ? shot.scene : 'sandbox',
     hand: 'both', cam: 'inspect', moveCamera: false, reduced: prefersReduced || shot.reduced,
-    speed: 1, paused: false, perf: false, tab: 'actions', open: true,
+    speed: 1, paused: false, perf: false, tab: 'actions', open: false,
   };
+  // The control centre starts collapsed; after that it remembers.
+  const savedControls = load('controls', null);
+  if (savedControls && typeof savedControls === 'object') {
+    state.open = Boolean(savedControls.open);
+    if (TABS.some(([k]) => k === savedControls.tab)) state.tab = savedControls.tab;
+  }
   const status = document.getElementById('status');
   const header = document.querySelector('.topbar');
   let ctl = null;
@@ -43,7 +51,7 @@ export function startApp({ canvas, shot }) {
   let look = { yaw: 0, pitch: 0 };
   // Camera drag settings: direct mapping unless the user inverts an axis.
   let camSettings = cameraSettings(load('camera', {}));
-  let bucket = aspectBucket(view.camera.aspect);
+  let bucket = aspectBucket(screenAspect());
   let flash = null; // { text, kind, until } a short note in the status line
   let lastResult = null;
 
@@ -154,16 +162,16 @@ export function startApp({ canvas, shot }) {
     if (state.cam === 'fp' && !f.eye) eye = null;
     applyCamera();
   }
-  // The drawer covers the bottom of the canvas, so the projection centre is
-  // shifted up into the band between the top bar and the open drawer. It is
-  // fixed by the layout (the open drawer, even while closed), so opening or
-  // closing the drawer never moves the picture.
+  // The control centre and the bar sit beside the view, never over it; only
+  // the top bar overlays its top edge. The projection centre is moved down
+  // into the band below the top bar so what the camera frames is the part
+  // you can see.
   function applyViewOffset() {
     const { width, height } = view.size;
-    const top = header.getBoundingClientRect().bottom;
-    const bottom = window.innerHeight - dock.offsetHeight;
-    const shift = Math.round(Math.max(0, height / 2 - (top + Math.max(top + 40, bottom)) / 2));
-    if (shift > 0) view.camera.setViewOffset(width, height, 0, shift, width, height);
+    const c = canvas.getBoundingClientRect();
+    const top = Math.max(0, Math.min(height - 40, header.getBoundingClientRect().bottom - c.top));
+    const shift = Math.round(height / 2 - (top + height) / 2);
+    if (shift !== 0) view.camera.setViewOffset(width, height, 0, shift, width, height);
     else view.camera.clearViewOffset();
     view.camera.updateProjectionMatrix();
   }
@@ -265,31 +273,51 @@ export function startApp({ canvas, shot }) {
   }
   header.append(sceneSeg.el, cam, perf);
 
-  const dock = el('div', 'dock ui');
+  // The control bar: always there, one compact row at the bottom of the
+  // view. It opens the control centre and carries the time controls.
+  const bar = el('div', 'bar ui');
+  bar.setAttribute('aria-label', 'Control bar');
+  const ccBtn = button('', 'cc-toggle', () => setOpen(!state.open));
+  ccBtn.append(el('span', 'cc-label', 'Controls'), el('kbd', 'key', 'C'));
+  ccBtn.setAttribute('aria-controls', 'control-centre');
+  ccBtn.title = 'Show or hide the control centre (keyboard: C)';
   const transport = el('div', 'transport');
   transport.setAttribute('aria-label', 'Time controls');
   const pauseBtn = button('Pause', '', () => setPaused(!state.paused));
+  pauseBtn.title = 'Pause or play (keyboard: Space)';
   const stepBtn = button('Step', '', () => { if (!state.paused) setPaused(true); clock.step(); });
-  const speedSeg = segmented(SPEEDS.map(([v, l]) => [String(v), l]), String(state.speed), (v) => { state.speed = Number(v); applyRate(); }, { label: 'Speed' });
-  const recBtn = button('Rec', 'rec', toggleRecord);
-  const replayBtn = button('Replay', '', startReplay);
-  transport.append(pauseBtn, stepBtn, speedSeg.el, recBtn, replayBtn);
+  stepBtn.title = 'One fixed step of 1/60 s';
+  const speedSeg = segmented(SPEEDS.map(([v, l]) => [String(v), l]), String(state.speed), (v) => { state.speed = Number(v); applyRate(); }, { label: 'Speed', className: 'speed' });
+  transport.append(pauseBtn, stepBtn, speedSeg.el);
+  bar.append(ccBtn, transport);
+
+  // The control centre: docked beside the view (landscape and desktop) or
+  // above the bar (portrait). The view shrinks to make room, so the panel
+  // never lies over the hands or the station, in any camera.
+  const centre = el('section', 'centre ui');
+  centre.id = 'control-centre';
+  centre.setAttribute('aria-label', 'Control centre');
+  const centreHead = el('div', 'centre-head');
+  const closeBtn = button('Close', '', () => setOpen(false));
+  closeBtn.title = 'Hide the control centre (keyboard: C or Escape)';
+  centreHead.append(el('h2', 'centre-title', 'Control centre'), closeBtn);
   const tabs = el('nav', 'tabs');
   tabs.setAttribute('aria-label', 'Panels');
   const tabBtns = new Map();
   for (const [key, label] of TABS) {
-    const b = button(label, '', () => {
-      if (state.open && state.tab === key) setDrawer(false);
-      else { state.tab = key; panels.show(key); syncTabs(); setDrawer(true); }
-    });
+    const b = button(label, '', () => showTab(key));
     b.setAttribute('aria-controls', 'drawer');
     tabBtns.set(key, b);
     tabs.append(b);
   }
   const drawer = el('div', 'drawer');
   drawer.id = 'drawer';
-  dock.append(transport, tabs, drawer);
-  document.body.append(dock);
+  centre.append(centreHead, tabs, drawer);
+  document.body.append(centre, bar);
+
+  // Sequence record and replay live in the Capture tab.
+  const recBtn = button('Rec', 'rec', toggleRecord);
+  const replayBtn = button('Replay', '', startReplay);
 
   const panels = createPanels({
     act, playRow, goScene: setScene,
@@ -304,10 +332,11 @@ export function startApp({ canvas, shot }) {
     setCamera: (patch) => { camSettings = cameraSettings({ ...camSettings, ...patch }); save('camera', camSettings); },
     seed: () => seed,
   }, drawer);
+  panels.setSequenceControls(recBtn, replayBtn);
 
   function syncTabs() {
     for (const [key, b] of tabBtns) {
-      const on = state.open && key === state.tab;
+      const on = key === state.tab;
       b.classList.toggle('on', on);
       b.setAttribute('aria-expanded', on ? 'true' : 'false');
     }
@@ -328,22 +357,54 @@ export function startApp({ canvas, shot }) {
     panels.setReduced(v);
   }
 
-  // Drawer open and close: anime.js v4 animate(), instant under reduced motion.
-  let drawerAnim = null;
-  function closedShift() {
-    const safe = Math.max(0, parseFloat(getComputedStyle(drawer).paddingBottom) - 14);
-    return Math.max(0, drawer.offsetHeight - safe);
-  }
-  function setDrawer(open, instant = false) {
+  // Control centre open and close, and tab changes: anime.js v4 animate(),
+  // instant under reduced motion. Opening docks the centre first (the view
+  // makes room at once, so nothing is ever drawn under it), then slides it
+  // in; closing slides it out, then gives the room back.
+  let centreAnim = null;
+  const wide = () => window.matchMedia('(orientation: landscape), (min-width: 900px)').matches;
+  function persist() { save('controls', { open: state.open, tab: state.tab }); }
+  function setOpen(open, instant = false) {
     state.open = open;
-    syncTabs();
-    if (drawerAnim) { drawerAnim.pause(); drawerAnim = null; }
-    if (open) drawer.inert = false;
-    const to = open ? 0 : closedShift();
-    const done = () => { drawerAnim = null; if (!state.open) drawer.inert = true; };
-    if (instant || state.reduced) { set(dock, { translateY: to }); done(); return; }
-    drawerAnim = animate(dock, { translateY: to, duration: 280, ease: 'outCubic', onComplete: done });
+    persist();
+    ccBtn.classList.toggle('on', open);
+    ccBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (centreAnim) { centreAnim.cancel(); centreAnim = null; }
+    const axis = wide() ? 'translateX' : 'translateY';
+    const other = axis === 'translateX' ? 'translateY' : 'translateX';
+    const root = document.documentElement;
+    if (open) {
+      root.classList.add('cc-open');
+      centre.inert = false;
+      if (instant || state.reduced) { set(centre, { [axis]: 0, [other]: 0, opacity: 1 }); return; }
+      centreAnim = animate(centre, { [axis]: { from: '100%', to: 0 }, [other]: 0, opacity: { from: 0, to: 1 }, duration: 260, ease: 'outCubic', onComplete: () => { centreAnim = null; } });
+      return;
+    }
+    const done = () => { centreAnim = null; if (!state.open) { root.classList.remove('cc-open'); centre.inert = true; } };
+    if (instant || state.reduced) { set(centre, { [axis]: '100%', [other]: 0, opacity: 0 }); done(); return; }
+    centreAnim = animate(centre, { [axis]: { to: '100%' }, opacity: { to: 0 }, duration: 200, ease: 'inCubic', onComplete: done });
   }
+  let tabAnim = null;
+  function showTab(key, { instant = false, open = true } = {}) {
+    state.tab = key;
+    persist();
+    panels.show(key);
+    syncTabs();
+    if (open && !state.open) setOpen(true);
+    if (tabAnim) { tabAnim.cancel(); tabAnim = null; }
+    const pane = panels.panels[key];
+    if (instant || state.reduced) { set(pane, { opacity: 1, translateY: 0 }); return; }
+    tabAnim = animate(pane, { opacity: { from: 0, to: 1 }, translateY: { from: 10, to: 0 }, duration: 180, ease: 'outCubic', onComplete: () => { tabAnim = null; } });
+  }
+
+  // Keyboard: C (or Escape to close) for the control centre, Space for pause.
+  // Ignored while typing in a field.
+  window.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.isContentEditable || (t.tagName === 'INPUT' && t.type !== 'range') || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+    if (e.key === 'c' || e.key === 'C') { e.preventDefault(); setOpen(!state.open); } else if (e.key === 'Escape' && state.open) { e.preventDefault(); setOpen(false); } else if (e.key === ' ' && !(t && t.tagName === 'BUTTON')) { e.preventDefault(); setPaused(!state.paused); }
+  });
 
   // Frame loop -------------------------------------------------------------
   const perfState = { frames: 0, acc: 0, fps: 0, lastShow: 0 };
@@ -354,7 +415,7 @@ export function startApp({ canvas, shot }) {
     last = now;
     if (view.resize()) {
       // A turn of the phone reframes for the new shape, keeping the user's angle and zoom.
-      const b = aspectBucket(view.camera.aspect);
+      const b = aspectBucket(screenAspect());
       if (b !== bucket && orbit) {
         const keep = { yaw: orbit.yaw, pitch: orbit.pitch, zoom: orbit.dist / framedDist };
         frameCamera();
@@ -363,7 +424,7 @@ export function startApp({ canvas, shot }) {
       bucket = b;
       applyViewOffset();
       applyCamera();
-      if (!state.open) setDrawer(false, true);
+      if (!centreAnim) setOpen(state.open, true);
     }
     const t0 = performance.now();
     solverMs = 0;
@@ -398,11 +459,11 @@ export function startApp({ canvas, shot }) {
   // Start ------------------------------------------------------------------
   build(state.scene, state.reduced);
   panels.rebuild(state.scene);
-  panels.show(state.tab);
-  syncTabs();
+  showTab(state.tab, { instant: true, open: false });
+  setOpen(state.open, true);
+  view.resize(true);
   frameCamera();
   syncTransport();
-  setDrawer(true, true);
   applyViewOffset();
   // For the headless checks: read-only handles, never used by the UI itself.
   window.__handsApp = {
@@ -415,12 +476,24 @@ export function startApp({ canvas, shot }) {
     // The camera's position and its own right and up vectors, world space.
     camera() {
       const e = view.camera.matrixWorld.elements;
-      return { pos: view.camera.position.toArray(), right: [e[0], e[1], e[2]], up: [e[4], e[5], e[6]] };
+      return { pos: view.camera.position.toArray(), right: [e[0], e[1], e[2]], up: [e[4], e[5], e[6]], fov: view.camera.fov };
+    },
+    // Both wrists and middle fingertips projected to CSS pixels on the page.
+    handsOnScreen() {
+      const c = canvas.getBoundingClientRect();
+      const out = [];
+      for (const side of ['left', 'right']) {
+        for (const j of ['wrist', 'middle-finger-tip']) {
+          const v = new THREE.Vector3(...ctl.hands.joint(side, j).pos).project(view.camera);
+          out.push({ side, joint: j, x: c.left + (v.x + 1) / 2 * c.width, y: c.top + (1 - v.y) / 2 * c.height, inFront: v.z < 1 });
+        }
+      }
+      return out;
     },
     // Where the control centre and the 3D view sit on screen, in CSS pixels.
     layout() {
       const box = (n) => { if (!n) return null; const r = n.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
-      return { canvas: box(canvas), dock: box(dock), open: state.open };
+      return { canvas: box(canvas), centre: box(centre), bar: box(bar), topbar: box(header), open: state.open, tab: state.tab, viewport: { w: window.innerWidth, h: window.innerHeight } };
     },
   };
   requestAnimationFrame((t) => { last = t; frame(t); });

@@ -72,7 +72,12 @@ export function createView(canvas, { preserveDrawingBuffer = false } = {}) {
     height = h;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    camera.fov = fovFor(camera.aspect);
+    // The field of view follows the screen's shape, not the canvas's: the
+    // control centre docking beside the view resizes the canvas, and that
+    // must never change the field of view (vestibular safety). Only turning
+    // the device does.
+    const screenAspect = (globalThis.innerWidth && globalThis.innerHeight) ? globalThis.innerWidth / globalThis.innerHeight : camera.aspect;
+    camera.fov = fovFor(screenAspect);
     camera.updateProjectionMatrix();
     return true;
   }
