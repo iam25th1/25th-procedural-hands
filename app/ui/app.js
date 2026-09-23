@@ -11,7 +11,8 @@ import * as THREE from '/vendor/three.module.js';
 import { animate, set } from '/vendor/anime.esm.js';
 import { createView } from '/render/view.js';
 import { Clock } from '/hands/src/clock.js';
-import { createController, SCENE_LABELS } from './controllers.js';
+import { createController, SCENE_LABELS, setSkinTone } from './controllers.js';
+import { MONK_TONES, DEFAULT_SKIN_TONE } from '/hands/src/index.js';
 import { createRecorder } from './recorder.js';
 import { attachInput } from './input.js';
 import { createPanels, TABS } from './panels.js';
@@ -51,6 +52,10 @@ export function startApp({ canvas, shot }) {
   let look = { yaw: 0, pitch: 0 };
   // Camera drag settings: direct mapping unless the user inverts an axis.
   let camSettings = cameraSettings(load('camera', {}));
+  // Skin tone: a Monk Skin Tone Scale id, remembered on the device.
+  let skin = load('skin', DEFAULT_SKIN_TONE);
+  if (!MONK_TONES.some((t) => t.id === skin)) skin = DEFAULT_SKIN_TONE;
+  setSkinTone(skin);
   let bucket = aspectBucket(screenAspect());
   let flash = null; // { text, kind, until } a short note in the status line
   let lastResult = null;
@@ -328,6 +333,8 @@ export function startApp({ canvas, shot }) {
     setReduced: (v) => act({ type: 'reduced', value: v }),
     setPerf: (v) => { state.perf = v; perf.hidden = !v; },
     recentre: frameCamera,
+    skin: () => skin,
+    setSkin: (id) => { skin = id; setSkinTone(id); save('skin', id); },
     camera: () => camSettings,
     setCamera: (patch) => { camSettings = cameraSettings({ ...camSettings, ...patch }); save('camera', camSettings); },
     seed: () => seed,

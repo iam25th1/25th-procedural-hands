@@ -88,7 +88,9 @@ function armView(skel, side, opts) {
 }
 
 // Both arms of a hands instance (or a bare Rig) as one Group to add to a scene.
-export function createThreeView(hands, { lod = DEFAULTS.lod, skinTone = DEFAULTS.skinTone, sleeveColour = DEFAULTS.sleeveColour, flat = false } = {}) {
+// skinTone: a Monk Skin Tone Scale id ('monk-1' to 'monk-10'), a Monk number
+// or a hex (see skin.js); it defaults to the hands instance's own option.
+export function createThreeView(hands, { lod = DEFAULTS.lod, skinTone = (hands.options && hands.options.skinTone) || DEFAULTS.skinTone, sleeveColour = DEFAULTS.sleeveColour, flat = false } = {}) {
   const skel = (hands.rig || hands).skel;
   const group = new THREE.Group();
   group.name = 'hands';

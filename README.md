@@ -59,7 +59,7 @@ function frame(dt) { hands.update(dt); view.update(); }  // fixed 60 Hz steps in
 
 | Call | What it does |
 | --- | --- |
-| `create(options)` | A `Hands` instance. Options: `seed`, `reducedMotion`, `targets`, `world` (`true` or a `World`), `strength`, skin and sleeve colours, object presets |
+| `create(options)` | A `Hands` instance. Options: `seed`, `reducedMotion`, `targets`, `world` (`true` or a `World`), `strength`, `skinTone` (a Monk Skin Tone Scale tone, default `monk-8`), sleeve colour, object presets |
 | `update(dt)` / `step()` | Advance by wall seconds in fixed 60 Hz steps / one step |
 | `setPose(hand, pose)` | A named pose from `POSES` (hand is `'left'`, `'right'` or `'both'`) |
 | `blendPose(hand, pose, weight, { mask })` | Blend a pose over the active one, per digit mask |
@@ -155,8 +155,8 @@ Hands module alone, no sandbox props:
 
 | Budget | Measured | Limit |
 | --- | --- | --- |
-| Triangles, both arms, high LOD | 13 904 | 20 000 |
-| Triangles, both arms, low LOD | 5 640 | 8 000 |
+| Triangles, both arms, high LOD | 14 504 | 20 000 |
+| Triangles, both arms, low LOD | 5 960 | 8 000 |
 | Draw calls, both arms | 2 | 6 |
 | Bones | 60 | 80 |
 | Solver time per frame, median in Node | 0.046 ms | 0.5 ms |
@@ -165,12 +165,36 @@ Sandbox scene loaded:
 
 | Budget | Measured | Limit |
 | --- | --- | --- |
-| Triangles, worst of six stations | 23 186 | 30 000 |
+| Triangles, worst of six stations | 23 786 | 30 000 |
 | Draw calls, worst of six stations | 37 | 45 |
 | Bones | 60 | 80 |
-| Solver time per frame (hands, interaction, world), median in Node | 0.871 ms | 1.2 ms |
+| Solver time per frame (hands, interaction, world), median in Node | 0.896 ms | 1.2 ms |
 
 The sandbox triangle and draw-call counts come from three's `renderer.info` after rendering in headless Chromium on the machine running the check, not from a phone. The on-device figures come from the sandbox's perf overlay.
+
+## Skin tones
+
+The hands come in the ten tones of the **Monk Skin Tone Scale**, from `monk-1` (lightest) to `monk-10` (deepest). The source is Monk, E. (2023), *The Monk Skin Tone Scale*, SocArXiv, [doi:10.31235/osf.io/pdf4c](https://doi.org/10.31235/osf.io/pdf4c), with the values Google publishes at [skintone.google](https://skintone.google). Monk rather than Fitzpatrick because it is a colour scale built to represent the whole human range evenly and publishes its colours; Fitzpatrick sorts skin by how it burns and tans, has no official colours and is weighted toward lighter skin.
+
+Every tone has its own undertone, a palm lighter than the back (slightly on the lightest tones, far lighter on the deepest), and a nail bed that stands out against it. Each is checked as rendered, not only in the palette: `npm run hands:check` draws every tone and keeps the back of the hand within 2.5 dE of the published swatch and the palm lighter than the back. The sandbox's picker sits beside the hand picker in the control centre, and the gallery has a sheet of every tone at the anatomy framing. See [hands/README.md](hands/README.md#skin-tones) for the model and the calibration.
+
+<details>
+<summary>The ten tones</summary>
+
+| Tone | Published | Undertone |
+| --- | --- | --- |
+| Monk 1 | `#f6ede4` | neutral |
+| Monk 2 | `#f3e7db` | neutral |
+| Monk 3 | `#f7ead0` | golden |
+| Monk 4 | `#eadaba` | golden |
+| Monk 5 | `#d7bd96` | golden |
+| Monk 6 | `#a07e56` | neutral |
+| Monk 7 | `#825c43` | red |
+| Monk 8 | `#604134` | red |
+| Monk 9 | `#3a312a` | neutral |
+| Monk 10 | `#292420` | neutral |
+
+</details>
 
 ## The sandbox
 

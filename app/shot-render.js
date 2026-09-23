@@ -10,10 +10,11 @@ import { SCENARIOS } from '/scenes/capabilities.js';
 import { cameraFor } from '/scenes/cameras.js';
 import { createHandsScene } from '/scenes/hands-scene.js';
 import { SKIN_TONES, SLEEVE_COLOURS } from '/hands/src/defaults.js';
+import { skinTone } from '/hands/src/skin.js';
 
 export function renderShot(canvas, shot) {
   const view = createView(canvas, { preserveDrawingBuffer: true });
-  const look = { lod: shot.lod, skinTone: SKIN_TONES[shot.skin % SKIN_TONES.length], sleeveColour: SLEEVE_COLOURS[shot.sleeve % SLEEVE_COLOURS.length] };
+  const look = { lod: shot.lod, skinTone: shot.palmMatch ? { ...skinTone(SKIN_TONES[shot.skin % SKIN_TONES.length]), palmMatchesDorsal: true } : SKIN_TONES[shot.skin % SKIN_TONES.length], sleeveColour: SLEEVE_COLOURS[shot.sleeve % SLEEVE_COLOURS.length] };
   const applyCamera = (cam) => { if (cam.eye) view.setEye(cam.eye, cam.dir); else view.setOrbit(cam); };
 
   if (shot.scene === 'hands') {

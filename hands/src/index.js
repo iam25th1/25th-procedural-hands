@@ -18,6 +18,7 @@ import { FINGERS, DIGITS, Skeleton as SkeletonClass, XR_PREFIX } from './skeleto
 import { poseChannels, applyChannels } from './fingers.js';
 import { handCapsules as handCapsulesOf } from './measure.js';
 import { DEFAULTS, OBJECTS, SKIN_TONES, SLEEVE_COLOURS } from './defaults.js';
+import { skinTone } from './skin.js';
 import { World, Body, Prop, Rope } from './physics.js';
 import { Interaction, targetShape } from './interact.js';
 import { POSES, COUNTING, countPoseName, setPoseName, fingerSetPose } from './poses.js';
@@ -41,6 +42,8 @@ function digitOf(finger) {
 export class Hands {
   constructor(options = {}) {
     const o = { ...DEFAULTS, ...options };
+    // A bad skin tone fails here, where it was given, not at first draw.
+    skinTone(o.skinTone);
     this.options = o;
     this.rig = new Rig({ seed: o.seed, reduced: o.reducedMotion, targets: o.targets || null });
     this.listeners = new Map(EVENTS.map((e) => [e, new Set()]));
@@ -429,6 +432,7 @@ function isWorldTarget(o) {
 export function create(options = {}) { return new Hands(options); }
 
 export { Rig, defaultArmTargets, GRIPS, gripFor, handRotation, FINGERS, DIGITS, OBJECTS, SKIN_TONES, SLEEVE_COLOURS, DEFAULTS, POSES, STEP };
+export { MONK_TONES, DEFAULT_SKIN_TONE, skinTone, skinPalette } from './skin.js';
 export { GESTURES, registerGesture, compileGesture, gestureChannels, gestureArm, COUNTING, countPoseName, setPoseName, fingerSetPose };
 export { Skeleton, XR_JOINT_NAMES, ARM_JOINT_NAMES, SIDES } from './skeleton.js';
 export { Clock, RATES } from './clock.js';

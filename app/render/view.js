@@ -14,8 +14,8 @@ export { fovFor };
 export function createView(canvas, { preserveDrawingBuffer = false } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer });
   renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1.3;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, 1, NEAR, 80);

@@ -7,7 +7,7 @@
 // recorder.
 import { el, button, segmented, toggle, humanize, clear } from './dom.js';
 import { paletteFor, matrixRows, GRIP_LIST, OBJECT_LIST, objectLabel, gripLabel } from './catalog.js';
-import { DIGITS } from '/hands/src/index.js';
+import { DIGITS, MONK_TONES } from '/hands/src/index.js';
 import { SENSITIVITY } from './camera-map.js';
 
 const DIGIT_NAMES = { thumb: 'Thumb', index: 'Index', middle: 'Middle', ring: 'Ring', little: 'Little' };
@@ -42,13 +42,23 @@ function sliderRow(label, { min, max, step, value }, onInput) {
 
 // app: { act(action), playRow(row), goScene(kind), hands(), scene(),
 //        hand(), setHand(h), setReduced(v), setPerf(v), recentre(),
-//        camera(), setCamera(patch) }
+//        camera(), setCamera(patch), skin(), setSkin(id) }
 export function createPanels(app, drawer) {
   const panels = {};
   const handRow = el('div', 'hand-row');
   const handSeg = segmented([['left', 'Left'], ['right', 'Right'], ['both', 'Both']], app.hand(), (h) => { app.setHand(h); joints.refresh(); }, { label: 'Hand' });
   handRow.append(el('span', 'label', 'Hand'), handSeg.el);
-  drawer.append(handRow);
+  // Skin tone, beside the hand picker: the ten Monk Skin Tone Scale tones.
+  const skinSeg = segmented(MONK_TONES.map((t) => [t.id, '']), app.skin(), (id) => app.setSkin(id), { label: 'Skin tone', className: 'tones' });
+  for (const t of MONK_TONES) {
+    const b = skinSeg.buttons.get(t.id);
+    b.classList.add('tone', `tone-${t.monk}`);
+    b.setAttribute('aria-label', t.label);
+    b.title = `${t.label} on the Monk Skin Tone Scale`;
+  }
+  const skinRow = el('div', 'skin-row');
+  skinRow.append(el('span', 'label', 'Skin'), skinSeg.el);
+  drawer.append(handRow, skinRow);
   for (const [key, label] of TABS) {
     const p = el('section', 'panel');
     p.setAttribute('aria-label', label);
@@ -239,7 +249,7 @@ export function createPanels(app, drawer) {
 
   return {
     panels,
-    show(tab) { for (const [key] of TABS) panels[key].hidden = key !== tab; handRow.hidden = tab === 'settings' || tab === 'capture'; if (tab === 'joints') joints.refresh(); },
+    show(tab) { for (const [key] of TABS) panels[key].hidden = key !== tab; handRow.hidden = tab === 'settings' || tab === 'capture'; skinRow.hidden = handRow.hidden; if (tab === 'joints') joints.refresh(); },
     setSequenceControls(...buttons) { capture.seqRow.append(...buttons); },
     rebuild(scene) { buildActions(scene); buildObjects(scene); values.left = {}; values.right = {}; joints.refresh(); },
     setHand(h) { handSeg.set(h); joints.refresh(); },

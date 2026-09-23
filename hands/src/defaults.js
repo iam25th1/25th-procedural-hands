@@ -2,9 +2,11 @@
 // one of these is an option a consumer can override; nothing here is a game
 // rule. Units are metres and kilograms; colours are sRGB hex.
 
-// Dorsal skin tones. The mesh derives lighter palms and nail beds and darker
-// knuckles and creases from whichever tone is chosen.
-export const SKIN_TONES = ['#5A3A22', '#6B4226', '#7A4A2A', '#4E3220', '#80522F'];
+import { MONK_TONES, DEFAULT_SKIN_TONE } from './skin.js';
+
+// Skin tones: the ten Monk Skin Tone Scale tones, lightest to deepest, by id
+// (see skin.js for the source). skinTone also takes a Monk number or a hex.
+export const SKIN_TONES = MONK_TONES.map((t) => t.id);
 
 // Short sleeve colours.
 export const SLEEVE_COLOURS = ['#F2B705', '#2D6CDF', '#1FA25A', '#F5F5F0', '#2B2B2B'];
@@ -24,7 +26,7 @@ export const OBJECTS = {
 
 export const DEFAULTS = {
   seed: 1,
-  skinTone: SKIN_TONES[0],
+  skinTone: DEFAULT_SKIN_TONE,
   sleeveColour: SLEEVE_COLOURS[0],
   lod: 'high',
   reducedMotion: false,

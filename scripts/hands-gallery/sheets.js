@@ -3,6 +3,7 @@
 // shot mode URL parameters (app/shot.js); a sheet is a strip or grid of them.
 import { SCENARIOS } from '../../app/scenes/capabilities.js';
 import { GESTURES } from '../../hands/src/gestures.js';
+import { SKIN_TONES } from '../../hands/src/defaults.js';
 
 export const VIEWPORTS = [
   { key: 'phone-portrait', width: 390, height: 844, perSheet: 12, cols: 4 },
@@ -89,8 +90,8 @@ export function fullSet() {
     out.push({ key: `cap-${id}`, title: sc.label, frames: strip(id, times) });
   }
   out.push({
-    key: 'skin-tones', title: 'Skin tones and sleeves',
-    frames: [0, 1, 2, 3, 4].flatMap((i) => [hands(`tone ${i} back`, { hand: 'right', pose: 'relaxed', cam: 'back', skin: i, sleeve: i }), hands(`tone ${i} palm`, { hand: 'right', pose: 'relaxed', cam: 'palm', skin: i, sleeve: i })]),
+    key: 'skin-tones', title: 'Every Monk Skin Tone Scale tone at the anatomy framing, back and palm',
+    frames: SKIN_TONES.flatMap((id, i) => [hands(`Monk ${i + 1} back`, { hand: 'right', pose: 'relaxed', cam: 'back', skin: i }), hands(`Monk ${i + 1} palm`, { hand: 'right', pose: 'relaxed', cam: 'palm', skin: i })]),
   });
   out.push({
     key: 'grips-hands-scene', title: 'Every grip on its object, palm and side',

@@ -24,7 +24,8 @@ Units are metres, kilograms and seconds. Angles are radians in code and degrees 
 | `measure.js` | Limit margins, self-penetration and object penetration, shared by tests and checks |
 | `stones.js` | Procedural pebbles, rocks and the sachet |
 | `clock.js`, `rng.js`, `math.js` | Fixed step clock, seeded generator, dependency free vector and quaternion math |
-| `defaults.js` | Skin tones, sleeve colours and object presets, all overridable |
+| `defaults.js` | Default skin tone, sleeve colours and object presets, all overridable |
+| `skin.js` | The ten Monk Skin Tone Scale tones and the palette each gives the mesh: dorsal, palm, nail bed, lunula and free edge |
 | `physics.js` | `World`: deterministic rigid bodies (sphere, box, capsule), statics, one degree of freedom props (hinge, slider), ropes, hand capsule contacts, tethers |
 | `interact.js` | `Interaction`: the hands acting on a world: reach planning, grasp, hold, carry, set down, release, throw and catch, slip, weight, props, drag, climb |
 
@@ -85,6 +86,23 @@ $$\ddot x = -\omega^2 (x - x_t) - 2\omega\,\dot x$$
 ## Self contact
 
 Named poses and finger sets are solved clear of each other, but the straight path between two poses in joint space can carry the thumb through a finger (a relaxed hand closing into a fist sweeps the thumb across the index), and spreading a finger toward a straight neighbour would pass through it. After the springs move the hand each step, `guardFingers` stops neighbouring fingers where their sides meet and `guardThumb` runs a short coordinate descent on the thumb's own channels that moves it the least it can to slide over the digit in its way. The springs carry on from the corrected state, so the thumb reaches the pose around the fingers rather than through them.
+
+## Skin tones
+
+`create({ skinTone })` and `createThreeView(hands, { skinTone })` take a Monk Skin Tone Scale id (`'monk-1'` lightest to `'monk-10'` deepest, default `'monk-8'`), a Monk number 1 to 10, or any sRGB hex for a custom tone. `MONK_TONES`, `skinTone(value)` and `skinPalette(value)` are exported; `view.recolor({ skinTone })` changes a live view.
+
+The scale is the Monk Skin Tone Scale (Monk, E. 2023, *The Monk Skin Tone Scale*, SocArXiv, [doi:10.31235/osf.io/pdf4c](https://doi.org/10.31235/osf.io/pdf4c)), with the ten values Google publishes for it at [skintone.google](https://skintone.google) (the site's `--monk-scale-color-1` to `-10`, in HSL there). It is used rather than Fitzpatrick because it is a colour scale made to cover the whole human range evenly, with published colour values; Fitzpatrick classifies how skin burns and tans, has no official colours and leans toward lighter skin.
+
+Each tone carries more than its hue:
+
+| Part | Rule |
+| --- | --- |
+| Dorsal | The albedo that renders as the published swatch under the sandbox's lights (see below) |
+| Undertone | From the published hue: golden at 36 degrees and up, red at 24 and below, neutral between |
+| Palm | Lighter and pinker than the back on every tone, the gap widening with depth: a few L* on Monk 1 to 5, up to about 33 L* on Monk 10, as palmar skin carries far less melanin |
+| Nail bed | A pink bed seen through the plate, drawn toward the palm tone, at least 20 dE from the skin on every tone; a paler lunula and a near white free edge |
+
+The swatches are skin as it appears, not a surface albedo, so each tone also has an `albedo`: fitted by `node scripts/skin-measure.js --calibrate`, which renders the back of the hand at the anatomy framing in the real app, reads the lit skin back from the canvas and moves the albedo in CIE Lab until the render matches the published swatch. The fit is for the sandbox's lighting (a warm key, a cool fill and a rim riding with the camera, Khronos PBR Neutral tone mapping at exposure 1.3); a consumer with very different lights can paint with `tone.hex` instead. `npm run hands:check` renders every tone and keeps the back within 2.5 dE of its swatch and the palm lighter than the back.
 
 ## Isolation
 

@@ -5,14 +5,15 @@
 // finger tubes joined by web membranes. Fingernails are small closed plates
 // in the same mesh. The right arm is generated and the left is its mirror.
 // Everything is data driven from anatomy.js; no textures, no downloads.
+import { skinPalette } from './skin.js';
 import { v3, quat, clamp, lerp, smoothstep } from './math.js';
 import { SECTIONS_MM, BONES_MM, MM, NAIL, fingerExternal, ARM_MM } from './anatomy.js';
 import { FINGERS, XR_PREFIX } from './skeleton.js';
 import { DEFAULTS } from './defaults.js';
 
 export const LODS = {
-  high: { F: 7, reduced: false, nailCells: [2, 4] },
-  low: { F: 4, reduced: true, nailCells: [2, 3] },
+  high: { F: 7, reduced: false, nailCells: [4, 5] },
+  low: { F: 4, reduced: true, nailCells: [3, 4] },
 };
 
 // Vertex regions for colouring.
@@ -581,19 +582,49 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     const slope = (dorsalOfPts(b.pts, x) - dorsalOfPts(a.pts, x)) / (b.d - a.d);
     return dorsalOfPts(b.pts, x) + slope * (u - b.d);
   }
+  // The skin actually drawn over a distal phalanx, in that joint's frame: the
+  // triangles already built whose vertices all ride mostly on its bone.
+  // The plate sits on these facets, not on the smooth profile they were
+  // lofted from; seated on the profile, the faceted skin rounded over the
+  // sides of the tip rose through the plate by up to a millimetre.
+  function skinUnder(joint, boneIndex) {
+    const inv = quat.conjugate([0, 0, 0, 1], joint.restWorldRot);
+    const onBone = (i) => b.meta[i].region === REGION.SKIN && b.w[i].some(([bone, wt]) => bone === boneIndex && wt > 0.5);
+    const tris = [];
+    for (let t = 0; t < b.tri.length; t += 3) {
+      const ids = [b.tri[t], b.tri[t + 1], b.tri[t + 2]];
+      if (!ids.every(onBone)) continue;
+      tris.push(ids.map((i) => quat.rotate([0, 0, 0], inv, v3.sub([0, 0, 0], b.point(i), joint.restWorldPos))));
+    }
+    // Highest skin at (x, z) in the joint frame, or -Infinity off the skin.
+    return (x, z) => {
+      let best = -Infinity;
+      for (const [p0, p1, p2] of tris) {
+        const d = (p1[2] - p2[2]) * (p0[0] - p2[0]) + (p2[0] - p1[0]) * (p0[2] - p2[2]);
+        if (Math.abs(d) < 1e-14) continue;
+        const w1 = ((p1[2] - p2[2]) * (x - p2[0]) + (p2[0] - p1[0]) * (z - p2[2])) / d;
+        const w2 = ((p2[2] - p0[2]) * (x - p2[0]) + (p0[0] - p2[0]) * (z - p2[2])) / d;
+        const w3 = 1 - w1 - w2;
+        if (w1 < -1e-9 || w2 < -1e-9 || w3 < -1e-9) continue;
+        best = Math.max(best, w1 * p0[1] + w2 * p1[1] + w3 * p2[1]);
+      }
+      return best;
+    };
+  }
   function nail(joint, boneIndex, sec, Ltip, profiles) {
+    const skinAt = skinUnder(joint, boneIndex);
     const w = sec.distal[0] * NAIL.width;
     const u0 = (1 - NAIL.length) * Ltip;
     // The plate ends where the tip starts to round off, plus the free edge.
     const u1 = 0.93 * Ltip + NAIL.freeEdge;
     const q = joint.restWorldRot;
-    const top = [];
-    const bottom = [];
+    // First pass: where each grid point sits (u along the bone, xs across,
+    // y the skin height under it, all in millimetres).
+    const grid = [];
     for (let iy = 0; iy <= cellsY; iy++) {
       const ty = iy / cellsY;
       const u = lerp(u0, u1, ty);
-      const rowTop = [];
-      const rowBottom = [];
+      const row = [];
       for (let ix = 0; ix <= cellsX; ix++) {
         const tx = ix / cellsX;
         const x = lerp(-w / 2, w / 2, tx);
@@ -602,7 +633,38 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
         // hanging past it.
         const cap = 0.82 * skinHalfWidth(profiles, Math.min(u, 0.965 * Ltip)) / MM;
         const xs = x * lerp(0.85, 1, ty) * Math.min(1, cap / (w / 2));
-        const y = skinDorsal(profiles, u, xs * MM) / MM;
+        // On the drawn skin where there is skin under the point, on the
+        // profile past the end of it (the free edge overhangs the tip).
+        const drawn = skinAt(xs * MM, -u);
+        const y = Math.max(skinDorsal(profiles, u, xs * MM), Number.isFinite(drawn) ? drawn : -Infinity) / MM;
+        row.push({ u, xs, y, ty });
+      }
+      grid.push(row);
+    }
+    // Second pass: a flat plate facet spans a curved patch of skin, so the
+    // skin can bulge above it between grid points. Sample each cell's
+    // interior and edges and lift its corners by any bulge found.
+    for (let pass = 0; pass < 2; pass++) {
+      for (let iy = 0; iy < cellsY; iy++) {
+        for (let ix = 0; ix < cellsX; ix++) {
+          const c = [grid[iy][ix], grid[iy][ix + 1], grid[iy + 1][ix + 1], grid[iy + 1][ix]];
+          let bulge = 0;
+          for (const [s1, s2] of [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75], [0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]]) {
+            const lerp4 = (k) => lerp(lerp(c[0][k], c[1][k], s1), lerp(c[3][k], c[2][k], s1), s2);
+            const skin = skinAt(lerp4('xs') * MM, -lerp4('u'));
+            if (Number.isFinite(skin)) bulge = Math.max(bulge, skin / MM - lerp4('y'));
+          }
+          if (bulge > 0) for (const g of c) g.y = Math.max(g.y, g.y + bulge);
+        }
+      }
+    }
+    const top = [];
+    const bottom = [];
+    for (let iy = 0; iy <= cellsY; iy++) {
+      const rowTop = [];
+      const rowBottom = [];
+      for (let ix = 0; ix <= cellsX; ix++) {
+        const { u, xs, y, ty } = grid[iy][ix];
         const region = iy === cellsY ? REGION.NAIL_EDGE : REGION.NAIL;
         const meta = { region, palmar: 0, shade: 1, lunula: ty < 0.25 ? 1 - ty / 0.25 : 0, edge: ty };
         const pt = v3.add([0, 0, 0], along(joint, u), rot(q, [xs * MM, y * MM + NAIL.lift, 0]));
@@ -730,22 +792,11 @@ const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1
 const mix = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
 
-// Palm and nail tones relative to the dorsal tone: palms and nail beds are
-// lighter and warmer than the back of the hand on every skin tone; knuckles
-// and creases are a little darker.
-export const TONE = {
-  palmLight: '#E6B896',
-  nailBed: '#E9B6A4',
-  nailEdge: '#F5EFE7',
-  padWarm: '#D98C78',
-};
 
 export function colorize(mesh, { skinTone = DEFAULTS.skinTone, shirt = DEFAULTS.sleeveColour } = {}) {
-  const dorsal = hexToRgb(skinTone);
-  const palm = mix(dorsal, hexToRgb(TONE.palmLight), 0.48);
-  const nailBed = mix(hexToRgb(TONE.nailBed), dorsal, 0.42);
-  const nailEdge = mix(hexToRgb(TONE.nailEdge), nailBed, 0.6);
-  const lunula = mix(nailBed, nailEdge, 0.5);
+  // The tone's own palette (skin.js): the dorsal colour from the Monk scale,
+  // a lighter palm, and nail bed, lunula and free edge for that tone.
+  const { dorsal, palm, nailBed, nailEdge, lunula } = skinPalette(skinTone);
   const cloth = hexToRgb(shirt);
   const clothInner = mul(cloth, 0.5);
   const n = mesh.stats.vertices;

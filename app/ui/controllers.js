@@ -9,7 +9,7 @@
 import * as THREE from '/vendor/three.module.js';
 import { STEP, GRIPS, DIGITS } from '/hands/src/index.js';
 import { createThreeView } from '/hands/src/three-view.js';
-import { SKIN_TONES, SLEEVE_COLOURS } from '/hands/src/defaults.js';
+import { SLEEVE_COLOURS, DEFAULTS } from '/hands/src/defaults.js';
 import { createWorldView } from '/render/world-view.js';
 import { createSandbox, startScenario } from '/scenes/runner.js';
 import { SCENARIOS } from '/scenes/capabilities.js';
@@ -18,7 +18,14 @@ import { createHandsScene, GRIP_OBJECTS } from '/scenes/hands-scene.js';
 import { cameraFor } from '/scenes/cameras.js';
 import { humanize } from './dom.js';
 
-const LOOK = { lod: 'high', skinTone: SKIN_TONES[0], sleeveColour: SLEEVE_COLOURS[0] };
+// How the arms look: shared by every controller, changed by the skin picker.
+const LOOK = { lod: 'high', skinTone: DEFAULTS.skinTone, sleeveColour: SLEEVE_COLOURS[0] };
+const views = new Set(); // every live hands view, to recolour in place
+export function setSkinTone(id) {
+  LOOK.skinTone = id;
+  for (const v of views) v.recolor({ skinTone: id });
+}
+function lookedAfter(view) { views.add(view); const dispose = view.dispose; view.dispose = () => { views.delete(view); dispose(); }; return view; }
 const sidesOf = (hand) => (hand === 'both' ? ['left', 'right'] : [hand]);
 const secs = (t) => Math.round(t / STEP);
 
@@ -127,7 +134,7 @@ function handsController({ seed, reducedMotion }) {
   const hands = scene.hands;
   scene.setPresent('raised', true);
   hands.rig.snapAll();
-  const view = createThreeView(hands, LOOK);
+  const view = lookedAfter(createThreeView(hands, LOOK));
   const group = new THREE.Group();
   group.add(view.group, scene.group);
   const sched = scheduler();
@@ -196,7 +203,7 @@ function sandboxController({ seed, reducedMotion }) {
 
   function mount() {
     worldView = createWorldView(sb.world, { seed });
-    handsView = createThreeView(sb.hands, LOOK);
+    handsView = lookedAfter(createThreeView(sb.hands, LOOK));
     group.add(worldView.group, handsView.group);
   }
   function unmount() {

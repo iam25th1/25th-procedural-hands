@@ -34,6 +34,7 @@ House rules: CLAUDE.md applies in full (security first; no em dashes anywhere; l
 - Public API in hands/src/index.js covering at least: create, update(dt), setPose, blendPose, setFinger(hand, finger, curl, spread), setFingerJoint, gesture(name), grasp(object, gripType), release, attach, detach, IK targets, events (contact, grasped, released, slipped), dispose.
 - The module is DOM free so all of it runs under node --test. Any browser-only glue lives in the sandbox app, not in hands/src.
 - Values that came from the old project's constants (skin tones, sleeve colours, object sizes) become options with defaults inside the module.
+- Skin tones are the ten tones of the Monk Skin Tone Scale (Monk, E. 2023, SocArXiv, doi:10.31235/osf.io/pdf4c; values as published at skintone.google), chosen over Fitzpatrick because Monk is a colour scale designed to cover the whole human range evenly, with published colour values. Each tone has an undertone, a palm lighter than its dorsal side, and a nail bed that reads against the skin. It is a module option with a default (monk-8), the sandbox has a picker beside the hand picker, the gallery has a sheet of every tone at the anatomy framing, and hands:check verifies every tone as rendered.
 - Isolation test in the gate: parse every file under hands/src and fail if an import resolves outside hands/ or is anything other than three, or if window or document is touched.
 - Carry over every test that came with the rig and keep it green.
 
