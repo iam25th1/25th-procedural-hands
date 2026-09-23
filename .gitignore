@@ -1,0 +1,18 @@
+# Dependencies. package-lock.json is committed on purpose: never ignore it.
+node_modules/
+
+# Local env and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and OS noise
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Test and render output (npm run hands:check, hands:matrix, hands:gallery)
+artifacts/
+coverage/
+test-results/

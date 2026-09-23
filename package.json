@@ -1,0 +1,29 @@
+{
+  "name": "25th-procedural-hands",
+  "version": "0.1.0",
+  "description": "Standalone procedural hand and arm library for the browser, built on three, with an interaction sandbox",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "check": "node scripts/check.js",
+    "test": "node --test",
+    "hands:check": "node scripts/hands-check.js",
+    "hands:matrix": "node scripts/hands-matrix.js",
+    "hands:gallery": "node scripts/hands-gallery.js",
+    "gate": "npm run check && npm test && npm run hands:check && npm run hands:matrix && npm audit --audit-level=high"
+  },
+  "dependencies": {
+    "@fontsource/alfa-slab-one": "5.3.0",
+    "@fontsource/barlow-condensed": "5.3.0",
+    "animejs": "4.5.0",
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
