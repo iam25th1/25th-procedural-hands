@@ -1,0 +1,187 @@
+# 25th procedural hands
+
+Procedural human hands and arms for the browser, with no animation files: every pose, grip and gesture is solved at run time from anatomy (bone lengths, joint limits, finger coupling) and from the shape and size of what the hand is holding. The library lives in [`hands/src`](hands/src) and imports nothing but [three.js](https://threejs.org). Around it, this repository holds an interaction sandbox that exercises every capability: grips on objects of many sizes, carrying, throwing and catching, buttons, switches, a lever, a knob, a drawer, a crate to push and drag, a rope and a ladder to climb, and a slingshot demo that proves the module still drives a real tool.
+
+<p align="center"><img src="docs/assets/finger-curl.svg" width="360" alt="Animated drawing of a finger curling at its three joints"></p>
+
+<!-- VIDEO: 25TH drops a directly uploaded video here (drag the .mp4 into this spot in the GitHub editor). -->
+> **Video goes here.** A short capture of the sandbox on a phone, uploaded directly to this README.
+
+| Phone portrait | Phone landscape | Desktop |
+| --- | --- | --- |
+| ![Overview, phone portrait](docs/assets/overview-phone-portrait.png) | ![Overview, phone landscape](docs/assets/overview-phone-landscape.png) | ![Overview, desktop](docs/assets/overview-desktop.png) |
+
+## Install and run
+
+Node 20 or newer. Dependencies are pinned exactly and installed without running package scripts:
+
+```sh
+npm ci --ignore-scripts
+PORT=3100 npm start
+```
+
+The server prints the sandbox URL on this machine and on the local network (open the LAN one on a phone). Port 3100 is the default; a taken port exits with a clear message.
+
+| Command | What it does |
+| --- | --- |
+| `npm start` | The static dev server: whitelisted files only, strict CSP (no inline scripts, no eval), `nosniff`, `frame-ancestors 'none'` |
+| `npm run check` | `node --check` over every source folder, and a scan for characters the house style bans |
+| `npm test` | `node --test`: module, physics, server, isolation and slingshot tests |
+| `npm run hands:check` | The acceptance suite: every check with its worst measured value against its limit |
+| `npm run hands:matrix` | The capability matrix: one row per capability, the checks and sheet that prove it, PASS or FAIL |
+| `npm run hands:gallery` | Renders the sheets in a real browser at 390x844, 844x390 and 1440x900 into `artifacts/gallery/` |
+| `npm run gate` | check, test, hands:check, hands:matrix and `npm audit --audit-level=high`: every commit passes it |
+
+## Use the module
+
+```js
+import { create } from './hands/src/index.js';
+import { createThreeView } from './hands/src/three-view.js';
+
+const hands = create({ seed: 7, world: true });   // world: true gives the hands a physics world to act on
+scene.add(createThreeView(hands).group);           // one skinned mesh per arm
+
+hands.gesture('thumbsUp', { hand: 'right' });
+hands.setFinger('left', 'index', 0.8, 0.2);         // curl 0 to 1, spread -1 to 1
+hands.count('both', 3, 'thumb');                    // counting, thumb first
+hands.on('grasped', (e) => console.log(e.hand, e.grip));
+
+const ball = hands.world.add({ shape: 'sphere', r: 0.035, mass: 0.06, pos: [0.15, -0.46, -0.4] });
+hands.reach('right', ball, 'spherical', { approach: 0.06 });
+// ...once hands.arrived('right'):
+hands.grasp('right', ball, 'spherical');
+
+function frame(dt) { hands.update(dt); view.update(); }  // fixed 60 Hz steps inside
+```
+
+<details>
+<summary>API</summary>
+
+| Call | What it does |
+| --- | --- |
+| `create(options)` | A `Hands` instance. Options: `seed`, `reducedMotion`, `targets`, `world` (`true` or a `World`), `strength`, skin and sleeve colours, object presets |
+| `update(dt)` / `step()` | Advance by wall seconds in fixed 60 Hz steps / one step |
+| `setPose(hand, pose)` | A named pose from `POSES` (hand is `'left'`, `'right'` or `'both'`) |
+| `blendPose(hand, pose, weight, { mask })` | Blend a pose over the active one, per digit mask |
+| `setFinger(hand, finger, curl, spread)` | Per finger curl 0 to 1 and spread -1 to 1, anatomically clamped, over whatever pose is active |
+| `setFingerJoint(hand, finger, joint, curl)` | One joint: `mcp`, `pip`, `dip` (thumb: `cmc`, `mcp`, `ip`) |
+| `setThumbOpposition(hand, amount)`, `releaseFingers(hand, finger)` | Thumb opposition; hand a digit back to the pose |
+| `count(hand, n, style)`, `showFingers(hand, set)` | Counting 1 to 5 index first or thumb first; any combination of extended digits |
+| `gesture(name, { hand })`, `stopGesture(hand)` | Any gesture in the registry (data: `GESTURES`, `registerGesture`) |
+| `setTarget(hand, { pos, rot, pole })`, `moveTo(hand, target)` | IK target for the wrist; `moveTo` routes round anything in the way |
+| `grasp(hand, object, gripType)` | Close a grip on an object (a shape, a world body, a body part, a prop part, a rung or the rope) |
+| `release(hand, { velocity })` | Let go (a velocity throws) |
+| `attach(hand, object)`, `detach(hand)` | Fix an object to the wrist without solving a closure |
+| `reach(hand, target, grip, opts)`, `arrived(hand)` | Plan and move to a grip pose, approach clear of obstacles |
+| `carry(body, target)`, `intent(hand, target)`, `setDown(hand)` | Carry with one or two hands; drive a held prop; lower until it rests |
+| `readyCatch`, `planCatch(hand, body, grip)` | Meet a flying body at the point it will pass |
+| `spin(hand, axis, rate)` | Turn a held object in the fingers |
+| `setBody(pos)`, `moveBody(pos, seconds)` | Move the body anchor (hang and climb) |
+| `on(event, fn)` | Events: `contact`, `grasped`, `released`, `slipped` |
+| `holding(hand)`, `held(hand)`, `contacts(hand)`, `joint(hand, name)`, `hash()` | State; `hash()` covers joints and the whole world, for replays |
+| `dispose()` | Tear down |
+
+</details>
+
+## Capabilities
+
+```mermaid
+flowchart TB
+  M[hands module] --> F[fingers: curl per finger and joint, spread, opposition]
+  M --> C[counting both ways, finger sets from a mask]
+  M --> G[gesture registry: relaxed, open, spread, fist, point, OK, thumbs up, V, beckon, wave, drum, pebble roll]
+  M --> P[grips: pad pinch, tripod, lateral, hook, power cylinder, spherical, press]
+  M --> W[physics world: spheres, boxes, capsules, hinges, sliders, rungs, rope]
+  P --> X[grab, hold under motion, carry, place, release, throw, catch]
+  P --> T[two hands on one object, handover, in-hand roll and spin]
+  W --> R[press a button, flip a switch, pull a lever, turn a knob, open and close a drawer]
+  W --> K[push a crate, drag a crate]
+  W --> L[hang from a rung, climb hand over hand, hold a rope]
+  P --> S[grip strength and slip; weight read in the arms]
+```
+
+Each hand moves through the same states whatever it works on. `contact`, `grasped`, `released` and `slipped` are the events it emits on the way.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Free
+  Free --> Reaching: reach or grasp
+  Reaching --> Holding: fingers close, grasped
+  Reaching --> Free: target lost
+  Holding --> Holding: carry, turn, hand over, climb
+  Holding --> Releasing: release or throw
+  Holding --> Slipped: load over grip capacity
+  Slipped --> Free: fingers come off, slipped
+  Releasing --> Free: hand backs off and opens, released
+  Free --> Gesturing: gesture or finger control
+  Gesturing --> Free: stopGesture
+```
+
+Every one of them has a row in `npm run hands:matrix` naming the check that proves it and the gallery sheet that shows it. Each manipulation is a scripted scenario in [`app/scenes/capabilities.js`](app/scenes/capabilities.js) with a statement of what it must achieve in [`app/scenes/expectations.js`](app/scenes/expectations.js); the checks play it frame by frame and fail it if it penetrates, drops what it holds, pops, or does not do what it is for.
+
+A grasp contact is a phalanx capsule (segment $a\,b$, radius $r$) resting on the object's surface inside the pad squish band:
+
+$$ -\delta_{\text{squish}} \le \min_{\mathbf p \in [a,b]} \operatorname{sdf}(\mathbf p) - r \le 0.3\ \text{mm}, \qquad \delta_{\text{squish}} = 0.45\ \text{mm} $$
+
+A held object slips when the force needed to hold it through the hand's own motion is more than the grips on it can give, for two frames running:
+
+$$ m\,\lVert \mathbf a + \mathbf g \rVert > \sum_{\text{hands on it}} C_{\text{grip}} $$
+
+with the capacities $C$ per grip in `GRIPS` (a pad pinch 16 N, a power grip 160 N). Weight reads in the arms: the wrist drops by $2.2\ \text{mm}$ per newton carried, capped at 7 cm, and settles with the load.
+
+<details>
+<summary>Limits the checks hold every scenario to</summary>
+
+| Measure | Limit |
+| --- | --- |
+| Hand into any object, static, prop or rope | 1 mm |
+| Finger into finger or palm | 1 mm |
+| A gripping digit off what it holds, once the grip has formed | 2 mm |
+| A hand off what it follows (position plus the turn as its arc 8 cm out) | 5 mm |
+| Joint angular speed | under 20 rad/s |
+| Wrist travel per frame | under 4 cm |
+| Joint limits | never passed |
+| Bodies moving without contact, bodies at rest in the air | none |
+| Hands attached while climbing | at least one |
+| Replay of a 30 s scripted run | identical hashes |
+
+</details>
+
+## Budgets
+
+Measured by `npm run hands:check`; the sandbox row is measured in a real browser with the whole sandbox loaded.
+
+| Budget | Measured | Limit |
+| --- | --- | --- |
+| Triangles, both arms, high LOD | 13 904 | 20 000 |
+| Triangles, both arms, low LOD | 5 640 | 8 000 |
+| Draw calls, both arms | 2 | 6 |
+| Bones | 60 | 80 |
+| Sandbox scene loaded: triangles, draw calls | about 21 000, 32 | 100 000, 60 |
+| Solver time per frame with the sandbox (hands, interaction, world), median in Node | under 1 ms | 2 ms |
+
+## The sandbox
+
+Open the root URL. Three scenes share one injected clock (pause, single step, 0.1x, 0.25x, 1x) and seeded randomness:
+
+- **Hands**: the rig alone on a plain backdrop, for inspection: poses, counting, gestures, grips on objects of any size, per joint sliders for all ten digits.
+- **Sandbox**: stations for a ledge of objects, a bench for two hands, a button panel with switch, knob, lever and drawer, a crate, a ladder and a rope. The action palette and the capability matrix play every capability.
+- **Slingshot**: the one from the original rig, drawn and released by the module.
+
+Touch drags the hand's target; buttons are at least 44 px; portrait and landscape both lay out, clear of notches and home indicators. First person and inspection cameras move only from your input. There is a perf overlay, record and replay, and a reduced motion setting that follows the system's.
+
+Shot mode renders any frame exactly from URL parameters, which is what the gallery uses: `/?shot=1&scene=sandbox&cap=throwCatch&t=2.45`.
+
+## Repository
+
+| Path | What is there |
+| --- | --- |
+| [`hands/`](hands) | The module ([internals and how to extend it](hands/README.md)) and its tests |
+| `app/` | The sandbox: scenes, rendering, shot mode, interface |
+| `server/` | The static dev server |
+| `scripts/` | check, hands:check (`hands-checks/`), hands:matrix, hands:gallery |
+| `docs/` | The spec, the list of known minor issues ([HANDS_MINORS.md](docs/HANDS_MINORS.md)), images |
+
+## Credits
+
+Fonts vendored in `app/fonts` under the SIL Open Font License 1.1 (OFL-1.1): **Alfa Slab One** by JM Solé and **Barlow Condensed** by Jeremy Tribby, via Fontsource. The license texts are in `app/fonts/OFL-*.txt`. three.js and anime.js are MIT licensed.

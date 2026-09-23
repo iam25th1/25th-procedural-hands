@@ -25,6 +25,8 @@ Units are metres, kilograms and seconds. Angles are radians in code and degrees 
 | `stones.js` | Procedural pebbles, rocks and the sachet |
 | `clock.js`, `rng.js`, `math.js` | Fixed step clock, seeded generator, dependency free vector and quaternion math |
 | `defaults.js` | Skin tones, sleeve colours and object presets, all overridable |
+| `physics.js` | `World`: deterministic rigid bodies (sphere, box, capsule), statics, one degree of freedom props (hinge, slider), ropes, hand capsule contacts, tethers |
+| `interact.js` | `Interaction`: the hands acting on a world: reach planning, grasp, hold, carry, set down, release, throw and catch, slip, weight, props, drag, climb |
 
 ## One step
 
@@ -76,7 +78,7 @@ $$\ddot x = -\omega^2 (x - x_t) - 2\omega\,\dot x$$
 1. Static: if the hand shape is a combination of straight and folded digits, use a finger set as the pose: `{ pose: 'set:index+little' }`. Otherwise add a `hand(...)` entry to `POSES` in `poses.js` (degrees per joint; `dip` left out follows the PIP) and name it as the entry's `pose`.
 2. Moving: add `arm`, `armOsc` or `osc` fields. The drum entry is a good model: `{ digits: ['little', 'ring', 'middle', 'index'], joints: { mcp: -30, pip: -15, dip: -10 }, hz: 2.8, phaseStep: -0.25, wave: 'tap' }` lifts each finger in turn.
 3. Register it: add it to `GESTURES`, or call `registerGesture(name, entry)` at runtime.
-4. The `gestures:` check in `npm run hands:check` samples every registry entry at 60 fps on both hands for reach, limits, self-penetration and continuity, so a new gesture is covered the moment it exists. Add a shot for it in `scripts/gallery/shots.js` to see it on a sheet.
+4. The `gestures:` check in `npm run hands:check` samples every registry entry at 60 fps on both hands for reach, limits, self-penetration and continuity, so a new gesture is covered the moment it exists. Add a frame for it in `scripts/hands-gallery/sheets.js` to see it on a sheet.
 
 </details>
 
@@ -87,3 +89,42 @@ Named poses and finger sets are solved clear of each other, but the straight pat
 ## Isolation
 
 `test/isolation.test.js` (run by `npm test` in the gate) and the `isolation:` row of `npm run hands:check` lex every file under `hands/src`, strip comments and string bodies, and fail if an import resolves outside `hands/`, names any package but `three`, is a computed dynamic import, or if `window` or `document` appears in code.
+
+## The world and the interaction
+
+`create({ world: true })` (or `{ world: someWorld }`) gives the hands a `World` to act on. The world steps at the rig's fixed 60 Hz with two substeps, in a fixed order, from seeded state only, so the same calls replay bit for bit (`hash()` covers the joints and every body, prop and rope).
+
+```mermaid
+stateDiagram-v2
+  [*] --> Free
+  Free --> Reaching: reach()
+  Reaching --> Holding: grasp() finds contact
+  Reaching --> Free: grasp() closes on air
+  Holding --> Holding: carry, turn, intent (props), drag (tethers)
+  Holding --> Released: release() or setDown() then release()
+  Holding --> Slipped: load or acceleration over the grip's capacity
+  Released --> Free: fingers open, hand backs out
+  Slipped --> Free
+```
+
+- **Reach** (`reachPose`, `reach`): the grip is placed on the object from the grip's own placement, the hand turned among the object's symmetric turns and a search round the hinted turn, each candidate scored by solving the closed grip on a scratch skeleton (penetration of the object and its surroundings, missing contacts) and the arm on a scratch arm (can the wrist take that turn, with how much room). The approach line and the way to its start are checked for sweeps through anything (`pathCost`, `transitCost`); when the straight way is blocked the hand goes round (`route`: over, back toward the body, out to the side, or turning first).
+- **Grasp** closes the digits onto the object with the grasp solver, then holds it one of four ways: carried (the object follows the hand), a prop part (the hand drives the prop's one degree of freedom toward where it means to go, and follows the part), dragged (tethers pull the body along what it rests on) or fixed (a rung or the rope: the hand stays put and the body moves).
+- **Release** eases each digit off the object, backs the hand out along a clear way (a grip wrapped round a handle opens first), and opens.
+- **Weight** reads in the arm: the wrist sags by the load in newtons, capped. **Slip**: each grip has a capacity; when the load plus the acceleration the hand puts on the object needs more,
+
+$$ m\,\lVert \mathbf a + \mathbf g \rVert > \sum_{\text{hands}} C_{\text{grip}} $$
+
+  for two frames running, the object is let go at its previous velocity and the fingers come off it.
+
+## Contact condition
+
+A grasp contact is a phalanx capsule (segment $a\,b$, radius $r$) touching the object's surface inside the pad squish band:
+
+$$ -\delta_{\text{squish}} \le d(\mathbf p) - r \le 0.3\,\text{mm}, \qquad d = \min_{\mathbf p \in [a,b]} \operatorname{sdf}_{\text{object}}(\mathbf p), \quad \delta_{\text{squish}} = 0.45\,\text{mm} $$
+
+## How to add a capability
+
+1. Put what it needs in the sandbox world (`app/scenes/sandbox-world.js`): a body, a static, a prop with its parts, or a rope.
+2. Script it as a scenario in `app/scenes/capabilities.js`: time-keyed calls on the public API (`reach`, `grasp`, `intent`, `carry`, `setDown`, `release`, `moveTo`), in station coordinates. A key that returns `WAIT` holds the script until the hand has arrived.
+3. Say what it must achieve in `app/scenes/expectations.js` (what to measure each frame and what counts as done).
+4. `npm run hands:check` then plays it frame by frame with every clean-play rule (penetration, grip, continuity, contact-only motion, floating) and gives it its own `capability:` row; add it to `scripts/hands-matrix/capabilities.js` with that row and a sheet, and it appears in the sandbox's action palette and matrix panel.
