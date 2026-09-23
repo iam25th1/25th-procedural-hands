@@ -164,7 +164,7 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 400; margin: 0; }
 @media (orientation: landscape) and (max-height: 560px) {
   :root { --bar-h: calc(54px + var(--safe-bottom)); }
   .topbar { grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "brand scenes cam" "status status perf"; row-gap: 4px; }
-  .perf { justify-self: end; grid-template-columns: repeat(10, auto); }
+  .perf { justify-self: end; grid-template-columns: repeat(8, auto); }
   .cam { flex-wrap: nowrap; }
   .hand-row { position: static; padding: 4px 0; }
   /* With the centre docked the stage is narrow: no brand, two rows. */

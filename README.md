@@ -170,9 +170,11 @@ Sandbox scene loaded:
 | Draw calls, worst of six stations | 37 | 45 |
 | Bones | 60 | 80 |
 | Sim step ms (one fixed step: script keys, rig, interaction, physics), median in Node | 0.891 ms | 1.2 ms |
-| Sim step ms, median, live in headless Chromium (the perf overlay's figure) | 1.1 to 2.1 ms (bimodal run to run) | 3.0 ms |
+| Sim step ms, median, live in headless Chromium (the perf overlay's figure) | 1.4 to 2.4 ms (bimodal run to run) | 3.0 ms |
+| Sim step ms, 95th percentile, live | 2.6 to 3.3 ms | 4.5 ms |
+| Sim step ms, worst step, live (the page's per-frame sim budget) | 3.3 to 6.8 ms | 8.0 ms |
 
-The perf overlay and the checks use the same names for the same things: **sim step ms** is one fixed 1/60 s step of the scene, **frame ms** is the main thread's JavaScript for one animation frame (not GPU time), each shown as the median of the last 120. The sandbox triangle and draw-call counts come from three's `renderer.info` after rendering in headless Chromium on the machine running the check, not from a phone. The on-device figures come from the sandbox's perf overlay.
+The perf overlay and the checks use the same names for the same things: **sim step ms** is one fixed 1/60 s step of the scene, **frame ms** is the main thread's JavaScript for one animation frame (not GPU time), each shown as the median of the last 120. Beside them the overlay shows **sim step p95 ms** (the 95th percentile of the last 120 steps) and **sim step worst ms** (the worst of the last 600, 10 s), the figures the tail budgets hold. The worst step may not pass 8 ms, the page's simulation budget for one frame; the reasons for each limit are in [the spec](docs/HANDS_SANDBOX_SPEC.md#budgets). The sandbox triangle and draw-call counts come from three's `renderer.info` after rendering in headless Chromium on the machine running the check, not from a phone. The on-device figures come from the sandbox's perf overlay.
 
 ## Skin tones
 

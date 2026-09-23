@@ -607,7 +607,7 @@ export class Interaction {
     if (this.hold[side]) this.release(side);
     this.via[side] = null;
     const obj = targetShape(target);
-    const att = this.rig.graspWhere(side, { ...obj, pos: obj.pos.slice(), rot: obj.rot.slice() }, grip, { env: this.environment(obj, target) });
+    const att = this.rig.graspWhere(side, { ...obj, pos: obj.pos.slice(), rot: obj.rot.slice() }, grip, { env: this.environment(obj, target), cache: (fp, compute) => this.cached('grasp', fp, compute) });
     // Nothing within the fingers' reach: the grasp closes on air and holds nothing.
     if (!att.contacts.some((c) => !c.via && c.depth > -0.002)) {
       this.rig.release(side);
@@ -1030,7 +1030,14 @@ export class Interaction {
     }
   }
 
+  // The eased grip, through the plan source (see cached).
   easeGrip(side, att) {
+    const wr = this.rig.skel.joint(side, 'wrist');
+    const objW = this.rig.attachedObject(side);
+    return this.cached('easeGrip', `${side}|${JSON.stringify(att.pose)}|${[wr.worldPos, wr.worldRot, objW.pos, objW.rot].flat().join(',')}`, () => this.solveEaseGrip(side, att));
+  }
+
+  solveEaseGrip(side, att) {
     const sk = this.scratch;
     sk.reset();
     const wr = this.rig.skel.joint(side, 'wrist');

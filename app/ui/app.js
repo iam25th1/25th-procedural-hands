@@ -196,12 +196,15 @@ export function startApp({ canvas, shot }) {
   // sim step ms, one fixed 1/60 s step of the scene (script keys, rig,
   // interaction and physics), and frame ms, the main thread's JavaScript for
   // one animation frame (steps, view sync, draw submission; not GPU time).
-  // The overlay shows the median of the last 120 of each.
+  // The overlay shows the median of the last 120 of each, and for sim step
+  // also the 95th percentile of the last 120 and the worst of the last 600
+  // (10 s at 60 steps a second).
   const RING = 600;
   const stepTimes = [];
   const frameTimes = [];
   const push = (ring, v) => { ring.push(v); if (ring.length > RING) ring.shift(); };
-  const median = (ring, n = ring.length) => { const a = ring.slice(-n).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
+  const quantile = (ring, q, n = ring.length) => { const a = ring.slice(-n).sort((x, y) => x - y); return a.length ? a[Math.min(a.length - 1, Math.floor(a.length * q))] : 0; };
+  const median = (ring, n = ring.length) => quantile(ring, 0.5, n);
   clock.onStep((dt, t, c) => {
     const s = performance.now();
     applyPending(c.frame - 1, false, true);
@@ -371,7 +374,7 @@ export function startApp({ canvas, shot }) {
   const perf = el('dl', 'perf ui');
   perf.hidden = true;
   const perfCells = {};
-  for (const [k, label] of [['fps', 'fps'], ['frame', 'frame ms'], ['step', 'sim step ms'], ['tris', 'triangles'], ['calls', 'draw calls']]) {
+  for (const [k, label] of [['fps', 'fps'], ['frame', 'frame ms'], ['step', 'sim step ms'], ['stepP95', 'sim step p95 ms'], ['stepMax', 'sim step worst ms'], ['tris', 'triangles'], ['calls', 'draw calls']]) {
     perf.append(el('dt', '', label));
     perfCells[k] = el('dd', '', '0');
     perf.append(perfCells[k]);
@@ -706,6 +709,8 @@ export function startApp({ canvas, shot }) {
       perfCells.fps.textContent = perfState.fps.toFixed(0);
       perfCells.frame.textContent = median(frameTimes, 120).toFixed(1);
       perfCells.step.textContent = median(stepTimes, 120).toFixed(2);
+      perfCells.stepP95.textContent = quantile(stepTimes, 0.95, 120).toFixed(2);
+      perfCells.stepMax.textContent = Math.max(0, ...stepTimes).toFixed(1);
       perfCells.tris.textContent = info.triangles.toLocaleString('en-GB');
       perfCells.calls.textContent = String(info.calls);
     }
@@ -735,7 +740,7 @@ export function startApp({ canvas, shot }) {
     // answered, and how long the page has been waiting on it.
     planning: () => ({ worker: planner.available, active: planner.active, ready: planner.ready, frame: clock.frame, waitingMs: waitingSince ? performance.now() - waitingSince : 0, workerStepMs: planner.workerMs.slice(-120) }),
     // The perf overlay's numbers over the last 600 steps and frames.
-    perf: () => ({ stepMedian: median(stepTimes), stepMax: Math.max(0, ...stepTimes), steps: stepTimes.length, frameMedian: median(frameTimes), frames: frameTimes.length }),
+    perf: () => ({ stepMedian: median(stepTimes), stepP95: quantile(stepTimes, 0.95), stepMax: Math.max(0, ...stepTimes), steps: stepTimes.length, frameMedian: median(frameTimes), frameP95: quantile(frameTimes, 0.95), frameMax: Math.max(0, ...frameTimes), frames: frameTimes.length }),
     resetPerf: () => { stepTimes.length = 0; frameTimes.length = 0; },
     planStats: () => (planner.active ? planner.stats() : ctl.planStats ? ctl.planStats() : null),
     // The camera's position and its own right and up vectors, world space.

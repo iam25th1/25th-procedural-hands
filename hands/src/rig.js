@@ -351,10 +351,14 @@ export class Rig {
   // the pose the hand already holds (a pre-shape set while reaching) and the
   // object is attached with its actual transform in the wrist frame, so the
   // moment of contact never moves it.
-  graspWhere(side, obj, key, { startPose = null, env = [] } = {}) {
+  // cache(fp, compute), when given, may answer the closing solve from a
+  // recorded or precomputed run instead (see Interaction.cached); the
+  // answer only sets the fingers' targets, as a fresh solve's does.
+  graspWhere(side, obj, key, { startPose = null, env = [], cache = null } = {}) {
     const h = this.hands[side];
     const start = startPose || clonePose(h.base);
-    const result = solveGrasp(this.skel, side, obj, key, start, env);
+    const solve = () => { const r = solveGrasp(this.skel, side, obj, key, start, env); return { pose: r.pose, contacts: r.contacts, gripKey: r.gripKey }; };
+    const result = cache ? cache(`${side}|${key}|${[obj.pos, obj.rot].flat().join(',')}|${JSON.stringify(start)}|${env.length}`, solve) : solve();
     h.base = result.pose;
     h.attached = { obj: { ...obj }, attachment: attachToHand(this.skel, side, obj), gripKey: key, contacts: result.contacts, preShape: null, pose: clonePose(result.pose) };
     this.step(0);

@@ -7,7 +7,10 @@ import path from 'node:path';
 import { launchBrowser, serve, capture } from '../shoot.js';
 import { Skeleton } from '../../hands/src/skeleton.js';
 
-export const SANDBOX_BUDGET = { triangles: 30000, calls: 45, bones: 80, liveStepMs: 3.0 }; // docs/HANDS_SANDBOX_SPEC.md, BUDGETS
+// docs/HANDS_SANDBOX_SPEC.md, BUDGETS. The live sim step is held to its
+// median, its 95th percentile and its worst step: the worst step may not
+// pass the page's per-frame simulation budget (8 ms, app/ui/app.js).
+export const SANDBOX_BUDGET = { triangles: 30000, calls: 45, bones: 80, liveStepMs: 3.0, liveStepP95Ms: 4.5, liveStepWorstMs: 8.0 };
 const SHOTS = [
   'scene=sandbox&cap=grabCarryPlace&t=2',
   'scene=sandbox&cap=drawer&t=2.5',
@@ -44,37 +47,57 @@ export const sandboxBudgetChecks = [
       }
     },
   },
-  {
-    // The figure that matters on a device: sim step ms as the perf overlay
-    // measures it, live, while scripted actions play (from the plan table,
-    // as a user gets them). Measured in headless Chromium on the machine
-    // running the check; the on-device figure is read off the overlay.
-    name: 'budget: sim step ms, median, sandbox loaded live in a browser (the perf overlay figure)',
-    async run() {
-      const { server, base } = await serve();
-      let browser = null;
-      try {
-        const launched = await launchBrowser();
-        browser = launched.browser;
-        const context = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1 });
-        const page = await context.newPage();
-        await page.goto(`${base}/`, { waitUntil: 'load' });
-        await page.waitForFunction(() => window.__handsApp && window.__handsApp.plansLoaded, null, { timeout: 30000 });
-        await page.keyboard.press('c');
-        const rows = [];
-        for (const label of ['Grab, lift, carry, place', 'Pull a lever', 'Climb hand over hand']) {
-          await page.getByRole('button', { name: label, exact: true }).click();
-          await page.evaluate(() => window.__handsApp.resetPerf());
-          await page.waitForTimeout(3000);
-          rows.push({ label, ...(await page.evaluate(() => window.__handsApp.perf())) });
-        }
-        const worst = Math.max(...rows.map((r) => r.stepMedian));
-        const note = rows.map((r) => `${r.label}: step ${r.stepMedian.toFixed(2)} ms (max ${r.stepMax.toFixed(1)}) over ${r.steps} steps, frame ${r.frameMedian.toFixed(2)} ms`).join('; ');
-        return { pass: worst <= SANDBOX_BUDGET.liveStepMs, worst, limit: SANDBOX_BUDGET.liveStepMs, unit: 'ms median', note: `${note}; renderer ${launched.renderer}` };
-      } finally {
-        if (browser) await browser.close();
-        server.close();
-      }
-    },
-  },
+  ...liveStepChecks(),
 ];
+
+// The figure that matters on a device: sim step ms as the perf overlay
+// measures it, live, while scripted actions play (from the planning worker
+// and the plan table, as a user gets them). Measured once in headless
+// Chromium on the machine running the check and read three ways; the
+// on-device figures are read off the overlay.
+const LIVE_ACTIONS = ['Grab, lift, carry, place', 'Pull a lever', 'Climb hand over hand'];
+let liveRun = null;
+function measureLive() {
+  liveRun = liveRun || (async () => {
+    const { server, base } = await serve();
+    let browser = null;
+    try {
+      const launched = await launchBrowser();
+      browser = launched.browser;
+      const context = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1 });
+      const page = await context.newPage();
+      await page.goto(`${base}/`, { waitUntil: 'load' });
+      await page.waitForFunction(() => window.__handsApp && window.__handsApp.plansLoaded, null, { timeout: 30000 });
+      await page.keyboard.press('c');
+      const rows = [];
+      for (const label of LIVE_ACTIONS) {
+        await page.getByRole('button', { name: label, exact: true }).click();
+        await page.evaluate(() => window.__handsApp.resetPerf());
+        await page.waitForTimeout(3000);
+        rows.push({ label, ...(await page.evaluate(() => window.__handsApp.perf())) });
+      }
+      return { rows, renderer: launched.renderer };
+    } finally {
+      if (browser) await browser.close();
+      server.close();
+    }
+  })();
+  return liveRun;
+}
+
+function liveStepChecks() {
+  const one = (name, pick, limit, what) => ({
+    name,
+    async run() {
+      const { rows, renderer } = await measureLive();
+      const worst = Math.max(...rows.map(pick));
+      const note = rows.map((r) => `${r.label}: ${what} ${pick(r).toFixed(2)} ms (median ${r.stepMedian.toFixed(2)}, p95 ${r.stepP95.toFixed(2)}, worst ${r.stepMax.toFixed(1)}) over ${r.steps} steps, frame ms median ${r.frameMedian.toFixed(2)}, worst ${r.frameMax.toFixed(1)}`).join('; ');
+      return { pass: worst <= limit, worst, limit, unit: `ms ${what}`, note: `${note}; renderer ${renderer}` };
+    },
+  });
+  return [
+    one('budget: sim step ms, median, sandbox loaded live in a browser (the perf overlay figure)', (r) => r.stepMedian, SANDBOX_BUDGET.liveStepMs, 'median'),
+    one('budget: sim step ms, 95th percentile, sandbox loaded live in a browser (the perf overlay figure)', (r) => r.stepP95, SANDBOX_BUDGET.liveStepP95Ms, 'p95'),
+    one('budget: sim step ms, worst step, sandbox loaded live in a browser, within the 8 ms per-frame sim budget', (r) => r.stepMax, SANDBOX_BUDGET.liveStepWorstMs, 'worst'),
+  ];
+}

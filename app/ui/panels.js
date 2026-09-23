@@ -203,7 +203,7 @@ export function createPanels(app, drawer) {
     const sens = sliderRow('Sensitivity', { min: SENSITIVITY.min, max: SENSITIVITY.max, step: SENSITIVITY.step, value: cam.sensitivity }, (v) => app.setCamera({ sensitivity: v }));
     wrap.append(
       line('Reduced motion', 'No interface animation; calmer idle sway and gestures on the rig.', settings.reduced.el),
-      line('Perf overlay', 'Frame rate; frame ms, the JavaScript of one frame (not GPU time); sim step ms, one fixed 1/60 s step of the scene; both medians of the last 120. Triangles and draw calls.', settings.perf.el),
+      line('Perf overlay', 'Frame rate; frame ms, the JavaScript of one frame (not GPU time); sim step ms, one fixed 1/60 s step of the scene; both medians of the last 120. Sim step p95 (last 120) and worst (last 10 s). Triangles and draw calls.', settings.perf.el),
       line('Camera', 'Frame the current station or the hands again.', button('Recentre', '', () => app.recentre())),
       el('h2', 'group-title', 'Move camera'),
       line('Invert X', 'Off: drag right and the camera moves right.', settings.invertX.el),
