@@ -1,7 +1,8 @@
 // Static file serving for the sandbox. Only whitelisted trees and files are
-// reachable: the app at /, the hands module source at /hands/src/, and an
-// explicit list of vendor files from node_modules at /vendor/. No directory
-// listings, no dotfiles, no traversal, strict CSP on every response.
+// reachable: the app at /, the hands module source at /hands/src/, an
+// explicit list of vendor files from node_modules at /vendor/, and an
+// explicit list of data files (DATA). No directory listings, no dotfiles, no
+// traversal, strict CSP on every response.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +36,41 @@ export const VENDOR = {
   '/vendor/three.core.js': path.join(ROOT, 'node_modules', 'three', 'build', 'three.core.js'),
   '/vendor/anime.esm.js': path.join(ROOT, 'node_modules', 'animejs', 'dist', 'bundles', 'anime.esm.min.js'),
 };
+
+// Data files served by exact path and nothing else, each behind a guard
+// that must pass on the file's current bytes. The recorded plan table is
+// served only while it was built from the sources as they are now (see
+// plan-hash.js); otherwise the app solves every plan itself.
+export const DATA = {
+  '/scenes/plans.json': {
+    file: PLAN_TABLE,
+    type: 'application/json; charset=utf-8',
+    guard: (body) => JSON.parse(body.toString('utf8')).sourceHash === planSourceHash(),
+    refused: 'Plan table is stale: run npm run hands:plans',
+  },
+};
+
+// The request's path, percent-decoded, or null when it cannot be one we
+// serve (too long, undecodable, a NUL or a backslash).
+function decodePath(urlPath) {
+  if (typeof urlPath !== 'string' || urlPath.length > 512) return null;
+  let decoded;
+  try {
+    decoded = decodeURIComponent(urlPath);
+  } catch {
+    return null;
+  }
+  if (decoded.includes('\0') || decoded.includes('\\')) return null;
+  return decoded;
+}
+
+// A data file's entry for a request path, or null. Exact match only, after
+// decoding: no normalisation, so no ./ or ../ or doubled slash reaches it.
+export function resolveData(urlPath) {
+  const decoded = decodePath(urlPath);
+  if (decoded === null || !Object.hasOwn(DATA, decoded)) return null;
+  return DATA[decoded];
+}
 
 // The hands module imports three by its package name so bundlers and Node
 // resolve it normally. Browsers cannot resolve a bare name without an import
@@ -74,14 +110,8 @@ export function securityHeaders() {
 
 // Resolve a request path to { file, rewrite } or null if it is not servable.
 export function resolvePath(urlPath) {
-  if (typeof urlPath !== 'string' || urlPath.length > 512) return null;
-  let decoded;
-  try {
-    decoded = decodeURIComponent(urlPath);
-  } catch {
-    return null;
-  }
-  if (decoded.includes('\0') || decoded.includes('\\')) return null;
+  const decoded = decodePath(urlPath);
+  if (decoded === null) return null;
   if (Object.hasOwn(VENDOR, decoded)) return { file: VENDOR[decoded], rewrite: false };
   const normal = path.posix.normalize(decoded);
   if (!normal.startsWith('/')) return null;
@@ -124,19 +154,16 @@ export function createStaticHandler() {
       return send(res, 400, headers, 'Bad request');
     }
     if (pathname === '/healthz') return send(res, 200, headers, 'ok');
-    // The recorded plan table: served only while it was built from the
-    // sources as they are now (see plan-hash.js); otherwise the app solves
-    // every plan itself.
-    if (pathname === '/scenes/plans.json') {
+    const data = resolveData(pathname);
+    if (data) {
       let body;
       try {
-        body = fs.readFileSync(PLAN_TABLE);
-        const table = JSON.parse(body.toString('utf8'));
-        if (table.sourceHash !== planSourceHash()) return send(res, 404, headers, 'Plan table is stale: run npm run hands:plans');
+        body = fs.readFileSync(data.file);
+        if (!data.guard(body)) return send(res, 404, headers, data.refused);
       } catch {
         return send(res, 404, headers, 'Not found');
       }
-      res.writeHead(200, { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': body.length, 'Cache-Control': 'no-cache' });
+      res.writeHead(200, { ...headers, 'Content-Type': data.type, 'Content-Length': body.length, 'Cache-Control': 'no-cache' });
       return res.end(req.method === 'HEAD' ? undefined : body);
     }
     const hit = resolvePath(pathname);

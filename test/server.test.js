@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
-import { resolvePath, createStaticHandler, securityHeaders, rewriteThreeSpecifier, VENDOR, ROOT } from '../server/static.js';
+import fs from 'node:fs';
+import { resolvePath, resolveData, createStaticHandler, securityHeaders, rewriteThreeSpecifier, VENDOR, DATA, ROOT } from '../server/static.js';
+import { planSourceHash, PLAN_TABLE } from '../server/plan-hash.js';
 import { lanAddresses } from '../server/lan.js';
 import { startServer, portTakenMessage, bootMessage, parsePort, DEFAULT_PORT } from '../server/index.js';
 
@@ -94,6 +96,52 @@ test('http: vendor files stream with CSP, everything else outside the whitelist 
     const root = await get(server, '/');
     assert.equal(root.status, 200);
     assert.match(root.headers['content-type'], /text\/html/);
+  } finally {
+    server.close();
+  }
+});
+
+// The plan table's route: the data whitelist serves exactly its listed
+// files, by exact path, and nothing near them.
+const NOT_DATA = [
+  '/scenes/../scenes/plans.json', '/scenes/%2e%2e/scenes/plans.json', '/scenes/..%2fscenes%2fplans.json', '/scenes/./plans.json',
+  '/scenes//plans.json', '/scenes/plans.json/', '/scenes/plans.json%00', '/scenes/plans.json\0', '/scenes\\plans.json', '/scenes/plans.JSON',
+  '/scenes/.plans.json', '/scenes/.git/config', '/scenes/.hidden.json', '/scenes/', '/scenes', '/scenes/capabilities.json',
+  '/scenes/plans.json.bak', '/app/scenes/plans.json', '/plans.json', '/scenes/../../package.json', '/scenes/%2e%2e/%2e%2e/package.json',
+  '/scenes/..%2f..%2fpackage.json', '/%2Fscenes%2Fplans.json', `/scenes/${'a'.repeat(600)}.json`,
+];
+
+test('data whitelist: only /scenes/plans.json, by exact path; traversal, dotfiles and unlisted paths are refused', () => {
+  assert.deepEqual(Object.keys(DATA), ['/scenes/plans.json']);
+  assert.equal(resolveData('/scenes/plans.json').file, PLAN_TABLE);
+  assert.equal(resolveData('/scenes/plans%2Ejson').file, PLAN_TABLE); // the same path, one character escaped
+  for (const p of NOT_DATA) assert.equal(resolveData(p), null, p);
+  // No other route reaches it or any JSON: the app mount has no .json type.
+  for (const p of ['/scenes/plans.json', ...NOT_DATA]) assert.equal(resolvePath(p), null, p);
+});
+
+test('http: the plan table is served only fresh, as JSON with the CSP; its neighbours are 404', async () => {
+  const server = http.createServer(createStaticHandler());
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const fresh = JSON.parse(fs.readFileSync(PLAN_TABLE, 'utf8')).sourceHash === planSourceHash();
+    const r = await get(server, '/scenes/plans.json');
+    assert.equal(r.status, fresh ? 200 : 404);
+    if (fresh) {
+      assert.equal(r.headers['content-type'], 'application/json; charset=utf-8');
+      assert.match(r.headers['content-security-policy'], /default-src 'self'/);
+      assert.equal(r.headers['x-content-type-options'], 'nosniff');
+      assert.equal(JSON.parse(r.body.toString('utf8')).sourceHash, planSourceHash());
+    } else assert.match(r.body.toString('utf8'), /stale/);
+    // Raw request paths: the client sends them as written, dot segments included.
+    for (const p of NOT_DATA.filter((q) => !q.includes('\0') && !q.includes('\\') && q !== '/scenes/../scenes/plans.json' && q !== '/scenes/%2e%2e/scenes/plans.json' && q !== '/scenes/./plans.json')) {
+      const x = await get(server, p);
+      assert.equal(x.status, 404, p);
+      assert.doesNotMatch(x.body.toString('utf8'), /sourceHash/, p);
+    }
+    // Dot segments a URL parser removes resolve to the table itself, never past it.
+    for (const p of ['/scenes/../scenes/plans.json', '/scenes/%2e%2e/scenes/plans.json', '/scenes/./plans.json']) assert.equal((await get(server, p)).status, fresh ? 200 : 404, p);
+    assert.equal((await new Promise((resolve, reject) => { const q = http.request({ host: '127.0.0.1', port: server.address().port, path: '/scenes/plans.json', method: 'POST' }, resolve); q.on('error', reject); q.end(); })).statusCode, 405);
   } finally {
     server.close();
   }

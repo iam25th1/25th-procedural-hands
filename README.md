@@ -24,7 +24,7 @@ The server prints the sandbox URL on this machine and on the local network (open
 
 | Command | What it does |
 | --- | --- |
-| `npm start` | The static dev server: whitelisted files only, strict CSP (no inline scripts, no eval, workers only from the same origin), `nosniff`, `frame-ancestors 'none'` |
+| `npm start` | The static dev server: whitelisted files only (the app, the module source, listed vendor files and listed data files such as the plan table, each by exact path), strict CSP (no inline scripts, no eval, workers only from the same origin), `nosniff`, `frame-ancestors 'none'` |
 | `npm run check` | `node --check` over every source folder, and a scan for characters the house style bans |
 | `npm test` | `node --test`: module, physics, server and isolation tests |
 | `npm run hands:check` | The acceptance suite: every check with its worst measured value against its limit |
