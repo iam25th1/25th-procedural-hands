@@ -75,7 +75,11 @@ test('colorize: on every Monk tone the palm is lighter than the back, more so th
     // Unshaded skin only: creases are darkened on purpose, and the palm has
     // many more of them than the back.
     const dorsal = mean((m) => m.region === 0 && m.palmar < 0.05 && m.shade === 1);
-    const palm = mean((m) => m.region === 0 && m.palmar > 0.95 && m.shade === 1);
+    // The palm is glabrous skin: palm and volar digits, ending at the wrist
+    // crease, with a fifth of the melanocytes of other sites (Yamaguchi Y et
+    // al. J Cell Biol 2004;165(2):275-285). The volar forearm faces the same
+    // way but is not glabrous, so it is not the palm.
+    const palm = mean((m) => m.region === 0 && m.palmar > 0.95 && (m.glabrous ?? 1) === 1 && m.shade === 1);
     const nail = mean((m) => m.region === 1);
     const cloth = mean((m) => m.region === 3);
     assert.ok(dorsal.n > 0 && palm.n > 0 && nail.n > 0 && cloth.n > 0);

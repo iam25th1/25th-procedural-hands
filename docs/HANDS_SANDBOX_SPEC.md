@@ -105,6 +105,25 @@ Minors, listed in docs/HANDS_MINORS.md with the sheet and one line each, not blo
 - Mesh defects carried over from the rig's last review: ring seams at the finger joints, flat palms in the anatomy close-up, pinch frames where the free fingers splay straight.
 - Any new cosmetic nit. These get fixed in a later finishing pass, not this one.
 
+## ANATOMICAL VALUES AND CORRECTED CHECKS
+
+Sourced values the rig is held to, and every existing check or test that was corrected because it enforced behaviour the anatomy contradicts. The findings behind them are in [HANDS_TWIST_FINDINGS.md](HANDS_TWIST_FINDINGS.md). A check was corrected only where its assertion encoded the defect; no limit was moved to make a row pass.
+
+| Value | Rig | Source | Held by |
+| --- | --- | --- | --- |
+| Palm colour boundary | the palm's lighter colour on glabrous skin only (palm and volar digits), half at the wrist crease ring, none on the arm | Yamaguchi Y et al. J Cell Biol 2004;165(2):275-285: palmoplantar melanocyte density is a fifth of other sites'; glabrous skin is the palms, soles and ventral digits | `colour: the palm colour stops at the wrist crease` (volar against dorsal forearm, at most 3 dE76 on every Monk tone) |
+
+### Corrected: unit test `colorize: on every Monk tone the palm is lighter than the back`
+
+<details>
+<summary>Old and new assertion, and why</summary>
+
+- Old: "palm" was every unshaded skin vertex with `palmar > 0.95`, which took in the volar forearm as well as the palm. The test then asserted the deep tones' "palm" was more than 1.5 times the back's L*, so it required palm colour up the forearm.
+- New: "palm" is unshaded skin with `palmar > 0.95` and glabrous (`(m.glabrous ?? 1) === 1`): the palm and volar digits only. Every assertion is unchanged: palm lighter than the back on every tone, the deep tones' palm over 1.5 times the back, the ratio rising with depth, nail beds over 15 dE from the skin, nail and cloth roughness.
+- Why: the volar forearm is not glabrous skin (Yamaguchi 2004), so counting it as palm encoded the stripe up the forearm that made its rotation read as a spiral.
+
+</details>
+
 ## BUDGETS
 
 Two sets, each measured on its own subject. npm run hands:check fails if any value goes over its limit.

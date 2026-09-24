@@ -257,17 +257,21 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     // frames carry the pronation. The previous ring is re-indexed to the
     // nearest correspondence so the bridge never twists across the tube.
     const join = (a, r) => b.bridge(st.q === prevQ ? a : alignRing(b, r, a), r);
+    // Arm skin is not palmar skin: the palm's lighter colour stops at the
+    // wrist crease (glabrous 0 on the arm, half at the crease; see colorize).
+    const glab = st.q === wr.restWorldRot ? [0.5, 0.5, 1] : [0, 0, 0];
+    const mark = (ids, g) => { for (const id of ids) b.meta[id].glabrous = g; return ids; };
     if (flank) {
-      const r0 = ring(st.q, v3.add([0, 0, 0], st.c, rot(st.q, [0, 0, flank])), pts, st.w, skinMeta(1, null, flip));
+      const r0 = mark(ring(st.q, v3.add([0, 0, 0], st.c, rot(st.q, [0, 0, flank])), pts, st.w, skinMeta(1, null, flip)), glab[0]);
       if (prev) join(prev, r0);
       prev = r0; prevQ = st.q;
     }
-    const r = ring(st.q, st.c, pts, st.w, skinMeta(1, st.crease || null, flip));
+    const r = mark(ring(st.q, st.c, pts, st.w, skinMeta(1, st.crease || null, flip)), glab[1]);
     if (!firstRing) firstRing = r;
     if (prev) join(prev, r);
     prev = r; prevQ = st.q;
     if (flank) {
-      const r1 = ring(st.q, v3.add([0, 0, 0], st.c, rot(st.q, [0, 0, -flank])), pts, st.w, skinMeta(1, null, flip));
+      const r1 = mark(ring(st.q, v3.add([0, 0, 0], st.c, rot(st.q, [0, 0, -flank])), pts, st.w, skinMeta(1, null, flip)), glab[2]);
       b.bridge(prev, r1);
       prev = r1;
     }
@@ -849,7 +853,12 @@ export function colorize(mesh, { skinTone = DEFAULTS.skinTone, shirt = DEFAULTS.
         r = 0.95;
         break;
       default: {
-        c = mix(dorsal, palm, m.palmar);
+        // The palm's lighter colour is palmar (glabrous) skin's alone: its
+        // melanocyte density is a fifth of other sites' (Yamaguchi Y et al.
+        // J Cell Biol 2004;165(2):275-285). The volar forearm is not
+        // glabrous, so it keeps the dorsal colour; the change sits at the
+        // wrist crease. Vertices with no glabrous mark are the hand's.
+        c = mix(dorsal, palm, m.palmar * (m.glabrous ?? 1));
         // Gentle mottling from the rest position (about 3 cm wavelength, plus
         // or minus 4 percent) so large flat areas do not read as plastic.
         const x = mesh.positions[i * 3], y = mesh.positions[i * 3 + 1], z = mesh.positions[i * 3 + 2];

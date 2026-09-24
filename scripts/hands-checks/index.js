@@ -15,6 +15,7 @@ import { planChecks } from './plans.js';
 import { videoChecks } from './video.js';
 import { planningChecks } from './planning.js';
 import { skinDeformChecks } from './skin-deform.js';
+import { glabrousChecks } from './glabrous.js';
 
 export const CHECKS = [
   ...servedChecks,
@@ -32,5 +33,6 @@ export const CHECKS = [
   ...uiChecks,
   ...skinChecks,
   ...skinDeformChecks,
+  ...glabrousChecks,
   ...videoChecks,
 ];

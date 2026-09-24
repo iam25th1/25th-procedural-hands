@@ -13,7 +13,7 @@ All renders were made with the single arm shot scene (`/?shot=1&scene=arm&pose=r
 | # | Cause | Measure | Before | Source | State |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Forearm skin laid down unwound in full pronation | volar side against the elbow crease (bind) and the palm (supination), skinned mesh | 180 deg off at the elbow; 129, 80, 27 deg off at 28, 55, 85 percent in supination | Kulesh et al 2015 | **fixed** (e7eae3f) |
-| 2 | Palm colour on the volar forearm | volar against dorsal forearm colour, every Monk tone | 6.7 dE76 | Yamaguchi et al 2004 | **conflict**, patch |
+| 2 | Palm colour on the volar forearm | volar against dorsal forearm colour, every Monk tone | 6.7 dE76 | Yamaguchi et al 2004 | **fixed**: palm colour on glabrous skin only (0.07 dE76) |
 | 3 | Thumb column under-rotated at rest | first metacarpal rotation, measured as Cheema et al measured it | 41.6 deg | Cheema et al 2006: 74 +/- 10 | **conflict**, patch |
 | 4 | Wrist crease ring weighted against its neighbours | ring turn under 90 deg of rotation, bend under 73 deg of flexion | turn 75 against 86 either side; bend 36 against 65 | (mesh consistency) | **fixed** (88b598b) |
 | 5 | A third of pronation at the wrist joint | distal third of the forearm turning with the hand | 85 percent at 85 percent of the forearm | Kulesh et al 2015; the radiocarpal joint does not pronate | **conflict**, patch |
@@ -59,7 +59,7 @@ Each image has the before row on top and the after row below, with the same fram
 | Forearm winding (e7eae3f) | bind from above and below; thumb up; full supination | ![](assets/twist/forearm.png) |
 | Wrist girth (8096e5d) | bind; thumb up from the side; full supination | ![](assets/twist/girth.png) |
 | Thumb roll (patch, not applied) | palm, back, radial, ulnar, three quarter | ![](assets/twist/thumb.png) |
-| Glabrous colour (patch, not applied) | bind from above and below; thumb up; full supination | ![](assets/twist/colour.png) |
+| Glabrous colour (landed) | bind from above and below; thumb up; full supination | ![](assets/twist/colour.png) |
 | Gallery: counting, desktop | the core sheet before and after the three commits | ![](assets/twist/gallery-counting.png) |
 
 ## Sources
@@ -86,7 +86,6 @@ Each patch applies to the committed tree with `git apply docs/conflicts/<name>.p
 flowchart TD
   T["thumb-rest-roll.patch: roll -24.2 deg, pre-shape abduction 37"] -->|fails| T1["Hook, Pull a lever, Drag a crate, Handover + 4 aggregates"]
   P["pronation-split.patch: pronation on the two twist bones, none at the wrist"] -->|fails| P1["ik: forearm twist shared (equal thirds), 2 unit tests, Hang from a rung"]
-  G["glabrous-colour.patch: palm colour only on glabrous skin"] -->|fails| G1["unit test: colorize"]
 ```
 
 ### thumb-rest-roll.patch
@@ -103,11 +102,13 @@ This puts pronation on the two forearm twist bones, half each, and none at the w
 
 It fails the existing `ik: forearm twist shared across the twist bones`, which asserts equal thirds (45 deg spread), and two unit tests that assume thirds. It also fails Hang from a rung: the left thumb metacarpal goes 14.1 mm into the rung, because the arm solve changes. It trades the wrist lag for deeper candy wrap: with only two forearm twist bones 90 deg apart at a 180 deg turn, the mid forearm shrinks to 74 percent of its radius (88 percent now). Doing it properly needs a third forearm twist bone, or dual quaternion skinning, as well.
 
-### glabrous-colour.patch
+### Landed: palm colour on glabrous skin only
 
-This keeps the palm's lighter colour on glabrous skin only: the palm and the volar digits, stopping at the wrist crease. The volar forearm keeps the forearm's colour, which removes the stripe that makes the forearm spiral visible in every rotation. The new check, `colour: the palm colour stops at the wrist crease`, measures 6.7 dE76 now and 0.07 with the patch.
+The palm's lighter colour now stays on glabrous skin: the palm and the volar digits, stopping at the wrist crease. The volar forearm keeps the forearm's colour, which removes the stripe that made the forearm spiral visible in every rotation. `colour: the palm colour stops at the wrist crease` measured 6.7 dE76 before and 0.07 after.
 
-It fails the existing unit test `colorize: on every Monk tone the palm is lighter than the back`. That test counts every palmar-facing skin vertex as "palm", the volar forearm included, so it encodes the defect: with the forearm corrected, the Monk 8 to 10 "palm" average falls below 1.5 times the back's lightness. The rendered skin-tone check, which measures the actual palm, still passes.
+The unit test `colorize: on every Monk tone the palm is lighter than the back` counted every palmar-facing skin vertex as "palm", the volar forearm included, so it encoded the defect. It now counts glabrous skin only, with every assertion kept; the old and new assertion are in [the spec](HANDS_SANDBOX_SPEC.md#anatomical-values-and-corrected-checks).
+
+It also explains the rendered skin-tone drift. The winding commit (e7eae3f) turned the palm-coloured volar forearm into the edge of the back view the skin-tone check samples, so deep tones' backs rendered lighter (Monk 10 back L* 14.6 to 16.6; worst dE76 1.20 to 2.43). With the forearm coloured as forearm the worst is back to 1.4.
 
 ## Checks added
 
@@ -118,4 +119,4 @@ It fails the existing unit test `colorize: on every Monk tone the palm is lighte
 | proportion: forearm length and wrist girth within half an SD of ANSUR II | yes | the wrist at 156.6 mm against 169.0 |
 | anatomy: first metacarpal rotation at rest (Cheema 2006) | in thumb-rest-roll.patch | the thumb at 41.6 deg against 74 +/- 10 |
 | skinning: the distal third of the forearm turns with the hand | in pronation-split.patch | a third of pronation at the wrist joint (85 percent at 85 percent of the forearm) |
-| colour: the palm colour stops at the wrist crease | in glabrous-colour.patch | the palm colour painted up the volar forearm (6.7 dE76) |
+| colour: the palm colour stops at the wrist crease | yes | the palm colour painted up the volar forearm (6.7 dE76) |
