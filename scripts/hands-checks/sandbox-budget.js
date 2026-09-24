@@ -90,6 +90,7 @@ function measureLive() {
 function liveStepChecks() {
   const one = (name, pick, limit, what) => ({
     name,
+    device: 'a wall-clock time per step in a browser (the perf overlay figure), its limit set on the machine the budgets were measured on',
     async run() {
       const { rows, renderer } = await measureLive();
       const worst = Math.max(...rows.map(pick));

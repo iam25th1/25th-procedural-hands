@@ -55,6 +55,7 @@
     "hands:plans": "node scripts/hands-plans.js",
     "hands:gallery": "node scripts/hands-gallery.js",
     "gate": "npm run check && npm test && npm run hands:check && npm run hands:matrix && npm audit --audit-level=high",
+    "gate:ci": "npm run check && npm test && npm run hands:check -- --set=ci && npm run hands:matrix -- --set=ci && npm audit --audit-level=high",
     "sandbox": "node server/index.js",
     "example": "npm --prefix examples/consumer run dev"
   },

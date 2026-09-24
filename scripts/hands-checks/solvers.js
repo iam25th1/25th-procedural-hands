@@ -292,6 +292,7 @@ export const solverChecks = [
   {
     // rig step ms: one fixed step of the hands module alone (rig.step), in Node.
     name: 'budget: rig step ms, median, hands module alone in Node',
+    device: 'a wall-clock time per step, its limit set on the machine the budgets were measured on',
     async run() {
       const rig = new Rig({ seed: 9 });
       const times = [];

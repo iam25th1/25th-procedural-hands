@@ -208,6 +208,7 @@ export const manipulationChecks = [
   {
     // sim step ms in Node, the same metric the perf overlay shows live.
     name: 'budget: sim step ms, median, sandbox loaded in Node (script keys, rig, interaction, physics)',
+    device: 'a wall-clock time per step, its limit set on the machine the budgets were measured on',
     async run() {
       const ms = auditAll().flatMap((r) => r.stepMs).sort((a, b) => a - b);
       const at = (q) => ms[Math.min(ms.length - 1, Math.floor(q * ms.length))];

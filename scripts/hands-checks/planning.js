@@ -13,6 +13,7 @@ const RUNS = ['Pad pinch on three sizes', 'Pull a lever', 'Climb hand over hand'
 export const planningChecks = [
   {
     name: 'planning: switching actions and cold solves after a slider move never hold a frame; the worker answers every solve',
+    device: 'a wall-clock frame time in a browser, with the GPU, CPU and scheduler of the machine it runs on',
     async run() {
       const { server, base } = await serve();
       let browser = null;

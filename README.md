@@ -322,9 +322,10 @@ The browser checks need Playwright's Chromium, which `--ignore-scripts` does not
 | `npm run hands:matrix` | The capability matrix: one row per capability, PASS or FAIL |
 | `npm run hands:plans` | Rebuilds the recorded plan table (after any change to `hands/src` or `app/scenes`; `hands:check` fails while it is stale) |
 | `npm run hands:gallery` | Renders the gallery sheets at 390x844, 844x390 and 1440x900 into `artifacts/gallery/` |
-| `npm run gate` | check, test, hands:check, hands:matrix and `npm audit --audit-level=high`: every commit passes it |
+| `npm run gate` | check, test, hands:check, hands:matrix and `npm audit --audit-level=high`: every commit passes it, device-dependent budgets included |
+| `npm run gate:ci` | The same with `--set=ci`: every machine-independent check, leaving out the 7 device-dependent ones (wall-clock budgets and the video render's time limit) |
 
-GitHub Actions runs the same gate on every push and pull request to main, on Linux and macOS ([`.github/workflows/gate.yml`](https://github.com/iam25th1/25th-procedural-hands/blob/main/.github/workflows/gate.yml)).
+GitHub Actions runs `npm run gate:ci` on every push and pull request to main, on x64 Linux, arm64 Linux and arm64 macOS ([`.github/workflows/gate.yml`](https://github.com/iam25th1/25th-procedural-hands/blob/main/.github/workflows/gate.yml)). The device budgets cannot be held on a shared runner and run only in `npm run gate` on real hardware; [CONTRIBUTING.md](https://github.com/iam25th1/25th-procedural-hands/blob/main/CONTRIBUTING.md) lists them and says why.
 
 ## Repository
 

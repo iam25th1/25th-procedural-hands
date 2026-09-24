@@ -33,6 +33,7 @@ async function play(page, bytes, type) {
 export const videoChecks = [
   {
     name: 'video: offline renders at 1920x1080 and 2560x1440 (60 fps, every frame, whatever the view) and a live recording each save a file that plays',
+    device: 'rendering and encoding 642 frames at 1080p and 1440p must finish inside a 120 s wall-clock wait, on the GPU and with the encoders of the machine it runs on',
     async run() {
       const { server, base } = await serve();
       let browser = null;

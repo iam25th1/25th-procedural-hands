@@ -1,7 +1,11 @@
-# The gate on every push and pull request to main: the same npm run gate
-# every commit passes locally (check, unit tests, hands:check, hands:matrix,
-# npm audit). The browser checks need Playwright's Chromium, which
-# npm ci --ignore-scripts does not download, so it is installed here.
+# The machine-independent gate on every push and pull request to main:
+# npm run gate:ci (check, unit tests, hands:check and hands:matrix with
+# --set=ci, npm audit). The device-dependent checks (wall-clock budgets
+# measured on one machine, and the video renders' time limit) cannot be
+# met on shared runners and are run only by npm run gate on the device;
+# CONTRIBUTING.md says which and why. The browser checks need Playwright's
+# Chromium, which npm ci --ignore-scripts does not download, so it is
+# installed here.
 name: gate
 
 on:
@@ -23,9 +27,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Linux is the usual runner; macOS is closest to the machine the
-        # budgets were measured on (ANGLE over Metal rather than SwiftShader).
-        os: [ubuntu-latest, macos-latest]
+        # x64 and arm64 Linux and arm64 macOS: the simulation must replay
+        # to the same bits on each (docs/dev-notes/HANDS_X64_REPLAY.md).
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -38,4 +42,4 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
-      - run: npm run gate
+      - run: npm run gate:ci
