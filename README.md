@@ -17,7 +17,7 @@ The **library** in [`hands/src`](https://github.com/iam25th1/25th-procedural-han
 - **Control at any level**: named poses, a gesture registry, counting, any set of extended fingers, per finger and per joint curl and spread, arm IK to a wrist target.
 - **Grasping and manipulation**: eight grips (tip pinch, pad pinch, tripod, lateral pinch, hook, power cylinder, spherical, palm press), reach planning round obstacles, carry, set down, throw, catch, handover, in-hand roll and spin, slip under load.
 - **An interaction layer**: a deterministic physics world of bodies, hinges, sliders, rungs and a rope that the hands push, pull, press, turn, drag and climb.
-- **Deterministic**: a fixed 60 Hz step and seeded randomness, so the same calls replay bit for bit.
+- **Deterministic**: a fixed 60 Hz step, seeded randomness and its own elementary functions, so the same calls replay bit for bit on any engine and CPU.
 
 ## Install
 
@@ -189,6 +189,16 @@ with $\delta_{\text{squish}} = 0.45$ mm and the capacities $C$ per grip in `GRIP
 
 </details>
 
+## Replay across machines
+
+The same calls with the same seed give the same run, and on any machine it is the same to the last bit, not only on the one that recorded it. That rests on the rig's elementary functions being its own. The standard lets `Math.sin`, `Math.pow`, `Math.hypot` and the rest differ in the last bit between engines and CPUs, and they do: Node on linux-x64 disagrees with darwin-arm64 in 9 of them. The rig uses none of them, and CI checks that replays are bit for bit on x64 Linux, arm64 Linux and arm64 macOS. What that means for code using the library:
+
+- **Your own inputs.** If you need a run to replay identically on other machines, compute the targets, poses and angles you pass in with the exported `dmath` (`dmath.sin`, `dmath.atan2`, `dmath.pow` and the rest) instead of `Math`. `+ - * /`, `Math.sqrt`, `abs`, `floor`, `round`, `min` and `max` are exact everywhere. The library cannot make a sine you computed yourself agree across machines.
+- **Comparing runs.** `hands.hash()` rounds every value to 1e-6 before hashing: it tells you that a run changed, not that two runs are equal to the bit. For a bit for bit comparison, hash the exact values of `hands.rig.skel.transformValues()` and `hands.world.stateValues()`.
+- **Recorded plans in the sandbox.** A plan table records the signature of the math it was built under. An engine that cannot reproduce that signature does not replay the table: it plans live and reports why (`window.__handsApp.plansNote` in the sandbox).
+
+The details, with the measurements, are in [the x64 replay note](https://github.com/iam25th1/25th-procedural-hands/blob/main/docs/dev-notes/HANDS_X64_REPLAY.md).
+
 ## Sourced values
 
 Every length, range and colour the rig is built from comes from a published measurement. They are used as data: numbers taken from the tables and figures cited, not reproduced text. Each is cited again beside the value in the code ([`anatomy.js`](https://github.com/iam25th1/25th-procedural-hands/blob/main/hands/src/anatomy.js), [`skin.js`](https://github.com/iam25th1/25th-procedural-hands/blob/main/hands/src/skin.js), [`mesh.js`](https://github.com/iam25th1/25th-procedural-hands/blob/main/hands/src/mesh.js)).
@@ -335,7 +345,7 @@ GitHub Actions runs `npm run gate:ci` on every push and pull request to main, on
 | [`examples/consumer/`](https://github.com/iam25th1/25th-procedural-hands/tree/main/examples/consumer) | The consumer example |
 | `app/`, `server/` | The sandbox and its static dev server |
 | `scripts/`, `test/` | The checks, the matrix, the gallery and the repository tests |
-| [`docs/dev-notes/`](https://github.com/iam25th1/25th-procedural-hands/tree/main/docs/dev-notes) | Development notes: the build brief, why the arms and thumbs looked twisted and how each cause was fixed, known minor issues |
+| [`docs/dev-notes/`](https://github.com/iam25th1/25th-procedural-hands/tree/main/docs/dev-notes) | Development notes: the build brief, why the arms and thumbs looked twisted and how each cause was fixed, why a replay parted from its live run on x64, known minor issues |
 
 [CONTRIBUTING.md](https://github.com/iam25th1/25th-procedural-hands/blob/main/CONTRIBUTING.md) has the rules that matter here: every anatomical value cited, no check loosened to make a row pass, the gate green before a pull request.
 

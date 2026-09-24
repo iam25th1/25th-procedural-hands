@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="230" viewBox="0 0 720 230" role="img" aria-labelledby="t d">
+  <title id="t">How the x64 replay parted from its live run</title>
+  <desc id="d">A timeline of the In-hand spin scenario, frames 0 to 355, replayed on linux-x64 from a table recorded on darwin-arm64. At frame 63 the grasp solve returns values up to 5.55e-17 apart on the two machines from identical inputs. At frame 222 the set-down solve's inputs differ by 5.55e-17 but round to the same 1e-7 fingerprint, so the replay uses the arm64 answer. At frame 225 the replay's state first differs from the x64 live run, by 1.1e-16. At frame 355 the difference is 1.6e-4 in the dowel's rotation.</desc>
+  <rect width="720" height="230" fill="#15171A"/>
+  <text x="24" y="30" fill="#F1F0EB" font-family="Arial, sans-serif" font-size="15" font-weight="700">In-hand spin replayed on linux-x64 from an arm64 table</text>
+  <!-- The run: frames 0 to 355 mapped onto x 40 to 680 -->
+  <line x1="40" y1="120" x2="680" y2="120" stroke="#8C969B" stroke-width="4" stroke-linecap="round"/>
+  <text x="40" y="146" fill="#8C969B" font-family="Arial, sans-serif" font-size="12" text-anchor="middle">0</text>
+  <text x="680" y="146" fill="#8C969B" font-family="Arial, sans-serif" font-size="12" text-anchor="middle">355</text>
+  <!-- Replay and live identical up to frame 225 (x 446), then apart -->
+  <line x1="40" y1="120" x2="446" y2="120" stroke="#F1F0EB" stroke-width="4" stroke-linecap="round">
+    <animate attributeName="x2" values="40;446;446;40" keyTimes="0;0.6;0.95;1" dur="10s" repeatCount="indefinite"/>
+  </line>
+  <path d="M446 120 L680 108" stroke="#F2B705" stroke-width="3" fill="none" stroke-dasharray="240" stroke-dashoffset="240">
+    <animate attributeName="stroke-dashoffset" values="240;240;0;0;240" keyTimes="0;0.6;0.85;0.95;1" dur="10s" repeatCount="indefinite"/>
+  </path>
+  <!-- Markers fade in one after another, once per 10 s loop -->
+  <g font-family="Arial, sans-serif" font-size="12" fill="#F1F0EB" opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.1;0.16;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <line x1="154" y1="104" x2="154" y2="136" stroke="#F1F0EB" stroke-width="2"/>
+    <text x="154" y="94" text-anchor="middle">frame 63: grasp solve</text>
+    <text x="154" y="170" text-anchor="middle" fill="#8C969B">same inputs, 6 values</text>
+    <text x="154" y="186" text-anchor="middle" fill="#8C969B">up to 5.55e-17 apart</text>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="12" fill="#F1F0EB" opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.4;0.46;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <line x1="440" y1="104" x2="440" y2="136" stroke="#F1F0EB" stroke-width="2"/>
+    <text x="400" y="74" text-anchor="middle">frame 222: set-down solve</text>
+    <text x="400" y="90" text-anchor="middle" fill="#8C969B">inputs 5.55e-17 apart, same 1e-7 fingerprint</text>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="12" fill="#F2B705" opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.6;0.66;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <circle cx="446" cy="120" r="6" fill="#F2B705"/>
+    <text x="446" y="170" text-anchor="middle">frame 225: state parts, 1.1e-16</text>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="12" fill="#F2B705" opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.85;0.9;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <circle cx="680" cy="108" r="6" fill="#F2B705"/>
+    <text x="672" y="206" text-anchor="end">frame 355: 1.6e-4 in the dowel's rotation</text>
+  </g>
+</svg>
