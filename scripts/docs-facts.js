@@ -7,6 +7,7 @@
 // export and backticked name a doc mentions must exist.
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { XR_JOINT_NAMES, JOINTS_PER_SIDE } from '../hands/src/skeleton.js';
 import { FOREARM_TWIST, KULESH_SKIN_SHARE, HAND_MM, SEGMENT_FRACTION, STATURE_MM, ARM_MM } from '../hands/src/anatomy.js';
 import { GRIPS } from '../hands/src/grasp.js';
@@ -122,9 +123,23 @@ export const FACTS = [
   { doc: 'hands/README.md', find: /`app\/scenes\/plans\.json` \(about (\d+) KB\)/, value: () => '', what: 'plan table size', test: (got) => { const kb = fs.statSync(PLAN_TABLE).size / 1024; return Math.abs(kb - Number(got)) / kb <= 0.1 ? '' : `the table is ${kb.toFixed(0)} KB`; } },
 ];
 
+// Paths the docs may name: files in the repository (what git tracks, so a
+// file that exists only on one machine does not count) and the directories
+// holding them, plus the one generated output directory, artifacts/, which
+// the gallery and the checks write and git ignores.
+const GENERATED = ['artifacts'];
+function trackedPaths(root) {
+  const files = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean);
+  const out = new Set(files);
+  for (const f of files) { let d = path.posix.dirname(f); while (d !== '.') { out.add(d); d = path.posix.dirname(d); } }
+  return out;
+}
+const named = (tracked, p) => tracked.has(p) || GENERATED.some((g) => p === g || p.startsWith(`${g}/`));
+
 // Every repository path, npm script, export and backticked name in the docs.
 export function checkNames(root) {
   const problems = [];
+  const tracked = trackedPaths(root);
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const example = JSON.parse(fs.readFileSync(path.join(root, 'examples/consumer/package.json'), 'utf8'));
   const walk = (d, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) { if (!['node_modules', 'artifacts', '.git', 'dist'].includes(e.name)) walk(f, out); } else if (/\.(js|mjs)$/.test(e.name)) out.push(f); } return out; };
@@ -134,12 +149,12 @@ export function checkNames(root) {
   const dirs = ['hands/src', 'scripts', 'scripts/hands-checks', 'app', 'app/scenes', 'app/plan', 'app/ui', 'server', 'test', 'docs/dev-notes', 'docs/assets', 'examples/consumer', '.'];
   for (const doc of DOCS) {
     const s = fs.readFileSync(path.join(root, doc), 'utf8');
-    for (const m of s.matchAll(/`([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+)\/?`/g)) if (!fs.existsSync(path.join(root, m[1]))) problems.push(`${doc}: no path ${m[1]}`);
-    for (const m of s.matchAll(/`([A-Za-z0-9_-]+\.(?:js|mjs|json|md|yml|svg|png))`/g)) if (!dirs.some((d) => fs.existsSync(path.join(root, d, m[1])))) problems.push(`${doc}: no file ${m[1]}`);
+    for (const m of s.matchAll(/`([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+)\/?`/g)) if (!named(tracked, m[1])) problems.push(`${doc}: no path ${m[1]} in the repository`);
+    for (const m of s.matchAll(/`([A-Za-z0-9_-]+\.(?:js|mjs|json|md|yml|svg|png))`/g)) if (!dirs.some((d) => tracked.has(d === '.' ? m[1] : `${d}/${m[1]}`))) problems.push(`${doc}: no file ${m[1]} in the repository`);
     for (const m of s.matchAll(/npm run ([a-z:]+)/g)) if (!pkg.scripts[m[1]] && !(example.scripts || {})[m[1]]) problems.push(`${doc}: no npm script ${m[1]}`);
     for (const m of s.matchAll(/`([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)(?:\([^`]*\))?`/g)) {
       const last = m[1].split('.').pop();
-      if (last.length >= 4 && !fs.existsSync(path.join(root, m[1])) && !new RegExp(`\\b${last.replace(/\$/g, '\\$')}\\b`).test(code)) problems.push(`${doc}: ${m[0]} is not in the code`);
+      if (last.length >= 4 && !tracked.has(m[1]) && !new RegExp(`\\b${last.replace(/\$/g, '\\$')}\\b`).test(code)) problems.push(`${doc}: ${m[0]} is not in the code`);
     }
   }
   const r = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
