@@ -182,6 +182,20 @@ Sourced values the rig is held to, and every existing check or test that was cor
 
 </details>
 
+## SET-DOWN
+
+A body set down is held or resting on its surface at every frame, from the set-down until the hand is clear of it, and ends let go and resting. `set-down: every body set down is held or resting on its surface at every frame until the hand is clear` checks every set-down in every capability scenario (resting: within 1.5 mm of a surface, the floating check's tolerance; clear: every hand capsule 3 mm off the body).
+
+<details>
+<summary>What it found, and the fix</summary>
+
+- Handover: the left hand set the handle down with its thumb and fingers curled under it, so the set-down stopped with the handle 20 mm above the bench on the thumb. Let go, the handle fell onto the thumb and rolled off it: 22 frames neither held nor resting, slowest 0.028 m/s (the floating check's limit is 0.02 m/s, so it passed by that margin).
+- Grab, lift, carry, place: the set-down never finished. At the chosen spot the arm could not bring the hand the last 27 mm down with the rock turned as it was carried (the shoulder's twist at its 90 deg limit), so the release waited out the script and the rock was carried home, still held. Its expectation measures where the rock ends up, not that it was let go, so it passed.
+- Fix: the set-down turns the body as it lowers (tip, roll about a handle's axis, turn about the vertical, or a shift of a few centimetres on the same surface) so the body lands before any digit and the arm can reach; the release lets go thumb first, then the fingers, and backs out before any other move.
+- The check fails the rig before the fix (Handover 22 unsupported frames, Grab, lift, carry, place never let go) and the rig with the thumb rest roll before the fix (Handover 21 frames, In-hand roll 2 frames).
+
+</details>
+
 ## BUDGETS
 
 Two sets, each measured on its own subject. npm run hands:check fails if any value goes over its limit.

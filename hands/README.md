@@ -183,7 +183,20 @@ stateDiagram-v2
 
 - **Reach** (`reachPose`, `reach`): the grip is placed on the object from the grip's own placement, the hand turned among the object's symmetric turns and a search round the hinted turn, each candidate scored by solving the closed grip on a scratch skeleton (penetration of the object and its surroundings, missing contacts) and the arm on a scratch arm (can the wrist take that turn, with how much room). The approach line and the way to its start are checked for sweeps through anything (`pathCost`, `transitCost`); when the straight way is blocked the hand goes round (`route`: over, back toward the body, out to the side, or turning first).
 - **Grasp** closes the digits onto the object with the grasp solver, then holds it one of four ways: carried (the object follows the hand), a prop part (the hand drives the prop's one degree of freedom toward where it means to go, and follows the part), dragged (tethers pull the body along what it rests on) or fixed (a rung or the rope: the hand stays put and the body moves).
-- **Release** eases each digit off the object, backs the hand out along a clear way (a grip wrapped round a handle opens first), and opens.
+- **Set down** (`setDown`) lowers a held body until it rests on its surface, the body first: no digit may reach the surface before it, or letting go would leave it standing on the digits and drop it. Where a digit would (a handle taken palm down has fingers and thumb curled under it), or where the arm cannot take the hand all the way down, the hand turns the body about its centre as it lowers: tipping it so a long handle's far end touches first, rolling a handle about its own axis so the thumb comes out from under it, turning it about the vertical, or setting it a few centimetres aside on the same surface. The smallest such turn is taken, finished 2 cm above the surface; most set-downs need none.
+- **Release** of a body resting on its surface lets go thumb first: the thumb comes off (0.2 s ahead) while the fingers still hold, then the fingers ease off, and the hand backs out (off a handle, level along it) before any other move it was asked for meanwhile, which then follow in order. Otherwise release eases each digit off the object, backs the hand out along a clear way (a grip wrapped round a handle opens first), and opens.
+
+```mermaid
+sequenceDiagram
+  participant H as Hand
+  participant B as Body
+  participant S as Surface
+  H->>B: setDown: lower, turning if a digit would land first
+  B->>S: body touches (supported from here on)
+  H->>B: release: thumb comes off first
+  H->>B: 0.2 s later: fingers ease off
+  H->>H: back out level, then the moves asked for meanwhile
+```
 - **Weight** reads in the arm: the wrist sags by the load in newtons, capped. **Slip**: each grip has a capacity; when the load plus the acceleration the hand puts on the object needs more,
 
 $$ m\,\lVert \mathbf a + \mathbf g \rVert > \sum_{\text{hands}} C_{\text{grip}} $$

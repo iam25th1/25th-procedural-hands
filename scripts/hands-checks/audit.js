@@ -11,6 +11,10 @@ import { STEP } from '../../hands/src/clock.js';
 import { capsuleEnd } from '../../hands/src/skeleton.js';
 
 const MM = 0.001;
+// A body set down counts as resting within 1.5 mm of a surface (the floating
+// check's tolerance); the hand is clear of it at 3 mm.
+const SUPPORT_TOL = 0.0015;
+const CLEAR = 0.003;
 
 function capsuleEndsOf(o) {
   if (o.a) return [o.a, o.b];
@@ -62,6 +66,7 @@ export function auditScenario(id, { seed = 1 } = {}) {
     stepMs: [],
     measures: {}, runState: {}, handled: new Set(), moved: new Map(), start: null,
     hashes: [],
+    setDowns: [],
   };
   let prevRot = null;
   let prevRoot = null;
@@ -78,6 +83,16 @@ export function auditScenario(id, { seed = 1 } = {}) {
         r.lastRelease = p.t;
       });
       p.sb.hands.on('slipped', () => { r.slipped++; });
+      // Every set-down, from the call until the hand is clear of the body.
+      const I = p.sb.hands.interaction;
+      if (I) {
+        const setDown = I.setDown.bind(I);
+        I.setDown = (side, o) => {
+          const rec = I.hold[side];
+          if (rec && rec.kind === 'body') r.setDowns.push({ side, body: rec.body, from: p.t, unsupported: 0, at: '', clear: false, released: false });
+          return setDown(side, o);
+        };
+      }
       // sim step ms: one whole fixed step, as the sandbox's perf overlay
       // times it: the script's keys, then rig, interaction and world.
       const step = p.step.bind(p);
@@ -87,6 +102,18 @@ export function auditScenario(id, { seed = 1 } = {}) {
       const { hands, world } = p.sb;
       const skel = hands.skeleton;
       r.frames++;
+      // A body being set down is held or resting on a surface at every frame.
+      for (const e of r.setDowns) {
+        if (e.clear) continue;
+        const held = Boolean(e.body.heldBy && e.body.heldBy.length);
+        if (!held) e.released = true;
+        if (!held && !world.isSupported(e.body, SUPPORT_TOL)) { e.unsupported++; if (!e.at) e.at = `${t.toFixed(2)} s`; }
+        if (!held && world.isSupported(e.body, SUPPORT_TOL)) {
+          const shape = e.body.graspShape();
+          const near = handCapsules(skel, e.side).some((c) => capsuleObjectDistance(shape, c.a, c.b, c.r, 6) < CLEAR);
+          if (!near) e.clear = true;
+        }
+      }
       // Hand into anything, 1 mm at most.
       const shapes = worldShapes(world);
       for (const side of ['left', 'right']) {

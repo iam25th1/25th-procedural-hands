@@ -107,6 +107,27 @@ export const manipulationChecks = [
     },
   },
   {
+    // A set-down ends with the body resting on its surface, let go: from the
+    // call until the hand is clear of it, it is held or rests on a surface at
+    // every frame (never dropped the last centimetre, never left on a digit).
+    name: 'set-down: every body set down is held or resting on its surface at every frame until the hand is clear, and ends let go and resting',
+    async run() {
+      const all = auditAll();
+      let n = 0;
+      let bad = 0;
+      const notes = [];
+      for (const r of all) {
+        for (const e of r.setDowns) {
+          n++;
+          const fail = e.unsupported > 0 || !e.released || !e.clear;
+          if (fail) { bad++; notes.push(`${r.id} ${e.side} ${e.body.name}: ${!e.released ? 'never let go' : !e.clear ? 'hand never clear of it resting' : `${e.unsupported} frames neither held nor resting from ${e.at}`}`); }
+        }
+      }
+      const frames = all.reduce((a, r) => a + r.setDowns.reduce((b, e) => b + e.unsupported, 0), 0);
+      return { pass: n > 0 && bad === 0, worst: bad, limit: 0, unit: 'set-downs', note: `${n} set-downs over ${all.filter((r) => r.setDowns.length).length} scenarios; ${frames} unsupported frames${notes.length ? `; ${notes.join('; ')}` : ''}` };
+    },
+  },
+  {
     name: 'continuity: every scenario under 20 rad/s per joint, wrist under 4 cm a frame, no self-penetration over 1 mm, inside limits',
     async run() {
       const all = auditAll();

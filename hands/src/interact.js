@@ -45,6 +45,19 @@ export function planFingerprint(side, grip, obj, hint, at, avoid) {
 }
 
 const FOREARM_ROOM_WEIGHT = 1 / 3;
+// Seconds the thumb leads the fingers in letting go of a body set down.
+const THUMB_LEAD = 0.2;
+// Height (metres over its surface) by which a set-down's turn is complete.
+const TURN_ABOVE = 0.02;
+// Seconds a hand backing out from under a body it set down is left to it.
+const LEAVE_TIME = 0.35;
+
+// A pose with another pose's thumb.
+function withThumb(pose, thumb) {
+  const out = clonePose(pose);
+  out.thumb = { cmc: thumb.cmc.slice(), mcp: thumb.mcp.slice(), ip: thumb.ip };
+  return out;
+}
 
 export function targetShape(target) {
   if (target instanceof Body) return target.graspShape();
@@ -99,6 +112,10 @@ export class Interaction {
     this.slipCount = { left: 0, right: 0 };
     this.loosen = { left: null, right: null };
     this.pendingOpen = { left: null, right: null };
+    this.pendingRelease = { left: null, right: null };
+    // A hand backing out from under a body it just set down, and the move it
+    // was asked for meanwhile (made once it is out).
+    this.leaving = { left: null, right: null };
     this.pendingMove = { left: null, right: null };
     this.unignore = [];
     this.wayIn = { left: null, right: null };
@@ -598,6 +615,7 @@ export class Interaction {
   // through anything near the path: straight if clear, else by the clearest
   // of a few detours (over, back toward the body, out to the side).
   moveTo(side, target) {
+    if (this.leaving[side]) { this.leaving[side].then.push(target); return this; }
     this.pendingMove[side] = null;
     const wr = this.rig.skel.joint(side, 'wrist');
     const from = { pos: wr.worldPos.slice(), rot: wr.worldRot.slice() };
@@ -781,9 +799,21 @@ export class Interaction {
   // open: the pose the fingers open to, after `openAfter` seconds (the hand
   // first backs off `withdraw` metres, so the opening fingers never press
   // into what was just set down); a throw opens at once.
-  release(side, { velocity = null, slipped = false, open = 'ready', withdraw = 0.02, openAfter = null } = {}) {
+  release(side, { velocity = null, slipped = false, open = 'ready', withdraw = 0.02, openAfter = null, thumbFirst = true, keepThumb = null, thumbUnder = false } = {}) {
     const rec = this.hold[side];
     if (!rec) return null;
+    // Setting a body down: the thumb comes off first while the fingers still
+    // hold it, then the fingers open. A thumb curled under a handle would
+    // otherwise lift the end it is under as the hand opens.
+    if (thumbFirst && !velocity && !slipped) {
+      const off = this.thumbOff(side);
+      const thumb = off ? clonePose(this.rig.hands[side].attached.pose).thumb : null;
+      if (off === true) {
+        this.pendingRelease[side] = { at: this.rig.time + THUMB_LEAD, opts: { open, withdraw, openAfter, thumbFirst: false, keepThumb: thumb } };
+        return rec.body || null;
+      }
+      if (off === 'under') { keepThumb = thumb; thumbUnder = true; }
+    }
     const arm = this.rig.arms[side];
     const wr = this.rig.skel.joint(side, 'wrist');
     let vel = [0, 0, 0];
@@ -876,10 +906,13 @@ export class Interaction {
     const held = object instanceof Body ? object : rec.kind === 'prop' ? { prop: rec.prop, part: rec.part } : null;
     const here = held ? { pos: wr.worldPos.slice(), rot: wr.worldRot.slice(), obj: targetShape(held) } : null;
     const hereEnv = here ? this.environment(here.obj, held) : null;
-    if (wayPose && here && this.pathCost(side, here, wayPose, hereEnv, [0, 1, 0], 0) > 0.0006) wayPose = null;
+    // It must fit round the object too, or opening would push into it.
+    if (wayPose && here && this.pathCost(side, here, wayPose, held instanceof Body ? [...hereEnv, here.obj] : hereEnv, [0, 1, 0], 0) > 0.0006) wayPose = null;
     // A slip eases the grip too: the pads visibly come off the object as it
     // goes, and a moment later the fingers close on nothing.
-    const eased = wayPose || (att && att.pose && !(GRIPS[rec.grip] && GRIPS[rec.grip].approachPose) ? this.easeGrip(side, att) : null);
+    let eased = wayPose || (att && att.pose && !(GRIPS[rec.grip] && GRIPS[rec.grip].approachPose) ? this.easeGrip(side, att) : null);
+    if (eased && keepThumb) eased = withThumb(this.rig.resolvePose(side, eased), keepThumb);
+    let openLater = null;
     this.rig.release(side);
     if (slipped) this.hands.emit('slipped', { hand: side, object, velocity: vel.slice() });
     this.hands.emit('released', { hand: side, object, velocity: vel.slice(), slipped });
@@ -900,15 +933,39 @@ export class Interaction {
       let way = this.wayIn[side] ? quat.rotate([0, 0, 0], wr.worldRot, this.wayIn[side]) : v3.negate([0, 0, 0], quat.rotate([0, 0, 0], wr.worldRot, [0, -1, 0]));
       if (eased && here) {
         const pose = here;
-        const envW = hereEnv;
+        // A body just set down is in the way like anything else: backing out
+        // must not lift it on the digits still under it.
+        const envW = held instanceof Body ? [...hereEnv, here.obj] : hereEnv;
+        // And the hand opens to a shape that fits where it is: a ready hand's
+        // thumb dips below the palm, into a table the hand is resting near.
+        if (open && held instanceof Body) {
+          let bestOpen = null;
+          for (const shape of [open, 'open', 'flat']) {
+            const cost = this.pathCost(side, pose, shape, envW, [0, 1, 0], 0);
+            if (!bestOpen || cost < bestOpen.cost - 1e-5) bestOpen = { cost, shape };
+          }
+          open = bestOpen.shape;
+        }
+        // A thumb that came off first stays where it went until the hand has
+        // backed out: opening it under a handle would lift the handle.
+        if (keepThumb && open) { openLater = open; open = withThumb(this.rig.resolvePose(side, open), keepThumb); }
         const palm = quat.rotate([0, 0, 0], wr.worldRot, [0, -1, 0]);
         const fingers = quat.rotate([0, 0, 0], wr.worldRot, [0, 0, -1]);
         // Never along a shaft the fingers are round: that does not free the
         // hand, it only slides the fist along the handle.
         let cands = [way, v3.negate([0, 0, 0], palm), [0, 1, 0], [0, 0, 1], v3.negate([0, 0, 0], fingers), v3.normalize([0, 0, 0], v3.sub([0, 0, 0], [0, 1, 0], palm))];
-        if (pose.obj.shape === 'cylinder') { const ax = quat.rotate([0, 0, 0], pose.obj.rot, [0, 0, 1]); cands = cands.filter((d) => Math.abs(v3.dot(d, ax)) < 0.7); }
+        if (pose.obj.shape === 'cylinder') {
+          const ax = quat.rotate([0, 0, 0], pose.obj.rot, [0, 0, 1]);
+          cands = cands.filter((d) => Math.abs(v3.dot(d, ax)) < 0.7);
+          // Once the fingers are off a handle just set down, the hand slides
+          // off along it, level: that neither lifts nor rolls it.
+          const flatAx = v3.normalize([0, 0, 0], [ax[0], 0, ax[2]]);
+          if (keepThumb) cands = [flatAx, v3.negate([0, 0, 0], flatAx), ...cands];
+        }
         // A grip wrapped round the object opens before the hand moves off.
-        const wraps = ['powerCylinder', 'hook', 'spherical'].includes(rec.grip);
+        // (A body set down, though, is only eased off first: opening a wrap
+        // at once flicks it, and it is resting on its surface anyway.)
+        const wraps = ['powerCylinder', 'hook', 'spherical'].includes(rec.grip) && !(held instanceof Body && keepThumb);
         let best = null;
         if (!wraps) {
           for (const d of cands) {
@@ -930,7 +987,11 @@ export class Interaction {
       }
       const t0 = this.rig.time + (openFirst ? 0.4 : uncurl || wayPose ? 0.24 : 0.1);
       if (withdraw) this.pendingMove[side] = { at: t0, pos: v3.addScaled([0, 0, 0], arm.target.pos, way, Math.max(withdraw, 0.035)) };
-      if (open) this.pendingOpen[side] = { at: openAfter != null ? this.rig.time + openAfter : t0 + 0.3, pose: open };
+     // Nothing else moves the hand until it has backed out: a move asked for
+      // meanwhile would drag the body it just let go of (a thumb under it
+      // would carry it up). Moves asked for meanwhile follow, in order.
+      if (keepThumb && withdraw) this.leaving[side] = { until: t0 + LEAVE_TIME, then: [] };
+      if (open) this.pendingOpen[side] = { at: openAfter != null ? this.rig.time + openAfter : t0 + 0.3, pose: openLater || open };
     }
     return object;
   }
@@ -996,8 +1057,151 @@ export class Interaction {
     const rec = this.hold[side];
     if (surface == null && rec && rec.kind === 'body') surface = this.world.surfaceBelow(rec.body);
     this.down[side] = { surface, speed, margin, done: false };
+    if (rec && rec.kind === 'body' && !this.objectLed.has(rec.body.id)) this.planSetDown(side, this.down[side]);
     return this.down[side];
   }
+
+  // The thumb's part of letting go a body that rests on its surface, held by
+  // this hand alone with at least two other digits: the thumb takes a shape
+  // off the body and clear of the surface (the grip eased off the body, the
+  // shape the hand arrived with, the open or ready hand) and leaves the
+  // grip. Tried on the hand as it is, then put back. False when it cannot.
+  thumbOff(side) {
+    const rec = this.hold[side];
+    const att = this.rig.hands[side].attached;
+    if (!rec || rec.kind !== 'body' || !att || !att.pose || (rec.body.heldBy || []).length > 1) return false;
+    const body = rec.body;
+    if (!this.world.isSupported(body, 0.0015)) return false;
+    const holding = new Set(att.contacts.filter((c) => !c.via).map((c) => c.digit));
+    if (!holding.has('thumb') || holding.size < 3) return false;
+    const sk = this.rig.skel;
+    // A thumb under the body (a handle taken palm down) cannot come off it
+    // first: the body would drop onto it. It stays as it is instead while
+    // the fingers come off, and slides out as the hand backs away.
+    const shape0 = body.graspShape();
+    for (const c of handCapsules(sk, side)) {
+      if (c.digit !== 'thumb') continue;
+      for (let i = 0; i <= 4; i++) {
+        const q = v3.lerp([0, 0, 0], c.a, c.b, i / 4);
+        if (capsuleObjectDistance(shape0, q, [q[0], q[1] + 0.2, q[2]], c.r, 6) < 0) return 'under';
+      }
+    }
+    const joints = sk.sides[side].joints.filter((j) => j.digit === 'thumb');
+    const saved = joints.map((j) => ({ ...j.channels }));
+    const cands = [this.easeGrip(side, att), this.wayInPose[side], 'open', 'ready'].filter(Boolean);
+    let found = null;
+    for (const cand of cands) {
+      const pose = clonePose(att.pose);
+      pose.thumb = clonePose(this.rig.resolvePose(side, cand)).thumb;
+      const ch = poseChannels(pose);
+      for (const j of joints) if (ch[j.name]) sk.setChannels(j, ch[j.name].flex, ch[j.name].abd, ch[j.name].twist);
+      sk.updateSide(side);
+      const shape = body.graspShape();
+      let clear = true;
+      for (const c of handCapsules(sk, side)) {
+        if (c.digit !== 'thumb') continue;
+        if (capsuleObjectDistance(shape, c.a, c.b, c.r, 6) < 0.0015) { clear = false; break; }
+        for (let i = 0; i <= 4 && clear; i++) {
+          const q = v3.lerp([0, 0, 0], c.a, c.b, i / 4);
+          if (q[1] - c.r - this.world.surfaceUnder(q, c.r) < 0) clear = false;
+        }
+        if (!clear) break;
+      }
+      if (clear) { found = pose.thumb; break; }
+    }
+    joints.forEach((j, i) => sk.setChannels(j, saved[i].flex, saved[i].abd, saved[i].twist));
+    sk.updateSide(side);
+    if (!found) return false;
+    att.pose.thumb = found;
+    att.contacts = att.contacts.filter((c) => c.digit !== 'thumb');
+    this.rig.setPose(side, att.pose);
+    return true;
+  }
+
+  // Before lowering: the object must meet its surface before any digit does
+  // (a handle taken palm down has fingers and thumb curled below it, which
+  // would reach the table first and leave it standing on them when the hand
+  // lets go), and the arm must be able to take the hand all the way down.
+  // Where either fails, the hand turns the object about its centre: tipping
+  // it (a long handle's far end goes down first and rests on the surface
+  // while the hand opens round the other) or turning it about the vertical
+  // (it lands the same way up). The smallest turn that does both is taken;
+  // none is needed for most.
+  planSetDown(side, plan) {
+    const body = this.hold[side].body;
+    const wr = this.rig.skel.joint(side, 'wrist');
+    const fp = `${side}|${body.shape}|${[body.r, body.h, body.hx, body.hy, body.hz].join(',')}|${[body.pos, body.rot, wr.worldPos, wr.worldRot].flat().join(',')}|${plan.surface}|${plan.margin}`;
+    const got = this.cached('setDown', fp, () => this.solveSetDown(side, plan));
+    if (!got) return;
+    // The turn is spread over the way down (the arm may take it only near
+    // the bottom): stepDown turns the hand by the share of the drop made.
+    plan.turn = { q: got.q, shift: got.shift, C: body.pos.slice(), pos: wr.worldPos.slice(), rot: wr.worldRot.slice(), endY: got.endY };
+    this.rig.arms[side].set({ pole: got.pole });
+  }
+
+  solveSetDown(side, plan) {
+    const body = this.hold[side].body;
+    const sk = this.rig.skel;
+    const wr = sk.joint(side, 'wrist');
+    const C = body.pos.slice();
+    const caps = handCapsules(sk, side).map((c) => ({ a: c.a.slice(), b: c.b.slice(), r: c.r, digit: c.digit }));
+    const check = (q, shift) => {
+      const move = (p) => v3.add([0, 0, 0], v3.add([0, 0, 0], C, quat.rotate([0, 0, 0], q, v3.sub([0, 0, 0], p, C))), shift);
+      const at = v3.add([0, 0, 0], C, shift);
+      // Only onto the same surface (a shift may not step off the table).
+      if (Math.abs(this.world.surfaceUnder(at, 0) - plan.surface) > 1e-6) return null;
+      const rot0 = quat.multiply([0, 0, 0, 1], q, body.rot);
+      const objGap = Body.prototype.lowest.call({ ...body, pos: at, rot: rot0 }) - plan.margin - plan.surface;
+      let digitGap = Infinity;
+      const pts = [];
+      for (const c of caps) {
+        const a = move(c.a);
+        const b = move(c.b);
+        for (let i = 0; i <= 4; i++) {
+          const p = v3.lerp([0, 0, 0], a, b, i / 4);
+          digitGap = Math.min(digitGap, p[1] - c.r - plan.margin - 0.0005 - this.world.surfaceUnder(p, c.r));
+          if (c.digit === 'thumb') pts.push([p, c.r]);
+        }
+      }
+      if (digitGap < objGap + 0.001) return null;
+      // Nor may the thumb end up under it: letting go, the thumb comes off
+      // first, and a thumb under the body cannot come out without lifting it.
+      const shape = { ...body.graspShape(), pos: at, rot: rot0 };
+      for (const [p, r] of pts) if (capsuleObjectDistance(shape, p, [p[0], p[1] + 0.2, p[2]], r, 6) < 0) return null;
+      const pos = move(wr.worldPos);
+      const rot = quat.normalize([0, 0, 0, 1], quat.multiply([0, 0, 0, 1], q, wr.worldRot));
+      const fitDown = this.armFit(side, { pos: [pos[0], pos[1] - objGap, pos[2]], rot });
+      if (fitDown.posErr > 0.002 || fitDown.rotErr > 0.035) return null;
+      // Turned by the time it is TURN_ABOVE over its surface, before any
+      // digit nears it: the arm must take the turn from there on.
+      const fitMid = this.armFit(side, { pos: [pos[0], pos[1] - Math.max(0, objGap - TURN_ABOVE), pos[2]], rot });
+      if (fitMid.posErr > 0.002 || fitMid.rotErr > 0.035) return null;
+      return { q: q.slice(), shift: shift.slice(), pole: fitDown.pole, endY: pos[1] - objGap };
+    };
+    if (check([0, 0, 0, 1], [0, 0, 0])) return null;
+    // Long axis in the horizontal: tipping is about the axis across it,
+    // rolling (a handle turning in the hand) about the axis along it.
+    const along = body.shape === 'capsule' ? quat.rotate([0, 0, 0], body.rot, [0, 0, 1]) : quat.rotate([0, 0, 0], body.rot, [1, 0, 0]);
+    const flat = v3.normalize([0, 0, 0], [along[0], 0, along[2]]);
+    const across = v3.normalize([0, 0, 0], v3.cross([0, 0, 0], [0, 1, 0], flat));
+    const rad = (d) => (d * Math.PI) / 180;
+    const about = (axis, d) => quat.fromAxisAngle([0, 0, 0, 1], axis, rad(d));
+    const turns = [{ cost: 0, q: [0, 0, 0, 1] }];
+    for (const d of [15, 30, 45, 60, 90]) for (const sg of [1, -1]) turns.push({ cost: d, q: about([0, 1, 0], sg * d) });
+    for (const axis of [across, flat]) for (const d of [5, 10, 15, 20, 30]) for (const sg of [1, -1]) turns.push({ cost: d * 1.5, q: about(axis, sg * d) });
+    for (const r of [45, 60, 75, 90, 105]) for (const rs of [1, -1]) for (const d of [0, 5, 10, 12.5, 15, 17.5, 20]) for (const sg of [1, -1]) turns.push({ cost: r * 0.5 + d * 1.5, q: quat.multiply([0, 0, 0, 1], about(across, sg * d), about(flat, rs * r)) });
+    for (const y of [15, 30, 45]) for (const ys of [1, -1]) for (const d of [5, 10, 15, 20]) for (const sg of [1, -1]) turns.push({ cost: y + d * 1.5, q: quat.multiply([0, 0, 0, 1], about([0, 1, 0], ys * y), about(across, sg * d)) });
+    // The spot may shift a little over the same surface, a few centimetres
+    // either way, where the arm takes the turn more easily.
+    const shifts = [[0, 0, 0]];
+    for (const d of [0.03, 0.05]) for (const dir of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]]) shifts.push(dir.map((v) => v * d));
+    const cands = [];
+    for (const t of turns) for (const sh of shifts) cands.push({ cost: t.cost + v3.len(sh) * 400, q: t.q, shift: sh });
+    cands.sort((a, b) => a.cost - b.cost);
+    for (const c of cands) { if (c.cost === 0) continue; const got = check(c.q, c.shift); if (got) return got; }
+    return null;
+  }
+
   downGap(side, plan) {
     const rec = this.hold[side];
     // The held body comes down onto its surface; each finger onto whatever
@@ -1035,7 +1239,14 @@ export class Interaction {
       const rest = arm.target.pos[1] - arm.sag.x;
       const left = gap - (wr[1] - rest);
       const next = arm.target.pos[1] - Math.min(plan.speed * dt, left);
-      arm.set({ pos: [arm.target.pos[0], next, arm.target.pos[2]] });
+      const T = plan.turn;
+      if (T) {
+        // Turned by the share of the drop made so far, about the body's centre.
+        const f = clamp((T.pos[1] - arm.target.pos[1]) / Math.max(1e-6, T.pos[1] - T.endY - TURN_ABOVE), 0, 1);
+        const q = quat.slerp([0, 0, 0, 1], [0, 0, 0, 1], T.q, f);
+        const p = v3.addScaled([0, 0, 0], v3.add([0, 0, 0], T.C, quat.rotate([0, 0, 0], q, v3.sub([0, 0, 0], T.pos, T.C))), T.shift, f);
+        arm.set({ pos: [p[0], next, p[2]], rot: quat.normalize([0, 0, 0, 1], quat.multiply([0, 0, 0, 1], q, T.rot)) });
+      } else arm.set({ pos: [arm.target.pos[0], next, arm.target.pos[2]] });
       if (Math.abs(gap) < 0.0005 && Math.abs(left) < 0.0005) plan.done = true;
     }
   }
@@ -1179,6 +1390,14 @@ export class Interaction {
       return false;
     });
     for (const side of SIDES) {
+      const lv = this.leaving[side];
+      if (lv && this.rig.time >= lv.until) {
+        this.leaving[side] = null;
+        const next = lv.then.shift();
+        if (next) { this.moveTo(side, next); if (lv.then.length) this.leaving[side] = { until: this.rig.time + LEAVE_TIME, then: lv.then }; }
+      }
+      const pr = this.pendingRelease[side];
+      if (pr && this.rig.time >= pr.at) { this.pendingRelease[side] = null; this.release(side, pr.opts); }
       const m = this.pendingMove[side];
       if (m && this.rig.time >= m.at) { if (!this.hold[side]) this.rig.arms[side].set({ pos: m.pos }); this.pendingMove[side] = null; }
       const o = this.pendingOpen[side];
