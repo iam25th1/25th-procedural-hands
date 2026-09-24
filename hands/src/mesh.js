@@ -225,6 +225,26 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     { q: wr.restWorldRot, c: along(wr, 0), pr: S.wrist, w: [[bi('wrist'), 1]], crease: 'palmar', flip: false },
   ];
   if (L.reduced) armStations.splice(7, 1);
+  // The skin of the forearm as it lies in the bind pose, which is a full
+  // pronation. Pronation turns the radius and the skin over it; the ulna,
+  // the elbow and the skin near them stay (Kulesh PN, Fletcher MDA, Solomin
+  // LN. SICOT J 2015;1:3: skin moves least against the ulna near the elbow
+  // and least against the radius in the distal third). So in pronation the
+  // skin is wound: its volar side faces the palm at the wrist and the elbow
+  // crease at the elbow, and in supination (the anatomical position) it
+  // runs straight. Each ring is laid down turned back by the share of the
+  // forearm's rotation it does not carry, (1 - s) of the half turn from full
+  // pronation to full supination, where s is the share its skin weights
+  // give it (0 on the elbow's and upper arm's bones, 1 on the wrist's). The
+  // skinning then unwinds it exactly as the forearm supinates.
+  const TURN_SHARE = { shoulder: 0, 'upper-arm': 0, forearm: 0, 'forearm-twist-1': 1 / 3, 'forearm-twist-2': 2 / 3, wrist: 1 };
+  const byBone = new Map(Object.keys(TURN_SHARE).map((n) => [bi(n), TURN_SHARE[n]]));
+  const turnShare = (w) => w.reduce((acc, [bone, wt]) => acc + wt * (byBone.get(bone) ?? 1), 0) / w.reduce((acc, [, wt]) => acc + wt, 0);
+  // Full pronation to full supination: half a turn about the forearm's
+  // axis, negative about the arm frames' +Z (proximal) on the right arm.
+  const SUPINATE = -Math.PI;
+  const wound = (st) => (st.q === wr.restWorldRot ? st.q : quat.normalize([0, 0, 0, 1], quat.multiply([0, 0, 0, 1], st.q, quat.fromAxisAngle([0, 0, 0, 1], [0, 0, 1], (1 - turnShare(st.w)) * SUPINATE))));
+  for (const st of armStations) st.q = wound(st);
   let prev = null;
   let prevQ = null;
   let firstRing = null;

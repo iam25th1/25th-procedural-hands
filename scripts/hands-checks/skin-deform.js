@@ -53,7 +53,7 @@ export function skinnedNormals(skel, mesh, side = 'right') {
 // Rings of skin along the forearm and into the palm: vertices grouped by
 // their rest distance from the elbow along the forearm axis, at the mesh's
 // station positions (fractions of the forearm length, and past the wrist).
-export const RING_AT = [0.28, 0.55, 0.85, 1 - 0.012 / (ARM_MM.forearm * MM), 1.0, 1 + 0.012 / (ARM_MM.forearm * MM), 1 + 0.022 / (ARM_MM.forearm * MM)];
+export const RING_AT = [0.04 / (ARM_MM.forearm * MM), 0.28, 0.55, 0.85, 1 - 0.012 / (ARM_MM.forearm * MM), 1.0, 1 + 0.012 / (ARM_MM.forearm * MM), 1 + 0.022 / (ARM_MM.forearm * MM)];
 export function forearmRings(skel, mesh, side = 'right') {
   const elbow = skel.joint(side, 'forearm').restWorldPos;
   const wrist = skel.joint(side, 'wrist').restWorldPos;
@@ -148,7 +148,55 @@ export function ringScale(rest, P, ids) {
 
 const toDeg = (r) => (r * 180) / Math.PI;
 
+// The direction a ring's volar (palmar) side faces: the palmar-weighted mean
+// of its points about their centroid, perpendicular to the forearm axis.
+export function volarDirection(P, mesh, ids, axis) {
+  const c = centroid(P, ids);
+  const d = [0, 0, 0];
+  for (const i of ids) {
+    const w = mesh.meta[i].palmar - 0.5;
+    d[0] += w * (P[i * 3] - c[0]); d[1] += w * (P[i * 3 + 1] - c[1]); d[2] += w * (P[i * 3 + 2] - c[2]);
+  }
+  return v3.normalize([0, 0, 0], v3.reject([0, 0, 0], d, axis));
+}
+const angleDeg = (a, b) => toDeg(Math.acos(Math.max(-1, Math.min(1, v3.dot(a, b)))));
+
+// Forearm skin in the bind pose (full pronation) and in full supination.
+export const VOLAR_LIMIT_DEG = 20;
+export function volarReport() {
+  const skel = new Skeleton();
+  const mesh = buildArmMesh(skel, 'right', { lod: 'high' });
+  const { rings, axis } = forearmRings(skel, mesh);
+  const forearmRings2 = rings.filter((r) => r.f < 0.99);
+  skel.reset();
+  // The elbow's flexion side (anterior): the arm frames' -Y.
+  const fa = skel.joint('right', 'forearm');
+  const anterior = quat.rotate([0, 0, 0], fa.worldRot, [0, -1, 0]);
+  const palmOut = (sk) => quat.rotate([0, 0, 0], sk.joint('right', 'wrist').worldRot, [0, -1, 0]);
+  const bind = skinned(skel, mesh);
+  const elbowRing = forearmRings2[0];
+  const atElbow = angleDeg(volarDirection(bind, mesh, elbowRing.ids, axis), anterior);
+  const lastRing = forearmRings2[forearmRings2.length - 1];
+  const atWristBind = angleDeg(volarDirection(bind, mesh, lastRing.ids, axis), v3.normalize([0, 0, 0], v3.reject([0, 0, 0], palmOut(skel), axis)));
+  // Full supination (the anatomical position): twist channels at -90 in thirds.
+  for (const nm of ['forearm-twist-1', 'forearm-twist-2', 'wrist']) skel.setChannels(skel.joint('right', nm), 0, 0, -Math.PI / 6);
+  skel.update();
+  const sup = skinned(skel, mesh);
+  const palm = v3.normalize([0, 0, 0], v3.reject([0, 0, 0], palmOut(skel), axis));
+  const straight = forearmRings2.map((r) => ({ f: r.f, deg: angleDeg(volarDirection(sup, mesh, r.ids, axis), palm) }));
+  return { atElbow, atWristBind, straight };
+}
+
 export const skinDeformChecks = [
+  {
+    name: 'skinning: forearm skin wound as the forearm is, facing the elbow crease at the elbow and the palm at the wrist in pronation, straight in supination',
+    async run() {
+      const r = volarReport();
+      const worstStraight = r.straight.reduce((a, x) => Math.max(a, x.deg), 0);
+      const worst = Math.max(r.atElbow, r.atWristBind, worstStraight);
+      return { pass: worst <= VOLAR_LIMIT_DEG, worst, limit: VOLAR_LIMIT_DEG, unit: 'deg', note: `pronation: volar side ${r.atElbow.toFixed(0)} deg from the elbow crease at the elbow, ${r.atWristBind.toFixed(0)} deg from the palm at the wrist; supination: volar side off the palm by ${r.straight.map((x) => `${x.deg.toFixed(0)} at ${x.f.toFixed(2)}`).join(', ')}` };
+    },
+  },
   {
     name: 'skinning: forearm and wrist skin turn and bend toward the hand in order, ring by ring, under 90 deg of forearm rotation and 73 deg of wrist flexion',
     async run() {

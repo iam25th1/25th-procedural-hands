@@ -117,6 +117,14 @@ Pronation is shared across three bones (`forearm-twist-1`, `forearm-twist-2`, `w
 
 The wrist crease ring used to be 0.5, and the first palm ring 0.85: both turned and bent less than the ring before them, a band that twisted back under rotation (75 deg against 86 either side) and folded under flexion (36 deg against 65). `npm run hands:check` now skins the mesh in Node the way three.js does and checks every ring from the elbow to the palm in order (`scripts/hands-checks/skin-deform.js`).
 
+**Wound as the forearm is.** The bind pose is a full pronation (arm forward, palm down), and in pronation real forearm skin is wound. The radius turns and carries the skin over it, while the ulna, the elbow and the skin near them stay put. Kulesh, Fletcher and Solomin (SICOT J 2015;1:3) measured this in cadavers: skin moves least against the ulna near the elbow, and least against the radius in the distal third. So each forearm ring is laid down turned back by the share of the half turn from pronation to supination that it does not carry, (1 - s) times 180 deg, where s is its share of the rotation from its skin weights. Near the elbow s = 0: the volar side faces the elbow crease. At the wrist s = 1: it faces the palm. Supinating unwinds it, so in the anatomical position the forearm runs straight. Before, the forearm was laid down unwound in pronation: its volar side faced the palm all the way to the elbow, 180 deg off the crease, and every turn toward supination wound it into a spiral (129 deg off at 28 percent of the forearm, 80 at 55 percent).
+
+```mermaid
+flowchart LR
+  E["elbow ring, s = 0: volar side faces the elbow crease"] --> M["mid forearm, s = 0.55: turned 81 deg"] --> W["wrist, s = 1: volar side faces the palm"]
+  W --> S["supinate 180 deg: every ring turns s x 180 and they line up"]
+```
+
 <details>
 <summary>How the check measures a ring</summary>
 
