@@ -16,3 +16,6 @@ Thumbs.db
 artifacts/
 coverage/
 test-results/
+
+# Consumer example build output
+examples/*/dist/

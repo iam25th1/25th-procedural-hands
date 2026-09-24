@@ -7,11 +7,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const JS_DIRS = ['server', 'hands', 'app', 'scripts', 'test'];
-const TEXT_DIRS = ['server', 'hands', 'app', 'scripts', 'test', 'docs', '.'];
+const JS_DIRS = ['server', 'hands', 'app', 'scripts', 'test', 'examples'];
+const TEXT_DIRS = ['server', 'hands', 'app', 'scripts', 'test', 'examples', 'docs', '.'];
 const JS_EXT = new Set(['.js', '.mjs', '.cjs']);
 const TEXT_EXT = new Set(['.js', '.mjs', '.cjs', '.css', '.html', '.md', '.json', '.svg', '.txt', '.yml', '.yaml']);
-const SKIP_DIRS = new Set(['node_modules', '.git', 'artifacts', 'fonts']);
+const SKIP_DIRS = new Set(['node_modules', '.git', 'artifacts', 'fonts', 'dist']);
 const EM_DASH = String.fromCharCode(0x2014);
 
 function walk(dir, exts, out, recurse) {
