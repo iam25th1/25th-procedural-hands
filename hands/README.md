@@ -10,12 +10,12 @@ Units are metres, kilograms and seconds. Angles are radians in code and degrees 
 | --- | --- |
 | `index.js` | The public API: `create()` returns a `Hands` instance; re-exports the building blocks |
 | `rig.js` | `Rig`: skeleton plus solvers, pose layers, per-finger control, springs, IK per step, controllers |
-| `skeleton.js` | 30 joints per side: shoulder, upper arm, forearm, two twist bones, the 25 WebXR hand joints |
+| `skeleton.js` | 31 joints per side, 62 in all: shoulder, upper arm, forearm, three twist bones, the 25 WebXR hand joints |
 | `anatomy.js` | Every length, limit and coupling ratio, each with its source |
 | `fingers.js` | Pose to channel resolution, natural coupling, per-finger curl and spread mapping |
 | `poses.js` | Named hand poses as per joint data in degrees |
 | `grasp.js` | Grip taxonomy, pre-shape, closure to contact, object placement and attachment |
-| `ik.js` | Two bone arm IK with a pole, reach clamping, pronation shared in thirds |
+| `ik.js` | Two bone arm IK with a pole, reach clamping, pronation spread over the three twist bones in Kulesh's shares, none at the wrist |
 | `springs.js` | Critically damped springs and the under damped oscillator |
 | `mesh.js` | Lofted skinned arm and hand mesh, skin weights, vertex colour |
 | `three-view.js` | `createThreeView`: one `SkinnedMesh` per arm for a three.js scene |
@@ -28,6 +28,22 @@ Units are metres, kilograms and seconds. Angles are radians in code and degrees 
 | `skin.js` | The ten Monk Skin Tone Scale tones and the palette each gives the mesh: dorsal, palm, nail bed, lunula and free edge |
 | `physics.js` | `World`: deterministic rigid bodies (sphere, box, capsule), statics, one degree of freedom props (hinge, slider), ropes, hand capsule contacts, tethers |
 | `interact.js` | `Interaction`: the hands acting on a world: reach planning, grasp, hold, carry, set down, release, throw and catch, slip, weight, props, drag, climb |
+
+## The skeleton
+
+Each side has 31 joints, so a pair of arms is 62 bones, one `SkinnedMesh` per arm. The six arm joints are `shoulder`, `upper-arm`, `forearm` and `forearm-twist-1` to `-3` (`ARM_JOINT_NAMES`); the hand is the 25 joint layout of the [WebXR Hand Input](https://www.w3.org/TR/webxr-hand-input-1/) module, named exactly as the module names them (`XR_JOINT_NAMES`): the wrist, four thumb joints and five per finger, tip included. Joint frames follow the module: -Z runs along the bone away from the wrist, -Y points out of the palm and +X completes a right handed frame. Every rest length comes from `anatomy.js`.
+
+```mermaid
+flowchart LR
+  SH[shoulder] --> UA[upper-arm] --> FA[forearm] --> T1[forearm-twist-1] --> T2[forearm-twist-2] --> T3[forearm-twist-3] --> W[wrist]
+  W --> TH["thumb: metacarpal, proximal, distal, tip"]
+  W --> IX["index-finger: metacarpal, proximal, intermediate, distal, tip"]
+  W --> MI[middle-finger, the same five]
+  W --> RI[ring-finger, the same five]
+  W --> PI[pinky-finger, the same five]
+```
+
+The forearm bone runs from the elbow to the first twist bone, and each twist bone runs to the next stop. Forearm rotation is spread over the three twist bones in the shares Kulesh et al. measured on the skin (below); the wrist joint flexes and deviates and carries no pronation, as the radiocarpal joint carries none.
 
 ## One step
 
@@ -154,15 +170,19 @@ The mesh is skinned by linear blend skinning in Node. Each ring's rotation from 
 
 </details>
 
-## The thumb at rest
+## The thumb
+
+### At rest
 
 The thumb column rests rolled toward opposition: measured as Cheema et al. measured it (J Hand Surg Am 2006;31(1):76-79: on an axial CT slice, the angle between the dorsal tangent of the second and third metacarpals and the line through the first metacarpal head), the relaxed pose reads 74.1 deg on both hands against their 74 +/- 10 deg at rest. The column is rolled -24.2 deg about its own axis from the layout's direction hint, which alone read 41.6 deg: the nail faced up and back, and the thumb read flat. The direction of the column out of the palm is unchanged, because no source gives it. `npm run hands:check` measures it (`anatomy: first metacarpal rotation at rest`).
+
+### Its shape
+
+The thumb's skin tapers from where it leaves the thenar (30.7 mm across) through the MCP to the IP joint without a step. It read as a short tube with a cuff at the MCP: the MCP ring carried a knuckle bump and a palmar crease ring (a dark band across the palm side), and the thenar ring nearest the MCP ended abruptly, so the taper changed by 1.0 mm from one 1.5 mm slice to the next at the MCP. The bump and crease ring are gone from the MCP (the IP keeps its crease) and the thenar ring blends 0.7 of the way to the metacarpal section; the taper now changes by at most 0.52 mm. `npm run hands:check` slices the skinned thumb in the relaxed pose and holds it to 0.75 mm (`thumb: the skin tapers ...`). No published figure gives a thumb's taper, so that limit is a visual judgement. No ring, triangle or bone was added.
 
 ## The sleeve
 
 The short sleeve is a closed cloth shell over the upper arm: a dome over the shoulder, the sleeve, a rolled hem and an inner wall. The dome and the skin cap under it are weighted alike (half shoulder, half upper arm), so the shoulder's rotation carries them together. Weighted apart (the dome 0.6 to the shoulder, the skin 0.5), a raised and turned arm pushed the skin out through the dome: in the anatomy sheet the far sleeve's shoulder end showed a dark saw-toothed crescent, which read as a jagged open end. `npm run hands:check` skins the arm through 25 shoulder poses (flex 0 to 160 deg, twist -90 to 90) and keeps every covered skin vertex inside the cloth (it was 16.2 mm out at flex 120, twist 90; it is now at least 2.7 mm in). The fix costs no triangles.
-
-The thumb's skin tapers from where it leaves the thenar (30.7 mm across) through the MCP to the IP joint without a step. It read as a short tube with a cuff at the MCP: the MCP ring carried a knuckle bump and a palmar crease ring (a dark band across the palm side), and the thenar ring nearest the MCP ended abruptly, so the taper changed by 1.0 mm from one 1.5 mm slice to the next at the MCP. The bump and crease ring are gone from the MCP (the IP keeps its crease) and the thenar ring blends 0.7 of the way to the metacarpal section; the taper now changes by at most 0.52 mm. `npm run hands:check` slices the skinned thumb in the relaxed pose and holds it to 0.75 mm (`thumb: the skin tapers ...`). No published figure gives a thumb's taper, so that limit is a visual judgement. No ring, triangle or bone was added.
 
 ## Proportion
 
@@ -215,16 +235,16 @@ $$ m\,\lVert \mathbf a + \mathbf g \rVert > \sum_{\text{hands}} C_{\text{grip}} 
 
 ## Contact condition
 
-A grasp contact is a phalanx capsule (segment $a\,b$, radius $r$) touching the object's surface inside the pad squish band:
+A phalanx capsule (segment $a\,b$, radius $r$) is recorded as a grasp contact when its surface is within the pad squish of the object's surface, plus 0.3 mm; the solver closes a digit until it touches, and accepts the closure only while the digit sits no deeper than 1.5 squish widths:
 
-$$ -\delta_{\text{squish}} \le d(\mathbf p) - r \le 0.3\,\text{mm}, \qquad d = \min_{\mathbf p \in [a,b]} \operatorname{sdf}_{\text{object}}(\mathbf p), \quad \delta_{\text{squish}} = 0.45\,\text{mm} $$
+$$ d - r \le \delta_{\text{squish}} + 0.3\,\text{mm}, \qquad d = \min_{\mathbf p \in [a,b]} \operatorname{sdf}_{\text{object}}(\mathbf p), \quad \delta_{\text{squish}} = 0.45\,\text{mm} $$
 
 ## Recorded plans
 
 The grasp search (where the hand grips an object, how it pre-shapes, which way it comes in and whether the way there is clear) is the costly part of a reach: 0.3 to 2.4 s for one plan in a browser. Run inside one fixed step, that froze the page for as long when a scripted action started. Two things take it off the frame:
 
 - The solver is cheaper with the same results to the last bit: while it probes, only the moving hand's joints are updated, and surroundings a bound shows cannot come within reach are skipped (`envMin` in `grasp.js`). Worst plans fell by about half.
-- `Interaction.planSource` can answer the costly solves (`reachPose`, `preShapePose`, `pathCost`, `transitCost`) from a run recorded earlier. `app/scenes/plans.js` has the recorder and the player; `npm run hands:plans` plays every scenario from the sandbox's seed, reduced motion off and on, and writes `app/scenes/plans.json` (about 235 KB) with the hash of the sources it came from. The dev server serves it only while that hash still matches (`server/plan-hash.js`), so a table from older code is never used. The player answers only while each call matches the recorded one (its kind and a fingerprint of its inputs rounded to 1e-7) and stops at the first difference or as soon as anything outside the script touches the run; from then on every solve runs live.
+- `Interaction.planSource` can answer the costly solves (`reachPose`, `preShapePose`, `pathCost`, `transitCost`) from a run recorded earlier. `app/scenes/plans.js` has the recorder and the player; `npm run hands:plans` plays every scenario from the sandbox's seed, reduced motion off and on, and writes `app/scenes/plans.json` (about 400 KB) with the hash of the sources it came from. The dev server serves it only while that hash still matches (`server/plan-hash.js`), so a table from older code is never used. The player answers only while each call matches the recorded one (its kind and a fingerprint of its inputs rounded to 1e-7) and stops at the first difference or as soon as anything outside the script touches the run; from then on every solve runs live.
 
 Under Node a replay is bit for bit the live run, and `hands:check` proves it for every scenario. Two JavaScript engines can round a sine or a power differently in the last bit, so a browser replaying the Node recording sees inputs a few units in the last place away; the fingerprint rounding lets it use the recorded answer, the solve for inputs within 0.1 micrometre.
 
@@ -233,5 +253,5 @@ Under Node a replay is bit for bit the live run, and `hands:check` proves it for
 1. Put what it needs in the sandbox world (`app/scenes/sandbox-world.js`): a body, a static, a prop with its parts, or a rope.
 2. Script it as a scenario in `app/scenes/capabilities.js`: time-keyed calls on the public API (`reach`, `grasp`, `intent`, `carry`, `setDown`, `release`, `moveTo`), in station coordinates. A key that returns `WAIT` holds the script until the hand has arrived.
 3. Say what it must achieve in `app/scenes/expectations.js` (what to measure each frame and what counts as done).
-4. `npm run hands:plans` rebuilds the recorded plan table (below), which every change to `hands/src` or `app/scenes` needs; `hands:check` fails while it is stale.
+4. `npm run hands:plans` rebuilds the recorded plan table (above), which every change to `hands/src` or `app/scenes` needs; `hands:check` fails while it is stale.
 5. `npm run hands:check` then plays it frame by frame with every clean-play rule (penetration, grip, continuity, contact-only motion, floating) and gives it its own `capability:` row; add it to `scripts/hands-matrix/capabilities.js` with that row and a sheet, and it appears in the sandbox's action palette and matrix panel.

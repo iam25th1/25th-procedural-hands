@@ -1,6 +1,8 @@
 # 25th procedural hands
 
-Procedural human hands and arms for the browser, with no animation files: every pose, grip and gesture is solved at run time from anatomy (bone lengths, joint limits, finger coupling) and from the shape and size of what the hand is holding. The library lives in [`hands/src`](hands/src) and imports nothing but [three.js](https://threejs.org). Around it, this repository holds an interaction sandbox that exercises every capability: grips on objects of many sizes, carrying, throwing and catching, buttons, switches, a lever, a knob, a drawer, a crate to push and drag, a rope and a ladder to climb.
+Procedural human hands and arms for [three.js](https://threejs.org), with no animation files. Every pose, grip and gesture is solved at run time from anatomy (bone lengths, joint limits, finger coupling) and from the shape and size of what the hand is holding. Every length, range and colour comes from a published measurement.
+
+The **library** in [`hands/src`](hands/src) is the product. It imports nothing but three, never touches the DOM, and runs the same in the browser and in Node. This repository also ships an **interaction sandbox**, the demo that exercises every capability, and a small **consumer example** that uses the library from outside itself.
 
 <p align="center"><img src="docs/assets/finger-curl.svg" width="360" alt="Animated drawing of a finger curling at its three joints"></p>
 
@@ -9,117 +11,122 @@ Procedural human hands and arms for the browser, with no animation files: every 
 
 | Phone portrait | Phone landscape | Desktop |
 | --- | --- | --- |
-| ![Overview, phone portrait](docs/assets/overview-phone-portrait.png) | ![Overview, phone landscape](docs/assets/overview-phone-landscape.png) | ![Overview, desktop](docs/assets/overview-desktop.png) |
+| ![The sandbox, phone portrait](docs/assets/overview-phone-portrait.png) | ![The sandbox, phone landscape](docs/assets/overview-phone-landscape.png) | ![The sandbox, desktop](docs/assets/overview-desktop.png) |
 
-## Install and run
+- **Anatomical rig**: 25 WebXR joints per hand, an arm of shoulder, upper arm, forearm and three twist bones, 62 bones in all, every joint held to a sourced range.
+- **Control at any level**: named poses, a gesture registry, counting, any set of extended fingers, per finger and per joint curl and spread, arm IK to a wrist target.
+- **Grasping and manipulation**: eight grips (tip pinch, pad pinch, tripod, lateral pinch, hook, power cylinder, spherical, palm press), reach planning round obstacles, carry, set down, throw, catch, handover, in-hand roll and spin, slip under load.
+- **An interaction layer**: a deterministic physics world of bodies, hinges, sliders, rungs and a rope that the hands push, pull, press, turn, drag and climb.
+- **Deterministic**: a fixed 60 Hz step and seeded randomness, so the same calls replay bit for bit.
 
-The library in `hands/src` is the product: install it into your own three.js project (see [Use the module](#use-the-module)). This repository also ships two things that run from a clean clone: the **sandbox**, the demo that exercises every capability, and a small **consumer example** that uses the library from outside itself.
-
-Node 20 or newer. Dependencies are pinned exactly and installed without running package scripts:
-
-```sh
-git clone https://github.com/iam25th1/25th-procedural-hands.git
-cd 25th-procedural-hands
-npm ci --ignore-scripts
-npm run sandbox            # or: PORT=3100 npm start
-```
-
-The server prints the sandbox URL on this machine and on the local network (open the LAN one on a phone). Port 3100 is the default; set `PORT` for another, and a taken port exits with a clear message.
-
-The consumer example is its own small project:
+## Install
 
 ```sh
-npm --prefix examples/consumer ci --ignore-scripts
-npm run example            # Vite prints the URL
+npm install 25th-procedural-hands three
 ```
 
-The checks that render in a browser (`hands:check`, `hands:matrix`, `hands:gallery`, and so `gate`) need Playwright's Chromium, which `--ignore-scripts` does not download:
+three is a peer dependency (`^0.186.0`, the version the library is tested on); nothing else is needed. Until the package is published, install it from the repository (`npm install github:iam25th1/25th-procedural-hands three`) or from a tarball made with `npm pack` in a clone. The package is ES modules only and needs a bundler or an import map for its bare `three` import, as three itself does.
 
-```sh
-npx playwright install chromium
-```
-
-| Command | What it does |
-| --- | --- |
-| `npm run sandbox`, `npm start` | The sandbox's static dev server: whitelisted files only (the app, the module source, listed vendor files and listed data files such as the plan table, each by exact path), strict CSP (no inline scripts, no eval, workers only from the same origin), `nosniff`, `frame-ancestors 'none'` |
-| `npm run check` | `node --check` over every source folder, and a scan for characters the house style bans |
-| `npm test` | `node --test`: module, physics, server and isolation tests |
-| `npm run hands:check` | The acceptance suite: every check with its worst measured value against its limit |
-| `npm run hands:matrix` | The capability matrix: one row per capability, the checks and sheet that prove it, PASS or FAIL |
-| `npm run hands:plans` | Rebuilds the recorded plan table the sandbox replays scripted actions from (needed after any change to `hands/src` or `app/scenes`; `hands:check` fails while it is stale) |
-| `npm run hands:gallery` | Renders the sheets in a real browser at 390x844, 844x390 and 1440x900 into `artifacts/gallery/` |
-| `npm run example` | The consumer example (`examples/consumer`), served by Vite |
-| `npm run gate` | check, test, hands:check, hands:matrix and `npm audit --audit-level=high`: every commit passes it |
-
-## Use the module
+## Quick start
 
 ```js
-import { create } from './hands/src/index.js';
-import { createThreeView } from './hands/src/three-view.js';
+import * as THREE from 'three';
+import { create, createThreeView } from '25th-procedural-hands';
 
-const hands = create({ seed: 7, world: true });   // world: true gives the hands a physics world to act on
-scene.add(createThreeView(hands).group);           // one skinned mesh per arm
+const scene = new THREE.Scene();
+const hands = create({ seed: 1 });          // the rig: both arms and hands
+const view = createThreeView(hands);        // one skinned mesh per arm
+scene.add(view.group);
 
-hands.gesture('thumbsUp', { hand: 'right' });
-hands.setFinger('left', 'index', 0.8, 0.2);         // curl 0 to 1, spread -1 to 1
-hands.count('both', 3, 'thumb');                    // counting, thumb first
-hands.on('grasped', (e) => console.log(e.hand, e.grip));
+hands.gesture('wave', { hand: 'left' });
+hands.count('right', 3);                    // index, middle and ring up
 
-const ball = hands.world.add({ shape: 'sphere', r: 0.035, mass: 0.06, pos: [0.15, -0.46, -0.4] });
-hands.reach('right', ball, 'spherical', { approach: 0.06 });
-// ...once hands.arrived('right'):
-hands.grasp('right', ball, 'spherical');
-
-function frame(dt) { hands.update(dt); view.update(); }  // fixed 60 Hz steps inside
+renderer.setAnimationLoop(() => {
+  hands.update(1 / 60);                     // wall seconds; steps at a fixed 60 Hz inside
+  view.update();
+  renderer.render(scene, camera);
+});
 ```
 
+Positions are metres in a frame centred on the eye: x to the right, y up, z toward the viewer, so the hands sit at about z = -0.35. The full, runnable version is [`examples/consumer`](examples/consumer) (about 70 lines):
+
+<p align="center"><img src="docs/assets/consumer-example.png" width="720" alt="The consumer example: a right hand counting three, the left hand waving, at desktop and phone sizes"></p>
+
+## How it fits together
+
+```mermaid
+flowchart TB
+  subgraph pkg["25th-procedural-hands (hands/src)"]
+    I["index.js: create() and the Hands API"] --> R["rig.js: pose layers, per-finger control, springs, IK per step"]
+    R --> SK["skeleton.js: joints, frames, limits"]
+    R --> FG["fingers.js, poses.js, gestures.js"]
+    R --> IK["ik.js: two bone arm IK, pronation over three twist bones"]
+    R --> GR["grasp.js: grips, pre-shape, closure to contact"]
+    SK --> AN["anatomy.js, skin.js: every sourced value"]
+    I --> IN["interact.js: reach, grasp, carry, set down, release, throw, catch, climb"]
+    IN --> PH["physics.js: World of bodies, props, rungs, rope"]
+    I --> TV["three-view.js: createThreeView"]
+    TV --> ME["mesh.js: lofted skinned arm and hand mesh"]
+  end
+  TV --> T[("three")]
+  APP["your app: renderer, camera, loop"] --> I
+  APP --> TV
+  SB["app/ (the sandbox demo)"] --> I
+```
+
+Only `three-view.js` imports three. Everything else is plain modules with no DOM, which is how the whole rig runs under `node --test`. A test in the gate lexes every file under `hands/src` and fails on any other import. [`hands/README.md`](hands/README.md) covers how each part works inside and how to extend it.
+
+## API
+
+`create(options)` returns a `Hands` instance; `hand` is `'left'`, `'right'` or `'both'`.
+
 <details>
-<summary>API</summary>
+<summary>The Hands API</summary>
 
 | Call | What it does |
 | --- | --- |
-| `create(options)` | A `Hands` instance. Options: `seed`, `reducedMotion`, `targets`, `world` (`true` or a `World`), `strength`, `skinTone` (a Monk Skin Tone Scale tone, default `monk-8`), sleeve colour, object presets |
-| `update(dt)` / `step()` | Advance by wall seconds in fixed 60 Hz steps / one step |
-| `setPose(hand, pose)` | A named pose from `POSES` (hand is `'left'`, `'right'` or `'both'`) |
-| `blendPose(hand, pose, weight, { mask })` | Blend a pose over the active one, per digit mask |
-| `setFinger(hand, finger, curl, spread)` | Per finger curl 0 to 1 and spread -1 to 1, anatomically clamped, over whatever pose is active |
+| `create(options)` | Options: `seed`, `reducedMotion`, `targets` (arm targets per hand), `world` (`true` for a fresh physics world, or a `World`), `strength`, `skinTone` |
+| `update(dt)`, `step()` | Advance by wall seconds in fixed 60 Hz steps; one step |
+| `setPose(hand, pose)` | A named pose from `POSES` |
+| `blendPose(hand, pose, weight, { mask })`, `clearBlend(hand)` | Blend a pose over the active one, per digit mask |
+| `setFinger(hand, finger, curl, spread)` | Curl 0 to 1 and spread -1 to 1, anatomically clamped, over whatever pose is active |
 | `setFingerJoint(hand, finger, joint, curl)` | One joint: `mcp`, `pip`, `dip` (thumb: `cmc`, `mcp`, `ip`) |
 | `setThumbOpposition(hand, amount)`, `releaseFingers(hand, finger)` | Thumb opposition; hand a digit back to the pose |
-| `count(hand, n, style)`, `showFingers(hand, set)` | Counting 1 to 5 index first or thumb first; any combination of extended digits |
-| `gesture(name, { hand })`, `stopGesture(hand)` | Any gesture in the registry (data: `GESTURES`, `registerGesture`) |
-| `setTarget(hand, { pos, rot, pole })`, `moveTo(hand, target)` | IK target for the wrist; `moveTo` routes round anything in the way |
-| `grasp(hand, object, gripType)` | Close a grip on an object (a shape, a world body, a body part, a prop part, a rung or the rope) |
-| `release(hand, { velocity })` | Let go (a velocity throws) |
+| `count(hand, n, style)`, `showFingers(hand, set)` | Counting 1 to 5, index first or thumb first; any combination of extended digits |
+| `gesture(name, { hand })`, `stopGesture(hand)` | Any gesture in the registry (`GESTURES`, `registerGesture`) |
+| `setTarget(hand, { pos, rot, pole })`, `moveTo(hand, target)`, `arrived(hand)` | Wrist IK target; `moveTo` routes round anything in the way |
+| `grasp(hand, object, grip)`, `release(hand, { velocity })` | Close a grip on a shape, a world body or body part, a prop part, a rung or the rope; let go (a velocity throws) |
 | `attach(hand, object)`, `detach(hand)` | Fix an object to the wrist without solving a closure |
-| `reach(hand, target, grip, opts)`, `arrived(hand)` | Plan and move to a grip pose, approach clear of obstacles |
-| `carry(body, target)`, `intent(hand, target)`, `setDown(hand)` | Carry with one or two hands; drive a held prop; lower until it rests |
-| `readyCatch`, `planCatch(hand, body, grip)` | Meet a flying body at the point it will pass |
+| `reach(hand, target, grip, opts)` | Plan and move to a grip pose, the approach clear of obstacles |
+| `carry(body, target)`, `intent(hand, target)`, `setDown(hand)` | Carry with one or two hands; drive a held prop; set a held body down on its surface |
+| `readyCatch(hand, point)`, `planCatch(hand, body, grip)` | Meet a flying body where it will pass |
 | `spin(hand, axis, rate)` | Turn a held object in the fingers |
 | `setBody(pos)`, `moveBody(pos, seconds)` | Move the body anchor (hang and climb) |
-| `on(event, fn)` | Events: `contact`, `grasped`, `released`, `slipped` |
-| `holding(hand)`, `held(hand)`, `contacts(hand)`, `joint(hand, name)`, `hash()` | State; `hash()` covers joints and the whole world, for replays |
-| `dispose()` | Tear down |
+| `on(event, fn)`, `off(event, fn)` | Events: `contact`, `grasped`, `released`, `slipped` |
+| `holding(hand)`, `held(hand)`, `contacts(hand)`, `joint(hand, name)`, `hash()` | State; `hash()` covers the joints and the whole world, for replays |
+| `dispose()` | Tear down; later calls fail loudly |
+
+</details>
+
+<details>
+<summary>Also exported</summary>
+
+| Export | What it is |
+| --- | --- |
+| `createThreeView(hands, { lod, skinTone, sleeveColour })` | The three.js view: `group`, `update()`, `setLod('high' \| 'low')`, `recolor({ skinTone, sleeveColour })`, `triangles`, `dispose()` |
+| `POSES`, `GESTURES`, `GRIPS`, `OBJECTS`, `COUNTING` | The data the API plays from |
+| `MONK_TONES`, `SKIN_TONES`, `skinTone`, `skinPalette` | The ten Monk Skin Tone Scale tones and the palette each gives the mesh |
+| `World`, `Body`, `Prop`, `Rope`, `Interaction` | The physics world and the hands acting on it |
+| `Skeleton`, `XR_JOINT_NAMES`, `ARM_JOINT_NAMES` | The skeleton and its joint names (WebXR Hand Input names for the hand) |
+| `buildArmMesh`, `colorize`, `buildStone`, `buildSachet` | Mesh builders, renderer free |
+| `handRotation`, `v3`, `quat`, `m4`, `deg`, `toDeg`, `mulberry32`, `Clock`, `STEP` | Math, the seeded generator and the fixed step clock |
+| `limitMargin`, `penetration`, `objectPenetration`, `handCapsules` | The measurements the tests and checks use |
 
 </details>
 
 ## Capabilities
 
-```mermaid
-flowchart TB
-  M[hands module] --> F[fingers: curl per finger and joint, spread, opposition]
-  M --> C[counting both ways, finger sets from a mask]
-  M --> G[gesture registry: relaxed, open, spread, fist, point, OK, thumbs up, V, beckon, wave, drum, pebble roll]
-  M --> P[grips: pad pinch, tripod, lateral, hook, power cylinder, spherical, press]
-  M --> W[physics world: spheres, boxes, capsules, hinges, sliders, rungs, rope]
-  P --> X[grab, hold under motion, carry, place, release, throw, catch]
-  P --> T[two hands on one object, handover, in-hand roll and spin]
-  W --> R[press a button, flip a switch, pull a lever, turn a knob, open and close a drawer]
-  W --> K[push a crate, drag a crate]
-  W --> L[hang from a rung, climb hand over hand, hold a rope]
-  P --> S[grip strength and slip; weight read in the arms]
-```
-
-Each hand moves through the same states whatever it works on. `contact`, `grasped`, `released` and `slipped` are the events it emits on the way.
+Each hand moves through the same states whatever it works on, emitting `contact`, `grasped`, `released` and `slipped` on the way.
 
 ```mermaid
 stateDiagram-v2
@@ -128,7 +135,7 @@ stateDiagram-v2
   Reaching --> Holding: fingers close, grasped
   Reaching --> Free: target lost
   Holding --> Holding: carry, turn, hand over, climb
-  Holding --> Releasing: release or throw
+  Holding --> Releasing: set down, release or throw
   Holding --> Slipped: load over grip capacity
   Slipped --> Free: fingers come off, slipped
   Releasing --> Free: hand backs off and opens, released
@@ -136,80 +143,85 @@ stateDiagram-v2
   Gesturing --> Free: stopGesture
 ```
 
-Every one of them has a row in `npm run hands:matrix` naming the check that proves it and the gallery sheet that shows it. Each manipulation is a scripted scenario in [`app/scenes/capabilities.js`](app/scenes/capabilities.js) with a statement of what it must achieve in [`app/scenes/expectations.js`](app/scenes/expectations.js); the checks play it frame by frame and fail it if it penetrates, drops what it holds, pops, or does not do what it is for.
+<details>
+<summary>All 64 capabilities, each proven by a named check</summary>
 
-A grasp contact is a phalanx capsule (segment $a\,b$, radius $r$) resting on the object's surface inside the pad squish band:
+| Group | Capabilities |
+| --- | --- |
+| Fingers | Curl 0 to 1 per finger and per joint; spread; thumb opposition; anatomically clamped; either hand, independently, at any time, over the active pose |
+| Counting | 1 to 5 index first and thumb first; any combination from a set or mask (all 32) |
+| Gestures | Relaxed, open palm, spread, fist, point, OK, thumbs up, V, beckon, wave, finger drum, pebble roll |
+| Grips | Pad pinch, tripod, lateral pinch, hook, power cylinder, spherical |
+| Manipulation | Grab, hold under motion, carry, place, release, throw, catch; two hands on one object; handover; in-hand roll and spin |
+| Props | Press a button, flip a switch, pull a lever, turn a knob, open and close a drawer, push a crate, drag a crate |
+| Climbing | Hang from a rung, climb hand over hand, hold a rope |
+| Strength | Grip strength and slip; weight read in the arms |
+| Physics | Rigid spheres, boxes and capsules; hinges; sliders; fixed rungs; a rope as a chain of points; hands move objects and objects resist hands; deterministic replay |
+| Budgets | Step time in Node and live; the live tail; planning off the frame |
 
-$$ -\delta_{\text{squish}} \le \min_{\mathbf p \in [a,b]} \operatorname{sdf}(\mathbf p) - r \le 0.3\ \text{mm}, \qquad \delta_{\text{squish}} = 0.45\ \text{mm} $$
+`npm run hands:matrix` prints one row per capability with the check that proves it and the gallery sheet that shows it. Each manipulation is a scripted scenario ([`app/scenes/capabilities.js`](app/scenes/capabilities.js)) with a statement of what it must achieve ([`app/scenes/expectations.js`](app/scenes/expectations.js)); the checks play it frame by frame and fail it if a hand passes into anything, drops what it holds, pops, or does not do what it is for.
 
-A held object slips when the force needed to hold it through the hand's own motion is more than the grips on it can give, for two frames running:
+</details>
 
-$$ m\,\lVert \mathbf a + \mathbf g \rVert > \sum_{\text{hands on it}} C_{\text{grip}} $$
+A phalanx capsule (segment $a\,b$, radius $r$) counts as a contact when its surface is within the pad squish of the object's surface, plus 0.3 mm, and a held object slips when holding it through the hand's own motion needs more than its grips can give:
 
-with the capacities $C$ per grip in `GRIPS` (a pad pinch 16 N, a power grip 160 N). Weight reads in the arms: the wrist drops by $2.2\ \text{mm}$ per newton carried, capped at 7 cm, and settles with the load.
+$$ \min_{\mathbf p \in [a,b]} \operatorname{sdf}(\mathbf p) - r \le \delta_{\text{squish}} + 0.3\ \text{mm}, \qquad m\,\lVert \mathbf a + \mathbf g \rVert > \sum_{\text{hands on it}} C_{\text{grip}} $$
+
+with $\delta_{\text{squish}} = 0.45$ mm and the capacities $C$ per grip in `GRIPS` (a pad pinch 16 N, a power grip 160 N).
 
 <details>
-<summary>Limits the checks hold every scenario to</summary>
+<summary>What every scenario is held to</summary>
 
 | Measure | Limit |
 | --- | --- |
 | Hand into any object, static, prop or rope | 1 mm |
 | Finger into finger or palm | 1 mm |
 | A gripping digit off what it holds, once the grip has formed | 2 mm |
-| A hand off what it follows (position plus the turn as its arc 8 cm out) | 5 mm |
+| A hand off what it follows | 5 mm |
 | Joint angular speed | under 20 rad/s |
 | Wrist travel per frame | under 4 cm |
 | Joint limits | never passed |
 | Bodies moving without contact, bodies at rest in the air | none |
+| A body set down | held or resting on its surface at every frame, and let go resting |
 | Hands attached while climbing | at least one |
 | Replay of a 30 s scripted run | identical hashes |
 
 </details>
 
-## Budgets
+## Sourced values
 
-Two sets, each on its own subject, as set in [the spec's BUDGETS section](docs/HANDS_SANDBOX_SPEC.md). Measured by `npm run hands:check`; the values below are from the run on 2026-09-23.
+Every length, range and colour the rig is built from comes from a published measurement. They are used as data: numbers taken from the tables and figures cited, not reproduced text. Each is cited again beside the value in the code ([`anatomy.js`](hands/src/anatomy.js), [`skin.js`](hands/src/skin.js), [`mesh.js`](hands/src/mesh.js)).
 
-Hands module alone, no sandbox props:
+| Source | Used for |
+| --- | --- |
+| Buryanov A, Kotiuk V. Proportions of hand segments. *Int J Morphol* 2010;28(3):755-758 | Every phalanx and metacarpal length and the fingertip soft tissue (Table I); the finger web heights (Table III) |
+| Drillis R, Contini R. *Body segment parameters*. New York University, 1966 (as reproduced in Winter DA, *Biomechanics and Motor Control of Human Movement*) | Upper arm, forearm and hand lengths as fractions of stature |
+| ANSUR II, 2012 Anthropometric Survey of US Army Personnel (combined sample, N = 6068) | Hand length and breadth, from which stature and the knuckle spacing follow; wrist circumference; the forearm length it is checked against |
+| Cheema TA, Cheema NI, Tayyab R, Firoozbakhsh K. Measurement of rotation of the first metacarpal during opposition using computed tomography. *J Hand Surg Am* 2006;31(1):76-79 | The thumb column's rest rotation, 74 +/- 10 deg, and the method it is measured by |
+| Kulesh PN, Fletcher MDA, Solomin LN. Avoidance of external fixation pin induced rotational stiffness in the forearm. *SICOT J* 2015;1:3 | How forearm rotation is shared along the forearm's skin: where the three twist bones sit and what share each carries |
+| Yamaguchi Y et al. Mesenchymal-epithelial interactions in the skin. *J Cell Biol* 2004;165(2):275-285 | Why the palm's lighter colour stops at the wrist crease: palmoplantar (glabrous) skin has a fifth of the melanocytes of other sites |
+| Monk E. The Monk Skin Tone Scale. SocArXiv, 2023 (doi:10.31235/osf.io/pdf4c), with the colour values Google publishes at skintone.google | The ten skin tones and the swatches the rendered skin is held to |
 
-| Budget | Measured | Limit |
-| --- | --- | --- |
-| Triangles, both arms, high LOD | 14 504 | 20 000 |
-| Triangles, both arms, low LOD | 5 960 | 8 000 |
-| Draw calls, both arms | 2 | 6 |
-| Bones | 60 | 80 |
-| Rig step ms (one fixed step of the module alone), median in Node | 0.047 ms | 0.5 ms |
+The whole arm scales from one measured value: stature is implied by the ANSUR II hand length through Drillis and Contini's hand fraction, and every segment follows from it,
 
-Sandbox scene loaded:
+$$ H = \frac{L_{\text{hand}}}{0.108} = \frac{189.3\ \text{mm}}{0.108} \approx 1753\ \text{mm}, \qquad L_{\text{upper arm}} = 0.186\,H, \quad L_{\text{forearm}} = 0.146\,H. $$
 
-| Budget | Measured | Limit |
-| --- | --- | --- |
-| Triangles, worst of six stations | 23 786 | 30 000 |
-| Draw calls, worst of six stations | 37 | 45 |
-| Bones | 60 | 80 |
-| Sim step ms (one fixed step: script keys, rig, interaction, physics), median in Node | 0.891 ms | 1.2 ms |
-| Sim step ms, median, live in headless Chromium (the perf overlay's figure) | 1.4 to 2.4 ms (bimodal run to run) | 3.0 ms |
-| Sim step ms, 95th percentile, live | 2.6 to 3.3 ms | 4.5 ms |
-| Sim step ms, worst step, live (one 60 Hz frame) | 6.3 to 11.7 ms (a new scene's first settling steps) | 16.7 ms |
+Forearm rotation is carried by the skin in the shares Kulesh et al. measured: at each of their eight levels the share is $s = \bar d_u / (\bar d_u + \bar d_r)$, from skin displacement against the ulna and against the radius, rising from 0.063 near the elbow to 0.728 at the distal radius. The rig carries it on three twist bones, a piecewise linear fit through levels V and VIII exactly and every other level within 0.025: forearm-twist-1 at level V (share 0.346), forearm-twist-2 at level VIII (0.728) and forearm-twist-3 at the distal radius (1), so the wrist joint itself does not pronate, as the radiocarpal joint does not.
 
-The perf overlay and the checks use the same names for the same things: **sim step ms** is one fixed 1/60 s step of the scene, **frame ms** is the main thread's JavaScript for one animation frame (not GPU time), each shown as the median of the last 120. Beside them the overlay shows **sim step p95 ms** (the 95th percentile of the last 120 steps) and **sim step worst ms** (the worst of the last 600, 10 s), the figures the tail budgets hold. No single step may take a whole 60 Hz frame (16.7 ms). The page's own per-frame simulation budget of 8 ms is a target the first settling steps of a freshly built scene do not yet meet in the slow CPU mode (up to 11.7 ms); [the spec](docs/HANDS_SANDBOX_SPEC.md#budgets) says why and gives the reasons for each limit. The sandbox triangle and draw-call counts come from three's `renderer.info` after rendering in headless Chromium on the machine running the check, not from a phone. The on-device figures come from the sandbox's perf overlay.
+<details>
+<summary>Also cited in the code, for joint ranges</summary>
+
+- Ryu JY et al. Functional ranges of motion of the wrist joint. *J Hand Surg Am* 1991;16(3):409-419: wrist flexion, extension and deviation.
+- Wheeless' Textbook of Orthopaedics, elbow joint: elbow flexion and forearm rotation.
+- AAOS normal values, as listed by goniometer.io: finger and shoulder ranges.
+- El-Shennawy et al. 2001: the mobile fourth and fifth carpometacarpal joints.
+- B K et al. *Indian J Plast Surg* 2024: finger hyperextension; Physiopedia goniometry: MCP abduction.
+
+</details>
 
 ## Skin tones
 
-The hands come in the ten tones of the **Monk Skin Tone Scale**, from `monk-1` (lightest) to `monk-10` (deepest). The source is Monk, E. (2023), *The Monk Skin Tone Scale*, SocArXiv, [doi:10.31235/osf.io/pdf4c](https://doi.org/10.31235/osf.io/pdf4c), with the values Google publishes at [skintone.google](https://skintone.google). Monk rather than Fitzpatrick because it is a colour scale built to represent the whole human range evenly and publishes its colours; Fitzpatrick sorts skin by how it burns and tans, has no official colours and is weighted toward lighter skin.
-
-Every tone has its own undertone, a palm lighter than the back (slightly on the lightest tones, far lighter on the deepest), and a nail bed that stands out against it. Each is checked as rendered, not only in the palette: `npm run hands:check` draws every tone and keeps the back of the hand within 2.5 dE of the published swatch and the palm lighter than the back. The sandbox's picker sits beside the hand picker in the control centre, and the gallery has a sheet of every tone at the anatomy framing. See [hands/README.md](hands/README.md#skin-tones) for the model and the calibration.
-
-**Tone mapping.** The sandbox renders with three's `NeutralToneMapping` (Khronos PBR Neutral) at exposure 1.3. It used ACES filmic at exposure 1.05 until the skin tone work, and that could not show the light tones as published. ACES compresses and desaturates light colours, so Monk 1 to 3 rendered grey-white. Even with the albedo fitted in CIE Lab to the render, their channels saturate at white 6.4 to 7.5 dE short of the swatch. PBR Neutral passes colours through unchanged below its compression point and only rolls off near white. With the albedo fitted under it, every tone renders within 1.4 dE. At exposure 1.3 with the scene's lights unchanged, the fit lands inside the gamut: Monk 1's albedo is `#fffaf4`, its red channel already at full, so a lower exposure would leave it short. The measurements, from `scripts/skin-measure.js` (back of the hand, CIE76 dE to the published swatch):
-
-| Setting | Monk 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ACES 1.05, swatch painted as is (before) | 7.8 | 7.1 | 10.0 | 8.5 | 6.6 | 5.3 | 6.2 | 4.9 | 5.2 | 4.9 |
-| ACES 1.05, albedo fitted under ACES | 7.5 | 6.4 | 7.5 | 2.9 | 0.0 | 0.0 | 0.5 | 0.0 | 0.0 | 0.0 |
-| Neutral 1.3, swatch painted as is | 3.3 | 2.9 | 3.3 | 3.1 | 4.7 | 6.5 | 9.4 | 10.3 | 9.2 | 7.5 |
-| **Neutral 1.3, albedo fitted (now)** | **0.8** | **0.5** | **1.2** | **0.0** | **0.0** | **0.0** | **0.0** | **0.0** | **1.4** | **0.0** |
-
-Everything else in the scene (props, ground, sleeves) is drawn under the same tone mapping, so it too shows closer to its base colour than it did under ACES, with less contrast in the highlights. The eleven core sheets have not been re-reviewed by eye under it; that is a manual check.
+The hands come in the ten tones of the **Monk Skin Tone Scale**, `monk-1` (lightest) to `monk-10` (deepest), default `monk-8`; `skinTone` also takes a Monk number or any hex. Monk rather than Fitzpatrick because it is a colour scale built to represent the whole human range evenly and publishes its colours; Fitzpatrick sorts skin by how it burns and tans and has no official colours. Each tone has its own undertone, a palm lighter than the back (slightly on the lightest tones, far lighter on the deepest), and a nail bed that stands out against it. The checks render every tone and hold the back of the hand within 2.5 dE of the published swatch.
 
 <details>
 <summary>The ten tones</summary>
@@ -227,108 +239,104 @@ Everything else in the scene (props, ground, sleeves) is drawn under the same to
 | Monk 9 | `#3a312a` | neutral |
 | Monk 10 | `#292420` | neutral |
 
+The albedo behind each swatch is fitted for the sandbox's lighting (Khronos PBR Neutral tone mapping at exposure 1.3); with very different lights, paint with `tone.hex` instead. [hands/README.md](hands/README.md#skin-tones) has the model and the calibration.
+
 </details>
 
-## The sandbox
+## Budgets
 
-Open the root URL. Two scenes share one injected clock (pause, single step, 0.1x, 0.25x, 1x) and seeded randomness:
+Measured by `npm run hands:check` (values from the run on 2026-09-24; limits and the reasons for them in [the spec](docs/dev-notes/HANDS_SANDBOX_SPEC.md#budgets)).
 
-- **Hands**: the rig alone on a plain backdrop, for inspection: poses, counting, gestures, grips on objects of any size, per joint sliders for all ten digits.
-- **Sandbox**: stations for a ledge of objects, a bench for two hands, a button panel with switch, knob, lever and drawer, a crate, a ladder and a rope. The action palette and the capability matrix play every capability.
-
-The control bar at the bottom holds Controls, Pause, Step and the speed. **Controls** (or the **C** key) opens the control centre with the Actions, Matrix, Joints, Objects, Capture and Settings tabs; **Escape** closes it and **Space** pauses. It starts collapsed and remembers whether you left it open. Open, it docks beside the view instead of over it (a sheet above the bar in portrait, a column at the right in landscape and on desktop), so it never covers the hands, first person included, and opening it changes neither the camera nor the field of view.
-
-**Video.** The Capture tab records the view two ways, both saved to your device (a save dialog where the browser has one, a download otherwise), named for the scene, the action and the time:
-
-- **Record video** (live) records what you see, as you see it, until you press Stop: `canvas.captureStream` into a `MediaRecorder`, in the most efficient codec the browser records (AV1, then VP9, H.264 High, H.264, VP8) at an explicit high bitrate. The Capture tab shows which codec and bitrate it used.
-- **Render video** (offline) is the quality path: it plays the action again from its start (or 5, 10 or 20 s of the scene as it is), one fixed 1/60 s step per frame off the injected clock, and encodes every frame with WebCodecs, so the file is 60 fps with nothing dropped whatever the display does. Pick the size, **1920 x 1080** or **2560 x 1440**: the file is exactly that size whatever the size of the view on your screen and whether the control centre is open (the view shows the render letterboxed meanwhile). The containers are written by `app/capture/webm.js` and `app/capture/mp4.js`.
+| The library alone | Measured | Limit |
+| --- | --- | --- |
+| Triangles, both arms, high LOD | 14 504 | 20 000 |
+| Triangles, both arms, low LOD | 5 960 | 8 000 |
+| Draw calls, both arms | 2 | 6 |
+| Bones | 62 | 80 |
+| Rig step (one fixed step), median in Node | 0.049 ms | 0.5 ms |
 
 <details>
-<summary>Which codec each path uses, and why</summary>
+<summary>With the sandbox scene loaded</summary>
 
-| Path | Tried in order | In Chromium on a Mac | Why that order |
-| --- | --- | --- | --- |
-| Offline (Render video) | H.264 High in MP4, H.264 Main, VP9 in WebM, VP8 | H.264 High, MP4 | MP4 with H.264 opens in every player, QuickTime included; QuickTime opens no WebM. At 0.2 bits a pixel a frame (capped at 40 Mbit/s) a newer codec buys little. |
-| Live (Record video) | AV1, VP9, H.264 High, H.264, VP8 through MediaRecorder | AV1 in WebM | The most efficient codec the browser records live. VLC and browsers play it; QuickTime does not. |
+| Budget | Measured | Limit |
+| --- | --- | --- |
+| Triangles, worst of six stations | 23 786 | 30 000 |
+| Draw calls, worst of six stations | 37 | 45 |
+| Sim step (script keys, rig, interaction, physics), median in Node | 0.891 ms | 1.2 ms |
+| Sim step, median, live in headless Chromium | 2.3 to 2.4 ms (bimodal run to run) | 3.0 ms |
+| Sim step, 95th percentile, live | 3.1 to 3.3 ms | 4.5 ms |
+| Sim step, worst step, live | 6.5 to 6.6 ms (a new scene's first settling steps) | 16.7 ms |
 
-AV1 is not tried offline. The browser's AV1 encoder gives no decoder configuration record (`av1C`), which both WebM and MP4 need for AV1, so the file could not be written to spec. Levels fit the size at 60 fps: H.264 level 5.1 for both sizes, VP9 level 4.1 up to 1080p and 5.0 above.
+The live figures are the sandbox's perf overlay figures, read in headless Chromium on the machine running the check, not on a phone; on-device numbers come from the overlay itself.
 
 </details>
 
-The control centre stays closed while a live recording runs (it would resize what is recorded); an offline render leaves it as it is. The bar shows the time or the progress, and pressing it stops or cancels. **Record actions** and **Replay actions**, in the same tab, record the actions you take rather than video, and replay them exactly.
+## The sandbox (the demo)
 
-Touch drags the hand's target. In Move camera mode a drag moves the camera the way you drag: right moves it right, up moves it up, and in first person the view turns right and looks up. Settings has Invert X, Invert Y and a sensitivity slider (0.25 to 3); the defaults are the direct mapping, touch and mouse behave the same, and the choice is remembered on the device. Buttons are at least 44 px; portrait and landscape both lay out, clear of notches and home indicators. First person and inspection cameras move only from your input. There is a perf overlay, record and replay, and a reduced motion setting that follows the system's.
+The sandbox exercises every capability. It is the demo, not part of the package.
 
-**Planning off the main thread.** Where a hand grips, how it opens and which way it comes in are searches that can take a second on a phone. They never run on the page's thread. A planning worker ([`app/plan/`](app/plan)) runs its own copy of the Sandbox simulation two fixed steps ahead of the page, on the same seed and the same actions. It answers each search from the recorded plan table while an action is on its script, and solves it itself once you step off the script (a joint slider, a drag). The page takes the answers in order and never steps past the last one it has. While a plan is still being worked out, the view keeps drawing, sim time waits, and the status line says *planning the next move* with the time so far. Each frame's simulation work has an 8 ms budget, and a scene rebuild is spread over several frames. An action lands at most two steps (33 ms) after you take it, on the same frame in both copies, which is also the frame it is recorded on.
-
-```mermaid
-sequenceDiagram
-  participant U as You
-  participant P as Page (draws, steps its copy)
-  participant W as Planning worker (its own copy)
-  U->>P: action (button, slider, drag)
-  P->>W: action, stamped on frame f
-  P->>W: step to frame f + 2
-  W->>W: apply on frame f, step, search: plan table or solve
-  W-->>P: answers, in call order, and "stepped to f + 2"
-  P->>P: apply on frame f, step to f + 2 using the answers
-  Note over P: no answer yet: sim time waits, frames keep drawing, "planning the next move"
+```sh
+git clone https://github.com/iam25th1/25th-procedural-hands.git
+cd 25th-procedural-hands
+npm ci --ignore-scripts        # Node 20 or newer; exact pins, no install scripts
+npm run sandbox                # or: PORT=3100 npm start
 ```
 
+The server prints the sandbox URL on this machine and on the local network (open the LAN one on a phone). Two scenes share one clock (pause, single step, 0.1x, 0.25x, 1x) and seeded randomness:
+
+- **Hands**: the rig alone for inspection: poses, counting, gestures, grips on objects of any size, per joint sliders for all ten digits.
+- **Sandbox**: a ledge of objects, a bench for two hands, a panel with button, switch, knob, lever and drawer, a crate, a ladder and a rope, with an action palette and the capability matrix.
+
 <details>
-<summary>What happens on and off the recorded path</summary>
+<summary>Using the sandbox</summary>
 
-| Situation | Who searches | What the page does |
-| --- | --- | --- |
-| A scripted action, on its script | The worker answers from the recorded plan table | Steps at once; the worker is never behind |
-| Off the script: a slider, a drag, anything not in the script | The worker solves, off the page's thread | Keeps drawing; sim time waits while the worker works, and the status line says so |
-| The plan table is stale or missing | The worker solves every search | As above |
-| No module workers, or the worker failed | The page, from the plan table where it can | Solves the rest on its own thread (a stall of up to a second or two) |
+- **Controls** (or the **C** key) opens the control centre: Actions, Matrix, Joints, Objects, Capture and Settings. **Escape** closes it and **Space** pauses. It docks beside the view, never over the hands, and opening it changes neither the camera nor the field of view.
+- **Capture** records video two ways, both saved to your device: **Record video** records the view live; **Render video** replays the action and encodes every frame at 60 fps with WebCodecs at 1920x1080 or 2560x1440. **Record actions** and **Replay actions** record what you do, and replay it exactly.
+- **Camera**: touch drags the hand's target; in Move camera mode a drag moves the camera the way you drag. Settings has Invert X, Invert Y and sensitivity. The camera moves only from your input, and there is a reduced motion setting that follows the system's.
+- **Planning off the main thread**: where a hand grips and which way it comes in are searches that can take a second on a phone. A planning worker runs its own copy of the simulation two steps ahead and answers them, from a recorded plan table while an action is on its script; the page never solves on its own thread.
+- **Shot mode** renders any frame from URL parameters, which the gallery uses: `/?shot=1&scene=sandbox&cap=throwCatch&t=2.45`.
 
-The two copies are checked to stay identical: in Node, a run answered only from the worker copy's stream ends bit for bit where the worker copy does, including after the run leaves its script, and in the browser `npm run hands:check` moves a slider mid action and fails on any frame held over 50 ms or any search the page had to run itself.
+The server serves only whitelisted files under a strict Content Security Policy: no inline scripts, no eval, workers only from the same origin.
 
 </details>
 
-Shot mode renders any frame exactly from URL parameters, which is what the gallery uses: `/?shot=1&scene=sandbox&cap=throwCatch&t=2.45`.
+## The consumer example
+
+```sh
+npm --prefix examples/consumer ci --ignore-scripts
+npm run example                # Vite prints the URL
+```
+
+[`examples/consumer`](examples/consumer) is a fresh three.js scene that imports the library by its package name, the way an installed consumer does. It uses Vite because bare imports need a bundler or an import map, and an import map is an inline script, which this repository's pages do not use.
+
+## Checks
+
+The browser checks need Playwright's Chromium, which `--ignore-scripts` does not download: `npx playwright install chromium`.
+
+| Command | What it does |
+| --- | --- |
+| `npm run check` | Parses every source folder and scans for characters the house style bans |
+| `npm test` | `node --test`: the library, physics, server and isolation tests |
+| `npm run hands:check` | The acceptance suite: every check with its worst measured value against its limit |
+| `npm run hands:matrix` | The capability matrix: one row per capability, PASS or FAIL |
+| `npm run hands:plans` | Rebuilds the recorded plan table (after any change to `hands/src` or `app/scenes`; `hands:check` fails while it is stale) |
+| `npm run hands:gallery` | Renders the gallery sheets at 390x844, 844x390 and 1440x900 into `artifacts/gallery/` |
+| `npm run gate` | check, test, hands:check, hands:matrix and `npm audit --audit-level=high`: every commit passes it |
 
 ## Repository
 
 | Path | What is there |
 | --- | --- |
-| [`hands/`](hands) | The module ([internals and how to extend it](hands/README.md)) and its tests |
-| `app/` | The sandbox: scenes, rendering, shot mode, interface |
-| `server/` | The static dev server |
-| `scripts/` | check, hands:check (`hands-checks/`), hands:matrix, hands:gallery |
-| `docs/` | The spec, the list of known minor issues ([HANDS_MINORS.md](docs/HANDS_MINORS.md)), why the arms and thumbs looked twisted and how each cause was fixed ([HANDS_TWIST_FINDINGS.md](docs/HANDS_TWIST_FINDINGS.md)), images |
+| [`hands/`](hands) | The library ([internals and how to extend it](hands/README.md)) and its tests |
+| [`examples/consumer/`](examples/consumer) | The consumer example |
+| `app/`, `server/` | The sandbox and its static dev server |
+| `scripts/`, `test/` | The checks, the matrix, the gallery and the repository tests |
+| [`docs/dev-notes/`](docs/dev-notes) | Development notes: the build brief, why the arms and thumbs looked twisted and how each cause was fixed, known minor issues |
 
-## Sourced values
+[CONTRIBUTING.md](CONTRIBUTING.md) has the rules that matter here: every anatomical value cited, no check loosened to make a row pass, the gate green before a pull request.
 
-Every length, range and colour the rig is built from comes from a published measurement. They are used as data: numbers taken from the tables and figures cited, not reproduced text. Each is cited again beside the value in the code (`hands/src/anatomy.js`, `hands/src/skin.js`, `hands/src/mesh.js`).
+## Licence and credits
 
-| Source | Used for |
-| --- | --- |
-| Buryanov A, Kotiuk V. Proportions of hand segments. *Int J Morphol* 2010;28(3):755-758 | Every phalanx and metacarpal length and the fingertip soft tissue (Table I); the finger web heights (Table III) |
-| Drillis R, Contini R. *Body segment parameters*. New York University, 1966 (as reproduced in Winter DA, *Biomechanics and Motor Control of Human Movement*) | Upper arm, forearm and hand lengths as fractions of stature (0.186, 0.146 and 0.108) |
-| ANSUR II, 2012 Anthropometric Survey of US Army Personnel (combined sample, N = 6068) | Hand length and breadth, from which stature and the knuckle spacing follow; wrist circumference; the forearm length it is checked against |
-| Cheema TA, Cheema NI, Tayyab R, Firoozbakhsh K. Measurement of rotation of the first metacarpal during opposition using computed tomography. *J Hand Surg Am* 2006;31(1):76-79 | The thumb column's rest rotation, 74 +/- 10 deg, and the method it is measured by |
-| Kulesh PN, Fletcher MDA, Solomin LN. Avoidance of external fixation pin induced rotational stiffness in the forearm. *SICOT J* 2015;1:3 | How forearm rotation is shared along the forearm's skin, and so where the three twist bones sit and what share each carries |
-| Yamaguchi Y et al. Mesenchymal-epithelial interactions in the skin. *J Cell Biol* 2004;165(2):275-285 | Why the palm's lighter colour stops at the wrist crease: palmoplantar (glabrous) skin has a fifth of the melanocytes of other sites |
-| Monk E. The Monk Skin Tone Scale. SocArXiv, 2023 (doi:10.31235/osf.io/pdf4c), with the colour values Google publishes at skintone.google | The ten skin tones and the swatches the rendered skin is held to |
+MIT ([`LICENSE`](LICENSE)), copyright 2026 25TH.
 
-<details>
-<summary>Also cited in the code, for joint ranges</summary>
-
-- Ryu JY et al. Functional ranges of motion of the wrist joint. *J Hand Surg Am* 1991;16(3):409-419: wrist flexion, extension and deviation.
-- Wheeless' Textbook of Orthopaedics, elbow joint: elbow flexion and forearm rotation.
-- AAOS normal values, as listed by goniometer.io: finger and shoulder ranges.
-- El-Shennawy et al. 2001: the mobile fourth and fifth carpometacarpal joints.
-- B K et al. *Indian J Plast Surg* 2024: finger hyperextension; Physiopedia goniometry: MCP abduction.
-
-</details>
-
-## Credits
-
-The code is MIT licensed (`LICENSE`, copyright 2026 25TH).
-
-
-Fonts vendored in `app/fonts` under the SIL Open Font License 1.1 (OFL-1.1): **Alfa Slab One** by JM Solé and **Barlow Condensed** by Jeremy Tribby, via Fontsource. The license texts are in `app/fonts/OFL-*.txt`. three.js (copyright three.js authors) and anime.js (copyright Julian Garnier) are MIT licensed; the library needs only three, and anime.js is used by the sandbox alone.
+three.js (copyright three.js authors) and anime.js (copyright Julian Garnier) are MIT licensed; the library needs only three, and anime.js is used by the sandbox alone. The sandbox's fonts are vendored in `app/fonts` under the SIL Open Font License 1.1: **Alfa Slab One** by JM Solé and **Barlow Condensed** by Jeremy Tribby, via Fontsource; the licence texts are in `app/fonts/OFL-*.txt`.

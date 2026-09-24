@@ -7,7 +7,7 @@ import path from 'node:path';
 import { launchBrowser, serve, capture } from '../shoot.js';
 import { Skeleton } from '../../hands/src/skeleton.js';
 
-// docs/HANDS_SANDBOX_SPEC.md, BUDGETS. The live sim step is held to its
+// docs/dev-notes/HANDS_SANDBOX_SPEC.md, BUDGETS. The live sim step is held to its
 // median, its 95th percentile and its worst step: no single step may take a
 // whole 60 Hz frame (16.7 ms). The page's own per-frame simulation budget
 // (8 ms, app/ui/app.js) is a target the first steps of a freshly built

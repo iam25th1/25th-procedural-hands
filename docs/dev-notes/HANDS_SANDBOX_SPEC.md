@@ -101,7 +101,7 @@ Blockers, which must be zero:
 - A finger bending the wrong way or past its limit.
 - Framing that crops the action on phone, or anything clipping the near plane.
 
-Minors, listed in docs/HANDS_MINORS.md with the sheet and one line each, not blocking this run:
+Minors, listed in docs/dev-notes/HANDS_MINORS.md with the sheet and one line each, not blocking this run:
 - Mesh defects carried over from the rig's last review: ring seams at the finger joints, flat palms in the anatomy close-up, pinch frames where the free fingers splay straight.
 - Any new cosmetic nit. These get fixed in a later finishing pass, not this one.
 
@@ -165,7 +165,7 @@ Sourced values the rig is held to, and every existing check or test that was cor
 </details>
 
 <details>
-<summary>Check <code>skinning: forearm skin wound as the forearm is</code> (added in 85f5f58)</summary>
+<summary>Check <code>skinning: forearm skin wound as the forearm is</code> (added in f35a63b)</summary>
 
 - Old: in full pronation the last forearm ring's volar side within 20 deg of the palm, and the elbow ring's within 20 deg of the elbow crease.
 - New: in full pronation each end ring within 20 deg of its Kulesh wind: (1 - s) x 180 deg from the palm, s x 180 from the crease, with s from Kulesh 2015 at the ring. Straight in supination is unchanged.

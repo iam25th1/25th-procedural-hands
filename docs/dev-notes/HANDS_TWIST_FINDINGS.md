@@ -2,7 +2,7 @@
 
 Every automated check passed while the arms and thumbs still looked twisted by eye. The checks measured the bones, and the bones were not the problem. This page records what was measured on the rendered skin and the skeleton, the sources behind each anatomical value, what was fixed, and three fixes that were first held as patches because they failed existing checks. All three have landed: the palm colour and the pronation distribution with those checks corrected against their sources, and the thumb's rest roll once the planner and the set-down were fixed.
 
-![Forearm skin wound in pronation, straight in supination](assets/forearm-wind.svg)
+![Forearm skin wound in pronation, straight in supination](../assets/forearm-wind.svg)
 
 > **Media placeholder:** a screen recording of the forearm turning from full pronation to full supination, before and after, goes here.
 
@@ -12,12 +12,12 @@ All renders were made with the single arm shot scene (`/?shot=1&scene=arm&pose=r
 
 | # | Cause | Measure | Before | Source | State |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Forearm skin laid down unwound in full pronation | volar side against the elbow crease (bind) and the palm (supination), skinned mesh | 180 deg off at the elbow; 129, 80, 27 deg off at 28, 55, 85 percent in supination | Kulesh et al 2015 | **fixed** (e7eae3f) |
+| 1 | Forearm skin laid down unwound in full pronation | volar side against the elbow crease (bind) and the palm (supination), skinned mesh | 180 deg off at the elbow; 129, 80, 27 deg off at 28, 55, 85 percent in supination | Kulesh et al 2015 | **fixed** (cc32a19) |
 | 2 | Palm colour on the volar forearm | volar against dorsal forearm colour, every Monk tone | 6.7 dE76 | Yamaguchi et al 2004 | **fixed**: palm colour on glabrous skin only (0.07 dE76) |
 | 3 | Thumb column under-rotated at rest | first metacarpal rotation, measured as Cheema et al measured it | 41.6 deg | Cheema et al 2006: 74 +/- 10 | **fixed**: 74.1 deg |
-| 4 | Wrist crease ring weighted against its neighbours | ring turn under 90 deg of rotation, bend under 73 deg of flexion | turn 75 against 86 either side; bend 36 against 65 | (mesh consistency) | **fixed** (88b598b) |
+| 4 | Wrist crease ring weighted against its neighbours | ring turn under 90 deg of rotation, bend under 73 deg of flexion | turn 75 against 86 either side; bend 36 against 65 | (mesh consistency) | **fixed** (838b778) |
 | 5 | Forearm skin turned in equal thirds, a third on the wrist joint | ring turn against Kulesh's per-level share | 0.56 of the hand's turn at 55 percent of the forearm (Kulesh 0.34); 0.86 at 85 percent (0.63) | Kulesh et al 2015, Tables 1 and 3; the radiocarpal joint does not pronate | **fixed**: three twist bones at the sourced shares, none on the wrist |
-| 6 | Wrist thin | wrist ring perimeter | 156.6 mm against 169.0 | ANSUR II | **fixed** (8096e5d) |
+| 6 | Wrist thin | wrist ring perimeter | 156.6 mm against 169.0 | ANSUR II | **fixed** (63a54d0) |
 
 ### Ranking
 
@@ -53,15 +53,13 @@ Each image has the before row on top and the after row below, with the same fram
 
 | Change | Views | Image |
 | --- | --- | --- |
-| Recon: the thumb at rest (palmar, dorsal, radial, ulnar) | four views, before any change | ![](assets/twist/recon-thumb-rest.png) |
-| Recon: the forearm at 90, 0 and -90 deg | before any change | ![](assets/twist/recon-pronation.png) |
-| Wrist weights (88b598b) | thumb up; full supination from above and below | ![](assets/twist/wrist.png) |
-| Forearm winding (e7eae3f) | bind from above and below; thumb up; full supination | ![](assets/twist/forearm.png) |
-| Wrist girth (8096e5d) | bind; thumb up from the side; full supination | ![](assets/twist/girth.png) |
-| Pronation on three twist bones in Kulesh's shares (landed) | back at 90, 0 and -90 deg; palm and side at -90 | ![](assets/twist/pronation.png) |
-| Thumb roll (landed) | palm, back, radial, ulnar, three quarter | ![](assets/twist/thumb.png) |
-| Glabrous colour (landed) | bind from above and below; thumb up; full supination | ![](assets/twist/colour.png) |
-| Gallery: counting, desktop | the core sheet before and after the three commits | ![](assets/twist/gallery-counting.png) |
+| Wrist weights (838b778) | thumb up; full supination from above and below | ![](../assets/twist/wrist.png) |
+| Forearm winding (cc32a19) | bind from above and below; thumb up; full supination | ![](../assets/twist/forearm.png) |
+| Wrist girth (63a54d0) | bind; thumb up from the side; full supination | ![](../assets/twist/girth.png) |
+| Pronation on three twist bones in Kulesh's shares (landed) | back at 90, 0 and -90 deg; palm and side at -90 | ![](../assets/twist/pronation.png) |
+| Thumb roll (landed) | palm, back, radial, ulnar, three quarter | ![](../assets/twist/thumb.png) |
+| Glabrous colour (landed) | bind from above and below; thumb up; full supination | ![](../assets/twist/colour.png) |
+| Gallery: counting, desktop | the core sheet before and after the three commits | ![](../assets/twist/gallery-counting.png) |
 
 ## Sources
 
@@ -119,7 +117,7 @@ The palm's lighter colour now stays on glabrous skin: the palm and the volar dig
 
 The unit test `colorize: on every Monk tone the palm is lighter than the back` counted every palmar-facing skin vertex as "palm", the volar forearm included, so it encoded the defect. It now counts glabrous skin only, with every assertion kept; the old and new assertion are in [the spec](HANDS_SANDBOX_SPEC.md#anatomical-values-and-corrected-checks).
 
-It also explains the rendered skin-tone drift. The winding commit (e7eae3f) turned the palm-coloured volar forearm into the edge of the back view the skin-tone check samples, so deep tones' backs rendered lighter (Monk 10 back L* 14.6 to 16.6; worst dE76 1.20 to 2.43). With the forearm coloured as forearm the worst is back to 1.4.
+It also explains the rendered skin-tone drift. The winding commit (cc32a19) turned the palm-coloured volar forearm into the edge of the back view the skin-tone check samples, so deep tones' backs rendered lighter (Monk 10 back L* 14.6 to 16.6; worst dE76 1.20 to 2.43). With the forearm coloured as forearm the worst is back to 1.4.
 
 ## Checks added
 
