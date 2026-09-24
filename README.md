@@ -2,16 +2,16 @@
 
 Procedural human hands and arms for [three.js](https://threejs.org), with no animation files. Every pose, grip and gesture is solved at run time from anatomy (bone lengths, joint limits, finger coupling) and from the shape and size of what the hand is holding. Every length, range and colour comes from a published measurement.
 
-The **library** in [`hands/src`](hands/src) is the product. It imports nothing but three, never touches the DOM, and runs the same in the browser and in Node. This repository also ships an **interaction sandbox**, the demo that exercises every capability, and a small **consumer example** that uses the library from outside itself.
+The **library** in [`hands/src`](https://github.com/iam25th1/25th-procedural-hands/tree/main/hands/src) is the product. It imports nothing but three, never touches the DOM, and runs the same in the browser and in Node. This repository also ships an **interaction sandbox**, the demo that exercises every capability, and a small **consumer example** that uses the library from outside itself.
 
-<p align="center"><img src="docs/assets/finger-curl.svg" width="360" alt="Animated drawing of a finger curling at its three joints"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/iam25th1/25th-procedural-hands/main/docs/assets/finger-curl.svg" width="360" alt="Animated drawing of a finger curling at its three joints"></p>
 
 <!-- VIDEO: 25TH drops a directly uploaded video here (drag the .mp4 into this spot in the GitHub editor). -->
 > **Video goes here.** A short capture of the sandbox on a phone, uploaded directly to this README.
 
 | Phone portrait | Phone landscape | Desktop |
 | --- | --- | --- |
-| ![The sandbox, phone portrait](docs/assets/overview-phone-portrait.png) | ![The sandbox, phone landscape](docs/assets/overview-phone-landscape.png) | ![The sandbox, desktop](docs/assets/overview-desktop.png) |
+| ![The sandbox, phone portrait](https://raw.githubusercontent.com/iam25th1/25th-procedural-hands/main/docs/assets/overview-phone-portrait.png) | ![The sandbox, phone landscape](https://raw.githubusercontent.com/iam25th1/25th-procedural-hands/main/docs/assets/overview-phone-landscape.png) | ![The sandbox, desktop](https://raw.githubusercontent.com/iam25th1/25th-procedural-hands/main/docs/assets/overview-desktop.png) |
 
 - **Anatomical rig**: 25 WebXR joints per hand, an arm of shoulder, upper arm, forearm and three twist bones, 62 bones in all, every joint held to a sourced range.
 - **Control at any level**: named poses, a gesture registry, counting, any set of extended fingers, per finger and per joint curl and spread, arm IK to a wrist target.
@@ -48,9 +48,9 @@ renderer.setAnimationLoop(() => {
 });
 ```
 
-Positions are metres in a frame centred on the eye: x to the right, y up, z toward the viewer, so the hands sit at about z = -0.35. The full, runnable version is [`examples/consumer`](examples/consumer) (about 70 lines):
+Positions are metres in a frame centred on the eye: x to the right, y up, z toward the viewer, so the hands sit at about z = -0.35. The full, runnable version is [`examples/consumer`](https://github.com/iam25th1/25th-procedural-hands/tree/main/examples/consumer) (about 70 lines):
 
-<p align="center"><img src="docs/assets/consumer-example.png" width="720" alt="The consumer example: a right hand counting three, the left hand waving, at desktop and phone sizes"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/iam25th1/25th-procedural-hands/main/docs/assets/consumer-example.png" width="720" alt="The consumer example: a right hand counting three, the left hand waving, at desktop and phone sizes"></p>
 
 ## How it fits together
 
@@ -74,7 +74,7 @@ flowchart TB
   SB["app/ (the sandbox demo)"] --> I
 ```
 
-Only `three-view.js` imports three. Everything else is plain modules with no DOM, which is how the whole rig runs under `node --test`. A test in the gate lexes every file under `hands/src` and fails on any other import. [`hands/README.md`](hands/README.md) covers how each part works inside and how to extend it.
+Only `three-view.js` imports three. Everything else is plain modules with no DOM, which is how the whole rig runs under `node --test`. A test in the gate lexes every file under `hands/src` and fails on any other import. [`hands/README.md`](https://github.com/iam25th1/25th-procedural-hands/blob/main/hands/README.md) covers how each part works inside and how to extend it.
 
 ## API
 
@@ -159,7 +159,7 @@ stateDiagram-v2
 | Physics | Rigid spheres, boxes and capsules; hinges; sliders; fixed rungs; a rope as a chain of points; hands move objects and objects resist hands; deterministic replay |
 | Budgets | Step time in Node and live; the live tail; planning off the frame |
 
-`npm run hands:matrix` prints one row per capability with the check that proves it and the gallery sheet that shows it. Each manipulation is a scripted scenario ([`app/scenes/capabilities.js`](app/scenes/capabilities.js)) with a statement of what it must achieve ([`app/scenes/expectations.js`](app/scenes/expectations.js)); the checks play it frame by frame and fail it if a hand passes into anything, drops what it holds, pops, or does not do what it is for.
+`npm run hands:matrix` prints one row per capability with the check that proves it and the gallery sheet that shows it. Each manipulation is a scripted scenario ([`app/scenes/capabilities.js`](https://github.com/iam25th1/25th-procedural-hands/blob/main/app/scenes/capabilities.js)) with a statement of what it must achieve ([`app/scenes/expectations.js`](https://github.com/iam25th1/25th-procedural-hands/blob/main/app/scenes/expectations.js)); the checks play it frame by frame and fail it if a hand passes into anything, drops what it holds, pops, or does not do what it is for.
 
 </details>
 
@@ -190,7 +190,7 @@ with $\delta_{\text{squish}} = 0.45$ mm and the capacities $C$ per grip in `GRIP
 
 ## Sourced values
 
-Every length, range and colour the rig is built from comes from a published measurement. They are used as data: numbers taken from the tables and figures cited, not reproduced text. Each is cited again beside the value in the code ([`anatomy.js`](hands/src/anatomy.js), [`skin.js`](hands/src/skin.js), [`mesh.js`](hands/src/mesh.js)).
+Every length, range and colour the rig is built from comes from a published measurement. They are used as data: numbers taken from the tables and figures cited, not reproduced text. Each is cited again beside the value in the code ([`anatomy.js`](https://github.com/iam25th1/25th-procedural-hands/blob/main/hands/src/anatomy.js), [`skin.js`](https://github.com/iam25th1/25th-procedural-hands/blob/main/hands/src/skin.js), [`mesh.js`](https://github.com/iam25th1/25th-procedural-hands/blob/main/hands/src/mesh.js)).
 
 | Source | Used for |
 | --- | --- |
@@ -239,13 +239,13 @@ The hands come in the ten tones of the **Monk Skin Tone Scale**, `monk-1` (light
 | Monk 9 | `#3a312a` | neutral |
 | Monk 10 | `#292420` | neutral |
 
-The albedo behind each swatch is fitted for the sandbox's lighting (Khronos PBR Neutral tone mapping at exposure 1.3); with very different lights, paint with `tone.hex` instead. [hands/README.md](hands/README.md#skin-tones) has the model and the calibration.
+The albedo behind each swatch is fitted for the sandbox's lighting (Khronos PBR Neutral tone mapping at exposure 1.3); with very different lights, paint with `tone.hex` instead. [hands/README.md](https://github.com/iam25th1/25th-procedural-hands/blob/main/hands/README.md#skin-tones) has the model and the calibration.
 
 </details>
 
 ## Budgets
 
-Measured by `npm run hands:check` (values from the run on 2026-09-24; limits and the reasons for them in [the spec](docs/dev-notes/HANDS_SANDBOX_SPEC.md#budgets)).
+Measured by `npm run hands:check` (values from the run on 2026-09-24; limits and the reasons for them in [the spec](https://github.com/iam25th1/25th-procedural-hands/blob/main/docs/dev-notes/HANDS_SANDBOX_SPEC.md#budgets)).
 
 | The library alone | Measured | Limit |
 | --- | --- | --- |
@@ -307,7 +307,7 @@ npm --prefix examples/consumer ci --ignore-scripts
 npm run example                # Vite prints the URL
 ```
 
-[`examples/consumer`](examples/consumer) is a fresh three.js scene that imports the library by its package name, the way an installed consumer does. It uses Vite because bare imports need a bundler or an import map, and an import map is an inline script, which this repository's pages do not use.
+[`examples/consumer`](https://github.com/iam25th1/25th-procedural-hands/tree/main/examples/consumer) is a fresh three.js scene that imports the library by its package name, the way an installed consumer does. It uses Vite because bare imports need a bundler or an import map, and an import map is an inline script, which this repository's pages do not use.
 
 ## Checks
 
@@ -327,16 +327,16 @@ The browser checks need Playwright's Chromium, which `--ignore-scripts` does not
 
 | Path | What is there |
 | --- | --- |
-| [`hands/`](hands) | The library ([internals and how to extend it](hands/README.md)) and its tests |
-| [`examples/consumer/`](examples/consumer) | The consumer example |
+| [`hands/`](https://github.com/iam25th1/25th-procedural-hands/tree/main/hands) | The library ([internals and how to extend it](https://github.com/iam25th1/25th-procedural-hands/blob/main/hands/README.md)) and its tests |
+| [`examples/consumer/`](https://github.com/iam25th1/25th-procedural-hands/tree/main/examples/consumer) | The consumer example |
 | `app/`, `server/` | The sandbox and its static dev server |
 | `scripts/`, `test/` | The checks, the matrix, the gallery and the repository tests |
-| [`docs/dev-notes/`](docs/dev-notes) | Development notes: the build brief, why the arms and thumbs looked twisted and how each cause was fixed, known minor issues |
+| [`docs/dev-notes/`](https://github.com/iam25th1/25th-procedural-hands/tree/main/docs/dev-notes) | Development notes: the build brief, why the arms and thumbs looked twisted and how each cause was fixed, known minor issues |
 
-[CONTRIBUTING.md](CONTRIBUTING.md) has the rules that matter here: every anatomical value cited, no check loosened to make a row pass, the gate green before a pull request.
+[CONTRIBUTING.md](https://github.com/iam25th1/25th-procedural-hands/blob/main/CONTRIBUTING.md) has the rules that matter here: every anatomical value cited, no check loosened to make a row pass, the gate green before a pull request.
 
 ## Licence and credits
 
-MIT ([`LICENSE`](LICENSE)), copyright 2026 25TH.
+MIT ([`LICENSE`](https://github.com/iam25th1/25th-procedural-hands/blob/main/LICENSE)), copyright 2026 25TH.
 
 three.js (copyright three.js authors) and anime.js (copyright Julian Garnier) are MIT licensed; the library needs only three, and anime.js is used by the sandbox alone. The sandbox's fonts are vendored in `app/fonts` under the SIL Open Font License 1.1: **Alfa Slab One** by JM Solé and **Barlow Condensed** by Jeremy Tribby, via Fontsource; the licence texts are in `app/fonts/OFL-*.txt`.
