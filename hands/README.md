@@ -106,22 +106,44 @@ The swatches are skin as it appears, not a surface albedo, so each tone also has
 
 ## Skin along the forearm and across the wrist
 
-Pronation is shared across three bones (`forearm-twist-1`, `forearm-twist-2`, `wrist`), and the skin between the elbow and the palm blends them by distance, so a ring of skin turns and bends by the share of its bones. The wrist's share of the weight rises in order toward the hand and never steps back:
+Pronation is carried by three twist bones (`forearm-twist-1`, `forearm-twist-2`, `forearm-twist-3`); the wrist joint flexes and deviates but does not pronate, since the hand turns with the radius. Each twist bone sits where the forearm's skin carries a known share of the hand's turn, from Kulesh, Fletcher and Solomin (SICOT J 2015;1:3), and the skin between the elbow and the palm blends them by distance:
+
+| Stop | Where (fraction of the forearm from the elbow) | Skin's share of the hand's turn | Bone's own part |
+| --- | --- | --- | --- |
+| `forearm` | 0, the elbow | 0 | |
+| `forearm-twist-1` | 0.5625, Kulesh level V | 0.346 | 0.346 |
+| `forearm-twist-2` | 0.9375, Kulesh level VIII | 0.728 | 0.382 |
+| `forearm-twist-3` | 1, the distal radius | 1 | 0.272 |
+| `wrist` | 1 | 1 | 0 |
+
+Kulesh measured skin displacement against the ulna ($d_u$) and against the radius ($d_r$) at eight levels, 70 deg each way, in 34 arms. The share a level of skin carries is taken as
+
+$$ s = \frac{\bar d_u}{\bar d_u + \bar d_r} $$
+
+(skin moving with neither bone would move against both alike), which gives 0.063, 0.114, 0.187, 0.268, 0.346, 0.470, 0.586 and 0.728 from level I (radial neck) to VIII (distal radius). The stops fit it within 0.025 at every level. It is an estimate: the paper measured displacements, not a turn, and the level positions ((k - 0.5)/8 of the forearm) and a share linear in the angle are this rig's reading of it. The equal thirds this replaced turned the skin too early: 0.56 of the hand's turn at 55 percent of the forearm, where Kulesh gives 0.34.
+
+The rings turn and bend in order toward the hand, never stepping back:
 
 | Ring | Where | Wrist share | Turn at 90 deg of forearm rotation | Bend at 73 deg of wrist flexion |
 | --- | --- | --- | --- | --- |
-| Forearm | 85 percent of the way from the elbow | 0.45 | 77 deg | 41 deg |
-| Forearm | last ring, 12 mm short of the wrist | 0.86 | 86 deg | 65 deg |
+| Forearm | 28 percent | 0 | 15 deg | 0 deg |
+| Forearm | 55 percent | 0 | 30 deg | 0 deg |
+| Forearm | 85 percent | 0 | 58 deg | 0 deg |
+| Forearm | last ring, 12 mm short of the wrist | 0.25 | 72 deg | 16 deg |
 | Wrist crease | the wrist joint | 1 | 90 deg | 73 deg |
 | Palm | 12 mm past the wrist | 1 | 90 deg | 73 deg |
 
+Wrist flexion now bends only the skin within 12 mm of the crease. Under equal thirds the ring at 85 percent (4 cm up the forearm) bent 41 deg with the hand.
+
+**Candy wrap.** Linear blend skinning narrows a ring blended between bones turned apart, and the facets between rings turned apart narrow too. `npm run hands:check` slices the skinned surface every 1 percent of the forearm from full pronation to full supination (180 deg). The narrowest section keeps 83.1 percent of its rest radius; equal thirds kept 79.2, and that is the check's floor.
+
 The wrist crease ring used to be 0.5, and the first palm ring 0.85: both turned and bent less than the ring before them, a band that twisted back under rotation (75 deg against 86 either side) and folded under flexion (36 deg against 65). `npm run hands:check` now skins the mesh in Node the way three.js does and checks every ring from the elbow to the palm in order (`scripts/hands-checks/skin-deform.js`).
 
-**Wound as the forearm is.** The bind pose is a full pronation (arm forward, palm down), and in pronation real forearm skin is wound. The radius turns and carries the skin over it, while the ulna, the elbow and the skin near them stay put. Kulesh, Fletcher and Solomin (SICOT J 2015;1:3) measured this in cadavers: skin moves least against the ulna near the elbow, and least against the radius in the distal third. So each forearm ring is laid down turned back by the share of the half turn from pronation to supination that it does not carry, (1 - s) times 180 deg, where s is its share of the rotation from its skin weights. Near the elbow s = 0: the volar side faces the elbow crease. At the wrist s = 1: it faces the palm. Supinating unwinds it, so in the anatomical position the forearm runs straight. Before, the forearm was laid down unwound in pronation: its volar side faced the palm all the way to the elbow, 180 deg off the crease, and every turn toward supination wound it into a spiral (129 deg off at 28 percent of the forearm, 80 at 55 percent).
+**Wound as the forearm is.** The bind pose is a full pronation (arm forward, palm down), and in pronation real forearm skin is wound. The radius turns and carries the skin over it, while the ulna, the elbow and the skin near them stay put. Kulesh, Fletcher and Solomin (SICOT J 2015;1:3) measured this in cadavers: skin moves least against the ulna near the elbow, and least against the radius in the distal third. So each forearm ring is laid down turned back by the share of the half turn from pronation to supination that it does not carry, (1 - s) times 180 deg, where s is its share of the rotation from its skin weights (the table above). Near the elbow s is about 0.1: the volar side lies close to the elbow crease. At the wrist crease s = 1: it faces the palm. The last forearm ring (s = 0.795) lies 37 deg short of the palm, as Kulesh's level VIII puts it. Supinating unwinds it, so in the anatomical position the forearm runs straight. Before, the forearm was laid down unwound in pronation: its volar side faced the palm all the way to the elbow, 180 deg off the crease, and every turn toward supination wound it into a spiral (129 deg off at 28 percent of the forearm, 80 at 55 percent).
 
 ```mermaid
 flowchart LR
-  E["elbow ring, s = 0: volar side faces the elbow crease"] --> M["mid forearm, s = 0.55: turned 81 deg"] --> W["wrist, s = 1: volar side faces the palm"]
+  E["elbow ring, s = 0.08: volar side 15 deg from the elbow crease"] --> M["mid forearm, s = 0.34: turned 61 deg from it"] --> W["wrist crease, s = 1: volar side faces the palm"]
   W --> S["supinate 180 deg: every ring turns s x 180 and they line up"]
 ```
 

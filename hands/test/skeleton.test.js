@@ -18,14 +18,14 @@ test('25 WebXR joints per hand, in module order, with the module parent chain', 
     const hand = skel.sides[side].joints.filter((j) => j.kind === 'hand');
     assert.equal(hand.length, 25);
     assert.deepEqual(hand.map((j) => j.name), XR_JOINT_NAMES);
-    assert.equal(skel.joint(side, 'wrist').parent.name, 'forearm-twist-2');
+    assert.equal(skel.joint(side, 'wrist').parent.name, 'forearm-twist-3');
     assert.equal(skel.joint(side, 'thumb-metacarpal').parent.name, 'wrist');
     assert.equal(skel.joint(side, 'index-finger-tip').parent.name, 'index-finger-phalanx-distal');
     assert.equal(skel.joint(side, 'pinky-finger-phalanx-intermediate').parent.name, 'pinky-finger-phalanx-proximal');
     const arm = skel.sides[side].joints.filter((j) => j.kind === 'arm');
     assert.deepEqual(arm.map((j) => j.name), ARM_JOINT_NAMES);
   }
-  assert.equal(skel.joints.length, 60);
+  assert.equal(skel.joints.length, 62);
 });
 
 test('bone lengths equal the sourced data', () => {
@@ -164,7 +164,11 @@ test('wrist swing twist joint: channels round trip and stay continuous through b
       const t = deg(-30 + rng() * 60);
       skel.setChannels(wr, f, a, t);
       const m = skel.measureChannels(wr);
-      assert.ok(Math.abs(m.flex - f) < 1e-6 && Math.abs(m.abd - a) < 1e-6 && Math.abs(m.twist - t) < 1e-6, `${side} wrist round trip ${[f, a, t]} -> ${JSON.stringify(m)}`);
+      // The radiocarpal joint flexes and deviates but does not pronate: the
+      // hand turns with the radius, and the forearm's twist bones carry the
+      // rotation (anatomy.js, Kulesh 2015). A twist asked of the wrist is
+      // clamped to zero; flexion and deviation round trip through any swing.
+      assert.ok(Math.abs(m.flex - f) < 1e-6 && Math.abs(m.abd - a) < 1e-6 && Math.abs(m.twist) < 1e-9, `${side} wrist round trip ${[f, a, t]} -> ${JSON.stringify(m)}`);
     }
     skel.reset();
   }

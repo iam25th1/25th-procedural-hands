@@ -7,7 +7,7 @@
 // Everything is data driven from anatomy.js; no textures, no downloads.
 import { skinPalette } from './skin.js';
 import { v3, quat, clamp, lerp, smoothstep } from './math.js';
-import { SECTIONS_MM, BONES_MM, MM, NAIL, fingerExternal, ARM_MM } from './anatomy.js';
+import { SECTIONS_MM, BONES_MM, MM, NAIL, fingerExternal, ARM_MM, FOREARM_TWIST } from './anatomy.js';
 import { FINGERS, XR_PREFIX } from './skeleton.js';
 import { DEFAULTS } from './defaults.js';
 
@@ -192,10 +192,11 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
   const wr = J('wrist');
   const Lua = ARM_MM.upperArm * MM;
   const Lfa = ARM_MM.forearm * MM;
-  // Weights along the forearm shared between forearm, twist 1, twist 2 and wrist.
+  // Weights along the forearm shared between the forearm, the twist bones at
+  // their stops (anatomy.js) and the wrist.
   const forearmWeights = (f) => {
-    const stops = [['forearm', 0], ['forearm-twist-1', 1 / 3], ['forearm-twist-2', 2 / 3], ['wrist', 1]];
-    for (let i = 0; i < 3; i++) {
+    const stops = [['forearm', 0], ...FOREARM_TWIST.filter((t) => t.at < 1).map((t) => [t.name, t.at]), ['wrist', 1]];
+    for (let i = 0; i < stops.length - 1; i++) {
       const [na, fa0] = stops[i];
       const [nb, fb] = stops[i + 1];
       if (f <= fb) {
@@ -211,7 +212,10 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     { q: ua.restWorldRot, c: along(ua, 0.5 * Lua), pr: S.upperArm.mid, w: [[bi('upper-arm'), 1]] },
     { q: ua.restWorldRot, c: along(ua, Lua - 0.04), pr: S.upperArm.elbow, w: [[bi('upper-arm'), 0.85], [bi('forearm'), 0.15]] },
     { q: fa.restWorldRot, c: along(fa, 0), pr: [78, 74], w: [[bi('upper-arm'), 0.5], [bi('forearm'), 0.5]], crease: 'palmar' },
-    { q: fa.restWorldRot, c: along(fa, 0.04), pr: S.forearm.elbow, w: [[bi('forearm'), 0.85], [bi('upper-arm'), 0.15]] },
+    // Its forearm part is shared along the twist stops like every forearm
+    // ring: skin 4 cm below the elbow already turns about a tenth of the
+    // hand's turn (Kulesh 2015, levels I and II; anatomy.js).
+    { q: fa.restWorldRot, c: along(fa, 0.04), pr: S.forearm.elbow, w: [...forearmWeights(0.04 / Lfa).map(([bone, wt]) => [bone, 0.85 * wt]), [bi('upper-arm'), 0.15]] },
     { q: fa.restWorldRot, c: along(fa, 0.28 * Lfa), pr: S.forearm.belly, w: forearmWeights(0.28) },
     { q: fa.restWorldRot, c: along(fa, 0.55 * Lfa), pr: S.forearm.mid, w: forearmWeights(0.55) },
     { q: fa.restWorldRot, c: along(fa, 0.85 * Lfa), pr: S.forearm.lower, w: forearmWeights(0.85) },
@@ -237,7 +241,7 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
   // pronation to full supination, where s is the share its skin weights
   // give it (0 on the elbow's and upper arm's bones, 1 on the wrist's). The
   // skinning then unwinds it exactly as the forearm supinates.
-  const TURN_SHARE = { shoulder: 0, 'upper-arm': 0, forearm: 0, 'forearm-twist-1': 1 / 3, 'forearm-twist-2': 2 / 3, wrist: 1 };
+  const TURN_SHARE = { shoulder: 0, 'upper-arm': 0, forearm: 0, ...Object.fromEntries(FOREARM_TWIST.map((t) => [t.name, t.share])), wrist: 1 };
   const byBone = new Map(Object.keys(TURN_SHARE).map((n) => [bi(n), TURN_SHARE[n]]));
   const turnShare = (w) => w.reduce((acc, [bone, wt]) => acc + wt * (byBone.get(bone) ?? 1), 0) / w.reduce((acc, [, wt]) => acc + wt, 0);
   // Full pronation to full supination: half a turn about the forearm's

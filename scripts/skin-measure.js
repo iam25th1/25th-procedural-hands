@@ -38,10 +38,28 @@ function labToLinear([L, a, b]) {
   return [R, G, B];
 }
 
+// In the page: the pixels of a palm-key render (palmkey=1) that show palm
+// skin, as a mask. The palm is glabrous skin only, ending at the wrist crease
+// (Yamaguchi et al. J Cell Biol 2004); the forearm in the same view is not
+// palm and is left out of the palm's median.
+function palmMask() {
+  const src = document.getElementById('view');
+  const t = document.createElement('canvas');
+  t.width = src.width;
+  t.height = src.height;
+  const g = t.getContext('2d', { willReadFrequently: true });
+  g.drawImage(src, 0, 0);
+  const d = g.getImageData(0, 0, t.width, t.height).data;
+  const mask = [];
+  for (let i = 0; i < d.length; i += 4 * 3) mask.push(d[i + 1] > 60 && d[i + 1] > 1.5 * d[i] && d[i + 1] > 1.5 * d[i + 2] ? 1 : 0);
+  return mask;
+}
+
 // In the page: the median colour of the skin pixels (neither backdrop nor
 // sleeve), weighted to the lit side: the brightest half by luminance, which
-// is the part of the hand a swatch describes.
-function skinStats() {
+// is the part of the hand a swatch describes. With a mask, only the masked
+// pixels count.
+function skinStats(mask = null) {
   const src = document.getElementById('view');
   const t = document.createElement('canvas');
   t.width = src.width;
@@ -51,7 +69,8 @@ function skinStats() {
   const d = g.getImageData(0, 0, t.width, t.height).data;
   const bg = [d[0], d[1], d[2]];
   const px = [];
-  for (let i = 0; i < d.length; i += 4 * 3) {
+  for (let i = 0, k = 0; i < d.length; i += 4 * 3, k++) {
+    if (mask && !mask[k]) continue;
     const r = d[i], gg = d[i + 1], b = d[i + 2];
     if (Math.abs(r - bg[0]) + Math.abs(gg - bg[1]) + Math.abs(b - bg[2]) < 24) continue;
     // The sleeve: saturated yellow.
@@ -75,13 +94,17 @@ export async function measureSkin({ viewport = { width: 1440, height: 900 } } = 
       const row = { tone: MONK_TONES[i] };
       // The palm is also drawn once in the dorsal colour: how the palm-side
       // view renders the same colour, so the real palm is compared fairly.
-      for (const [key, cam, extra] of [['back', 'back', ''], ['palm', 'palm', ''], ['palmBase', 'palm', '&palmmatch=1']]) {
+      // The palm views are read through the palm mask; the back view whole.
+      let mask = null;
+      for (const [key, cam, extra] of [['back', 'back', ''], ['mask', 'palm', '&palmkey=1'], ['palm', 'palm', ''], ['palmBase', 'palm', '&palmmatch=1']]) {
         const page = await context.newPage();
         await page.goto(`${base}/?shot=1&ui=0&scene=hands&hand=right&pose=relaxed&cam=${cam}&skin=${i}${extra}`, { waitUntil: 'load' });
         await page.waitForFunction(() => window.__handsShot && window.__handsShot.ready, null, { timeout: 60000 });
-        row[key] = await page.evaluate(skinStats);
+        if (key === 'mask') mask = await page.evaluate(palmMask);
+        else row[key] = await page.evaluate(skinStats, key === 'back' ? null : mask);
         await page.close();
       }
+      row.palmPixels = mask.reduce((a, b) => a + b, 0);
       row.swatchLab = rgbToLab(hexToRgb(row.tone.hex));
       row.backLab = rgbToLab(row.back.rgb);
       row.palmLab = rgbToLab(row.palm.rgb);

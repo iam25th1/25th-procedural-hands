@@ -16,7 +16,7 @@ All renders were made with the single arm shot scene (`/?shot=1&scene=arm&pose=r
 | 2 | Palm colour on the volar forearm | volar against dorsal forearm colour, every Monk tone | 6.7 dE76 | Yamaguchi et al 2004 | **fixed**: palm colour on glabrous skin only (0.07 dE76) |
 | 3 | Thumb column under-rotated at rest | first metacarpal rotation, measured as Cheema et al measured it | 41.6 deg | Cheema et al 2006: 74 +/- 10 | **conflict**, patch |
 | 4 | Wrist crease ring weighted against its neighbours | ring turn under 90 deg of rotation, bend under 73 deg of flexion | turn 75 against 86 either side; bend 36 against 65 | (mesh consistency) | **fixed** (88b598b) |
-| 5 | A third of pronation at the wrist joint | distal third of the forearm turning with the hand | 85 percent at 85 percent of the forearm | Kulesh et al 2015; the radiocarpal joint does not pronate | **conflict**, patch |
+| 5 | Forearm skin turned in equal thirds, a third on the wrist joint | ring turn against Kulesh's per-level share | 0.56 of the hand's turn at 55 percent of the forearm (Kulesh 0.34); 0.86 at 85 percent (0.63) | Kulesh et al 2015, Tables 1 and 3; the radiocarpal joint does not pronate | **fixed**: three twist bones at the sourced shares, none on the wrist |
 | 6 | Wrist thin | wrist ring perimeter | 156.6 mm against 169.0 | ANSUR II | **fixed** (8096e5d) |
 
 ### Ranking
@@ -58,6 +58,7 @@ Each image has the before row on top and the after row below, with the same fram
 | Wrist weights (88b598b) | thumb up; full supination from above and below | ![](assets/twist/wrist.png) |
 | Forearm winding (e7eae3f) | bind from above and below; thumb up; full supination | ![](assets/twist/forearm.png) |
 | Wrist girth (8096e5d) | bind; thumb up from the side; full supination | ![](assets/twist/girth.png) |
+| Pronation on three twist bones in Kulesh's shares (landed) | back at 90, 0 and -90 deg; palm and side at -90 | ![](assets/twist/pronation.png) |
 | Thumb roll (patch, not applied) | palm, back, radial, ulnar, three quarter | ![](assets/twist/thumb.png) |
 | Glabrous colour (landed) | bind from above and below; thumb up; full supination | ![](assets/twist/colour.png) |
 | Gallery: counting, desktop | the core sheet before and after the three commits | ![](assets/twist/gallery-counting.png) |
@@ -85,7 +86,6 @@ Each patch applies to the committed tree with `git apply docs/conflicts/<name>.p
 ```mermaid
 flowchart TD
   T["thumb-rest-roll.patch: roll -24.2 deg, pre-shape abduction 37"] -->|fails| T1["Hook, Pull a lever, Drag a crate, Handover + 4 aggregates"]
-  P["pronation-split.patch: pronation on the two twist bones, none at the wrist"] -->|fails| P1["ik: forearm twist shared (equal thirds), 2 unit tests, Hang from a rung"]
 ```
 
 ### thumb-rest-roll.patch
@@ -96,11 +96,13 @@ It fails 8 existing checks: Hook (16.8 mm into the strap), Pull a lever (23.7 mm
 
 The visible effect alone is modest. The pad turns toward the fingers and the nail faces radially. The column's direction out of the palm is unchanged, because it has no source.
 
-### pronation-split.patch
+### Landed: pronation on three twist bones, in Kulesh's shares
 
-This puts pronation on the two forearm twist bones, half each, and none at the wrist joint, which does not pronate. The skin over the distal third then turns fully with the hand, which the new check `skinning: the distal third of the forearm turns with the hand` requires: 100 percent against 85 percent now. The patch also updates the forearm winding's shares to match.
+The held patch put pronation on two twist bones, half each, and required the distal third of the forearm to turn at least 90 percent with the hand. Reading Kulesh's tables in full contradicted that. Skin displacement against the ulna and against the radius at each of the eight levels gives the skin's share of the hand's turn, $\bar d_u/(\bar d_u+\bar d_r)$: 0.063 at the radial neck rising to 0.728 at the distal radius. So the distal forearm does not turn with the hand, and the equal thirds turned the skin too early rather than too late (0.56 at 55 percent of the forearm against 0.34). The recon's claim that the distal third should turn with the hand was wrong.
 
-It fails the existing `ik: forearm twist shared across the twist bones`, which asserts equal thirds (45 deg spread), and two unit tests that assume thirds. It also fails Hang from a rung: the left thumb metacarpal goes 14.1 mm into the rung, because the arm solve changes. It trades the wrist lag for deeper candy wrap: with only two forearm twist bones 90 deg apart at a 180 deg turn, the mid forearm shrinks to 74 percent of its radius (88 percent now). Doing it properly needs a third forearm twist bone, or dual quaternion skinning, as well.
+What landed instead: three twist bones at 0.5625 (share 0.346), 0.9375 (0.728) and the distal radius (1), and the wrist joint's pronation at 0. Every ring turns within 0.021 of Kulesh's share. Candy wrap improved rather than worsened: the narrowest section of the rendered surface at 180 deg keeps 83.1 percent of its radius, against 79.2 under equal thirds. (The recon's 87 and 74 percent were ring vertices only; the facets between rings narrow further.) Dual quaternion skinning was not needed and was not chosen. It would remove the blend narrowing but not the facet narrowing between rings, and it would replace three.js's skinning shader for every bone of the hand.
+
+Hang from a rung (the thumb metacarpal 14.1 mm into the rung under the patch) passes. The patch's ±45 deg per-bone limits changed which arm poses the reach planner judged roomy (it scores room on `forearm-twist-1`'s range). With each bone limited to its own part of the ±90 deg range, the chosen poses and the hand's orientation are the same as before, since the twist bones turn about one axis and their sum is unchanged.
 
 ### Landed: palm colour on glabrous skin only
 

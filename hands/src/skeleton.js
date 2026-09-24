@@ -1,11 +1,11 @@
-// Skeleton: per side a shoulder anchor, upper arm, forearm with two twist
+// Skeleton: per side a shoulder anchor, upper arm, forearm with three twist
 // bones, then the 25 joint hand layout of the WebXR Hand Input module
 // (wrist, four thumb joints, five per finger including the tip), named
 // exactly as the module names them. Joint frames follow the same module:
 // -Z runs along the bone away from the wrist, -Y points out of the palm,
 // +X completes a right handed frame. Rest lengths come from anatomy.js.
 import { v3, quat, deg } from './math.js';
-import { BONES_MM, LAYOUT_MM, CARPUS_MM, ARM_MM, SHOULDER_M, SECTIONS_MM, MM, LIMITS_DEG } from './anatomy.js';
+import { BONES_MM, LAYOUT_MM, CARPUS_MM, ARM_MM, SHOULDER_M, SECTIONS_MM, MM, LIMITS_DEG, FOREARM_TWIST } from './anatomy.js';
 
 export const SIDES = ['left', 'right'];
 export const FINGERS = ['index', 'middle', 'ring', 'little'];
@@ -20,7 +20,10 @@ export const XR_JOINT_NAMES = [
   ...THUMB_SEGMENTS.map((s) => `thumb-${s}`),
   ...FINGERS.flatMap((f) => FINGER_SEGMENTS.map((s) => `${XR_PREFIX[f]}-${s}`)),
 ];
-export const ARM_JOINT_NAMES = ['shoulder', 'upper-arm', 'forearm', 'forearm-twist-1', 'forearm-twist-2'];
+export const ARM_JOINT_NAMES = ['shoulder', 'upper-arm', 'forearm', ...FOREARM_TWIST.map((t) => t.name)];
+// Each twist bone's own part of the forearm's rotation: its share of the
+// hand's turn less the share of the bone before it (anatomy.js, Kulesh 2015).
+export const TWIST_PART = Object.fromEntries(FOREARM_TWIST.map((t, i) => [t.name, t.share - (i ? FOREARM_TWIST[i - 1].share : 0)]));
 export const JOINTS_PER_SIDE = ARM_JOINT_NAMES.length + XR_JOINT_NAMES.length;
 
 const NO_LIMIT = { flex: [0, 0], abd: [0, 0], twist: [0, 0] };
@@ -30,16 +33,13 @@ function limitsFor(spec) {
 }
 
 // Limit table per joint name, radians.
-const THIRD = 1 / 3;
 function jointLimits(name, digit, segment) {
+  const part = TWIST_PART[name];
   if (name === 'upper-arm') return limitsFor({ flex: [0, LIMITS_DEG.shoulder.cone], twist: LIMITS_DEG.shoulder.twist });
   if (name === 'forearm') return limitsFor({ flex: LIMITS_DEG.elbow.flex });
-  if (name === 'forearm-twist-1' || name === 'forearm-twist-2') {
-    return limitsFor({ twist: [LIMITS_DEG.forearm.twist[0] * THIRD, LIMITS_DEG.forearm.twist[1] * THIRD] });
-  }
-  if (name === 'wrist') {
-    return limitsFor({ flex: LIMITS_DEG.wrist.flex, abd: LIMITS_DEG.wrist.dev, twist: [LIMITS_DEG.forearm.twist[0] * THIRD, LIMITS_DEG.forearm.twist[1] * THIRD] });
-  }
+  if (part !== undefined) return limitsFor({ twist: [LIMITS_DEG.forearm.twist[0] * part, LIMITS_DEG.forearm.twist[1] * part] });
+  // The radiocarpal joint flexes and deviates; it does not pronate.
+  if (name === 'wrist') return limitsFor({ flex: LIMITS_DEG.wrist.flex, abd: LIMITS_DEG.wrist.dev });
   if (digit === 'thumb') {
     if (segment === 'metacarpal') return limitsFor(LIMITS_DEG.thumb.cmc);
     if (segment === 'phalanx-proximal') return limitsFor(LIMITS_DEG.thumb.mcp);
@@ -144,7 +144,7 @@ function handLayout() {
 }
 
 function parentName(name) {
-  if (name === 'wrist') return 'forearm-twist-2';
+  if (name === 'wrist') return FOREARM_TWIST[FOREARM_TWIST.length - 1].name;
   const m = /^(thumb|index-finger|middle-finger|ring-finger|pinky-finger)-(.+)$/.exec(name);
   const segs = m[1] === 'thumb' ? THUMB_SEGMENTS : FINGER_SEGMENTS;
   const i = segs.indexOf(m[2]);
@@ -180,9 +180,15 @@ export function buildSide(side, offset = 0) {
   const armRot = frameFrom([0, 0, -1], [0, -1, 0]);
   add('shoulder', null, { kind: 'arm', worldPos: shoulder, worldRot: armRot.slice(), length: 0 });
   add('upper-arm', 'shoulder', { kind: 'arm', worldPos: shoulder.slice(), worldRot: armRot.slice(), length: ARM_MM.upperArm * MM, radius: (SECTIONS_MM.upperArm.mid[0] + SECTIONS_MM.upperArm.mid[1]) / 4 * MM });
-  add('forearm', 'upper-arm', { kind: 'arm', worldPos: elbow, worldRot: armRot.slice(), length: fl * THIRD, radius: (SECTIONS_MM.forearm.belly[0] + SECTIONS_MM.forearm.belly[1]) / 4 * MM });
-  add('forearm-twist-1', 'forearm', { kind: 'arm', worldPos: v3.add([0, 0, 0], elbow, [0, 0, -fl * THIRD]), worldRot: armRot.slice(), length: fl * THIRD, radius: (SECTIONS_MM.forearm.lower[0] + SECTIONS_MM.forearm.lower[1]) / 4 * MM });
-  add('forearm-twist-2', 'forearm-twist-1', { kind: 'arm', worldPos: v3.add([0, 0, 0], elbow, [0, 0, -fl * 2 * THIRD]), worldRot: armRot.slice(), length: fl * THIRD, radius: (SECTIONS_MM.forearm.wrist[0] + SECTIONS_MM.forearm.wrist[1]) / 4 * MM });
+  // The forearm bone runs from the elbow to the first twist bone; each twist
+  // bone sits at its stop along the forearm (anatomy.js) and runs to the next.
+  const stops = [0, ...FOREARM_TWIST.map((t) => t.at), 1];
+  const section = (f) => (f < 0.4 ? SECTIONS_MM.forearm.belly : f < 0.8 ? SECTIONS_MM.forearm.lower : SECTIONS_MM.forearm.wrist);
+  const radiusAt = (f) => (section(f)[0] + section(f)[1]) / 4 * MM;
+  add('forearm', 'upper-arm', { kind: 'arm', worldPos: elbow, worldRot: armRot.slice(), length: fl * stops[1], radius: radiusAt(0) });
+  FOREARM_TWIST.forEach((t, i) => {
+    add(t.name, i ? FOREARM_TWIST[i - 1].name : 'forearm', { kind: 'arm', worldPos: v3.add([0, 0, 0], elbow, [0, 0, -fl * t.at]), worldRot: armRot.slice(), length: fl * (stops[i + 2] - t.at), radius: radiusAt(t.at) });
+  });
 
   const layout = handLayout();
   for (const name of XR_JOINT_NAMES) {
@@ -209,9 +215,9 @@ export function buildSide(side, offset = 0) {
   // across the palm), Z completes it. The rest metacarpal direction has no
   // X component in this basis.
   // Pronation channels measure from the thumb up neutral; the bind pose is
-  // fully pronated, a third of it on each bone of the chain.
-  const third = deg(LIMITS_DEG.forearm.bindPronation) / 3;
-  for (const name of ['forearm-twist-1', 'forearm-twist-2', 'wrist']) byName.get(name).twistOffset = third;
+  // fully pronated, each twist bone carrying its part of it and the wrist
+  // none.
+  for (const t of FOREARM_TWIST) byName.get(t.name).twistOffset = deg(LIMITS_DEG.forearm.bindPronation) * TWIST_PART[t.name];
   // The wrist composes as a swing (flexion and deviation as one rotation
   // vector in the XY plane) followed by the pronation twist about the bone,
   // which stays continuous where an Euler split would jump.

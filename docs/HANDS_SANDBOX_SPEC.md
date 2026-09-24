@@ -112,6 +112,7 @@ Sourced values the rig is held to, and every existing check or test that was cor
 | Value | Rig | Source | Held by |
 | --- | --- | --- | --- |
 | Palm colour boundary | the palm's lighter colour on glabrous skin only (palm and volar digits), half at the wrist crease ring, none on the arm | Yamaguchi Y et al. J Cell Biol 2004;165(2):275-285: palmoplantar melanocyte density is a fifth of other sites'; glabrous skin is the palms, soles and ventral digits | `colour: the palm colour stops at the wrist crease` (volar against dorsal forearm, at most 3 dE76 on every Monk tone) |
+| Forearm rotation along the skin | share of the hand's turn: 0 at the elbow, 0.346 at 0.5625 of the forearm (forearm-twist-1), 0.728 at 0.9375 (forearm-twist-2), 1 at the distal radius (forearm-twist-3); the wrist joint's own pronation 0 | Kulesh PN, Fletcher MDA, Solomin LN. SICOT J 2015;1:3, Tables 1 and 3: share $\bar d_u / (\bar d_u + \bar d_r)$ per level = 0.063, 0.114, 0.187, 0.268, 0.346, 0.470, 0.586, 0.728 (levels I to VIII at (k - 0.5)/8 of the forearm). The radiocarpal joint flexes and deviates only | `ik: forearm rotation shared over the three twist bones in the parts the forearm skin carries it`; `skinning: forearm skin turns along the forearm as Kulesh 2015 measured it` (each ring within 0.05 of the hand's turn); `skinning: the forearm keeps its girth from full pronation to full supination` (narrowest section at least 79 percent of rest radius, the equal-thirds rig's 79.2) |
 
 ### Corrected: unit test `colorize: on every Monk tone the palm is lighter than the back`
 
@@ -121,6 +122,62 @@ Sourced values the rig is held to, and every existing check or test that was cor
 - Old: "palm" was every unshaded skin vertex with `palmar > 0.95`, which took in the volar forearm as well as the palm. The test then asserted the deep tones' "palm" was more than 1.5 times the back's L*, so it required palm colour up the forearm.
 - New: "palm" is unshaded skin with `palmar > 0.95` and glabrous (`(m.glabrous ?? 1) === 1`): the palm and volar digits only. Every assertion is unchanged: palm lighter than the back on every tone, the deep tones' palm over 1.5 times the back, the ratio rising with depth, nail beds over 15 dE from the skin, nail and cloth roughness.
 - Why: the volar forearm is not glabrous skin (Yamaguchi 2004), so counting it as palm encoded the stripe up the forearm that made its rotation read as a spiral.
+
+</details>
+
+### Corrected with the pronation distribution
+
+<details>
+<summary>Check <code>ik: forearm twist shared across the twist bones</code>, now <code>ik: forearm rotation shared over the three twist bones in the parts the forearm skin carries it (Kulesh 2015), none at the wrist joint</code></summary>
+
+- Old: `|t1 - t2| < 1e-9` and `|t2 - wrist| < 1e-9` for 400 seeded IK solves: equal thirds, a third of every rotation on the wrist joint.
+- New: each twist bone's channel equals the total times its part (0.346, 0.382, 0.272) within 1e-9 rad, and the wrist's twist is 0.
+- Why: the hand turns with the radius (the radiocarpal joint does not pronate), and the skin's share of the turn rises along the forearm as Kulesh 2015 measured (0.346 at level V, 0.728 at level VIII), not in thirds.
+
+</details>
+
+<details>
+<summary>Unit test <code>forearm rotation is shared across the twist bones and the hand</code>, now <code>... in the sourced parts, none at the wrist</code></summary>
+
+- Old: `Math.abs(t1 - t2) < 1e-9 && Math.abs(t2 - tw) < 1e-9` ("equal thirds"); palm down read as `forearm-twist-1 * 3`.
+- New: each twist bone carries `total * TWIST_PART[name]` within 1e-9; `wrist.channels.twist === 0`; palm down read as the sum of the three twist bones. The total pronation, reach error and palm-down 90 deg assertions are unchanged.
+- Why: as above (Kulesh 2015; the radiocarpal joint does not pronate).
+
+</details>
+
+<details>
+<summary>Unit test <code>wrist swing twist joint: channels round trip and stay continuous through big swings</code></summary>
+
+- Old: flex, deviation and twist (-30 to 30 deg) all round trip through the wrist within 1e-6.
+- New: flex and deviation round trip within 1e-6 over the same 200 seeded swings; a twist asked of the wrist reads back 0.
+- Why: the wrist joint no longer pronates, so its twist limit is [0, 0]; the pronation lives on the twist bones.
+
+</details>
+
+<details>
+<summary>Unit tests that count bones: <code>createThreeView builds one skinned mesh per arm with every bone</code>, <code>25 WebXR joints per hand ... with the module parent chain</code></summary>
+
+- Old: 30 bones per arm; the wrist's parent `forearm-twist-2`; 60 joints.
+- New: 31 bones per arm; the wrist's parent `forearm-twist-3`; 62 joints. The 25 WebXR joints, their order and their parent chain are unchanged.
+- Why: the third twist bone was added. Bones stay inside the budget of 80 (62).
+
+</details>
+
+<details>
+<summary>Check <code>skinning: forearm skin wound as the forearm is</code> (added in 85f5f58)</summary>
+
+- Old: in full pronation the last forearm ring's volar side within 20 deg of the palm, and the elbow ring's within 20 deg of the elbow crease.
+- New: in full pronation each end ring within 20 deg of its Kulesh wind: (1 - s) x 180 deg from the palm, s x 180 from the crease, with s from Kulesh 2015 at the ring. Straight in supination is unchanged.
+- Why: the old wording needed skin 12 mm short of the wrist (95 percent of the forearm) to turn at least 89 percent with the hand; Kulesh level VIII turns 0.728.
+
+</details>
+
+<details>
+<summary>Measurement behind <code>skin tones: ... its palm renders lighter than the back</code></summary>
+
+- Old: the palm-side renders' median over every skin pixel in view, the raised forearm included.
+- New: the same median over the pixels a palm-key render (glabrous skin painted green, `palmkey=1`) marks as palm, for the palm and the palm drawn in the dorsal colour alike. The back view, the dE limit (2.5) and the lift limit (0.3 L*) are unchanged.
+- Why: the palm is glabrous skin only (Yamaguchi 2004). Once the forearm was coloured as forearm, its pixels diluted the palm's median: Monk 1 read 0.3 L* of lift after the twist change, measured 0.9 L* on the palm alone.
 
 </details>
 

@@ -15,7 +15,8 @@ import { create } from '/hands/src/index.js';
 
 export function renderShot(canvas, shot) {
   const view = createView(canvas, { preserveDrawingBuffer: true });
-  const look = { lod: shot.lod, skinTone: shot.palmMatch ? { ...skinTone(SKIN_TONES[shot.skin % SKIN_TONES.length]), palmMatchesDorsal: true } : SKIN_TONES[shot.skin % SKIN_TONES.length], sleeveColour: SLEEVE_COLOURS[shot.sleeve % SLEEVE_COLOURS.length] };
+  const measureFlag = shot.palmKey ? { palmKey: true } : shot.palmMatch ? { palmMatchesDorsal: true } : null;
+  const look = { lod: shot.lod, skinTone: measureFlag ? { ...skinTone(SKIN_TONES[shot.skin % SKIN_TONES.length]), ...measureFlag } : SKIN_TONES[shot.skin % SKIN_TONES.length], sleeveColour: SLEEVE_COLOURS[shot.sleeve % SLEEVE_COLOURS.length] };
   const applyCamera = (cam) => { if (cam.eye) view.setEye(cam.eye, cam.dir); else view.setOrbit(cam); };
 
   if (shot.scene === 'hands') {
@@ -43,10 +44,14 @@ export function renderShot(canvas, shot) {
     if (shot.pose) hands.setPose('right', shot.pose, { snap: true });
     const skel = hands.skeleton;
     const deg = Math.PI / 180;
-    for (const n of ['forearm-twist-1', 'forearm-twist-2', 'wrist']) {
-      const j = skel.joint('right', n);
-      skel.setChannels(j, 0, 0, (shot.pron * deg) / 3);
-    }
+    // Pronation shared over the joints that carry the bind pronation, in
+    // the parts they carry it.
+    const chain = skel.sides.right.joints.filter((jt) => jt.twistOffset);
+    const bindPron = chain.reduce((acc, jt) => acc + jt.twistOffset, 0);
+    for (const jt of chain) skel.setChannels(jt, 0, 0, (shot.pron * deg) * (jt.twistOffset / bindPron));
+    // The wrist straight: no flexion or deviation (and no pronation of its own).
+    const wj = skel.joint('right', 'wrist');
+    if (!chain.includes(wj)) skel.setChannels(wj, 0, 0, 0);
     for (const n of ['upper-arm', 'forearm']) { const j = skel.joint('right', n); j.localRot = [0, 0, 0, 1]; j.channels.flex = 0; }
     skel.update();
     view.setBackdrop('plain');
@@ -57,7 +62,7 @@ export function renderShot(canvas, shot) {
     view.resize(true);
     const j = (n) => skel.joint('right', n);
     const onForearm = shot.focus === 'left'; // focus=left is reused as "frame the forearm"
-    const target = onForearm ? j('forearm-twist-1').worldPos.map((v, i) => (v + j('forearm-twist-2').worldPos[i]) / 2) : j('wrist').worldPos.map((v, i) => (v * 0.35 + j('middle-finger-phalanx-proximal').worldPos[i] * 0.65));
+    const target = onForearm ? j('forearm').worldPos.map((v, i) => (v + j('wrist').worldPos[i]) / 2) : j('wrist').worldPos.map((v, i) => (v * 0.35 + j('middle-finger-phalanx-proximal').worldPos[i] * 0.65));
     // Views in the bind frame (arm along -Z, palm down at pron 90), fixed
     // whatever the forearm's turn so before and after compare like for like.
     const dirs = { palm: [0, -1, -0.2], back: [0, 1, -0.2], side: [-1, 0.1, -0.05], ulnar: [1, 0.1, -0.05], three: [-0.6, 0.55, -0.3] };

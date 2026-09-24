@@ -162,6 +162,39 @@ export const LIMITS_DEG = {
   metacarpal: { ring: { flex: [0, 10] }, little: { flex: [0, 20] } },
 };
 
+// How forearm rotation spreads along the forearm's skin. The radius turns
+// about the ulna and the hand turns with the radius (the radiocarpal joint
+// flexes and deviates but does not pronate), while the skin slides over
+// both. Kulesh PN, Fletcher MDA, Solomin LN. Avoidance of external fixation
+// pin induced rotational stiffness in the forearm. SICOT J 2015;1:3
+// (doi:10.1051/sicotj/2015005), Tables 1 and 3: skin displacement at 70 deg
+// of pronation and of supination, 34 arms, 12 positions around each bone at
+// eight equidistant levels (I at the radial neck, VIII at the distal
+// metaepiphysis of the radius), measured against the ulna (d_u) and against
+// the radius (d_r). Skin that turned with neither bone would move against
+// both alike; the share of the hand's turn a level of skin carries is taken
+// as d_u / (d_u + d_r), the means over positions and both directions:
+//   level    I     II    III   IV    V     VI    VII   VIII
+//   d_u mm   4.3   7.2   11.0  15.8  17.8  22.8  26.2  33.7
+//   d_r mm   63.9  56.1  47.7  43.0  33.5  25.7  18.5  12.6
+//   share    0.063 0.114 0.187 0.268 0.346 0.470 0.586 0.728
+// Level k sits at (k - 0.5) / 8 of the forearm from the elbow (eight equal
+// levels; I at the radial neck, VIII at the distal metaepiphysis); the
+// share is taken as linear in the angle (the paper measured 10, 30 and 70
+// deg). The skin at the wrist crease turns with the hand (share 1). The rig
+// carries it on three twist bones, each a stop on a piecewise linear fit
+// that passes through levels V and VIII exactly and every other level
+// within 0.025 of the table: the elbow (share 0), forearm-twist-1 at level
+// V, forearm-twist-2 at level VIII, and forearm-twist-3 at the distal end
+// of the radius, carrying the rest to the hand, so the wrist joint's own
+// pronation is zero.
+export const KULESH_SKIN_SHARE = [[0.0625, 0.063], [0.1875, 0.114], [0.3125, 0.187], [0.4375, 0.268], [0.5625, 0.346], [0.6875, 0.470], [0.8125, 0.586], [0.9375, 0.728]];
+export const FOREARM_TWIST = [
+  { name: 'forearm-twist-1', at: 0.5625, share: 0.346 },
+  { name: 'forearm-twist-2', at: 0.9375, share: 0.728 },
+  { name: 'forearm-twist-3', at: 1, share: 1 },
+];
+
 // Coupling. DIP follows PIP at two thirds in free motion (Roda-Sales A,
 // Sancho-Bru JL, Vergara M. PeerJ 2022;10:e14051, linear DIP from PIP).
 // Enslaving: a fraction of a neighbour's flexion leaks into a finger; the

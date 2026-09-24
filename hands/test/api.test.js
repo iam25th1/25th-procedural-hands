@@ -121,7 +121,7 @@ test('createThreeView builds one skinned mesh per arm with every bone, DOM free'
   assert.ok(view.triangles > 2000);
   const sm = view.arms.right.mesh;
   assert.equal(sm.isSkinnedMesh, true);
-  assert.equal(sm.skeleton.bones.length, 30);
+  assert.equal(sm.skeleton.bones.length, 31);
   view.recolor({ skinTone: '#4E3220', sleeveColour: '#2D6CDF' });
   view.setLod('high');
   assert.ok(view.triangles > 10000);

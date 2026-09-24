@@ -37,6 +37,7 @@ export function parseShot(search) {
     focus: ['left', 'right', 'both'].includes(q.get('focus')) ? q.get('focus') : null,
     skin: Math.floor(num(q.get('skin'), 7, 0, 9)),
     palmMatch: q.get('palmmatch') === '1',
+    palmKey: q.get('palmkey') === '1',
     sleeve: Math.floor(num(q.get('sleeve'), 0, 0, 9)),
     lod: q.get('lod') === 'low' ? 'low' : 'high',
     // scene=arm: forearm rotation in degrees from thumb-up neutral (positive

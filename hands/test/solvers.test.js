@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Spring, Oscillator } from '../src/springs.js';
-import { Skeleton } from '../src/skeleton.js';
+import { Skeleton, TWIST_PART } from '../src/skeleton.js';
+import { FOREARM_TWIST } from '../src/anatomy.js';
 import { solveArm, handRotation } from '../src/ik.js';
 import { poseChannels, applyChannels } from '../src/fingers.js';
 import { POSES } from '../src/poses.js';
@@ -75,25 +76,27 @@ test('two bone IK meets reachable targets within 2 mm, extends fully when unreac
   }
 });
 
-test('forearm rotation is shared across the twist bones and the hand', () => {
+test('forearm rotation is shared across the twist bones in the sourced parts, none at the wrist', () => {
   const skel = new Skeleton();
   const side = 'right';
   const shoulder = skel.joint(side, 'upper-arm').worldPos;
   const target = [shoulder[0] + 0.05, shoulder[1] + 0.05, shoulder[2] - 0.45];
   const rot = handRotation([0, 0, -1], [Math.sin(deg(40)), -Math.cos(deg(40)), 0]);
   const r = solveArm(skel, side, target, rot, [0.5, -0.7, 0]);
-  const t1 = skel.joint(side, 'forearm-twist-1').channels.twist;
-  const t2 = skel.joint(side, 'forearm-twist-2').channels.twist;
-  const tw = skel.joint(side, 'wrist').channels.twist;
-  assert.ok(Math.abs(t1 - t2) < 1e-9 && Math.abs(t2 - tw) < 1e-9, 'equal thirds');
+  // Each twist bone takes its part of the rotation: the skin's share of the
+  // hand's turn at its stop less the share at the stop before (Kulesh PN et
+  // al. SICOT J 2015;1:3; anatomy.js FOREARM_TWIST), and the wrist none.
+  const twists = FOREARM_TWIST.map((t) => skel.joint(side, t.name).channels.twist);
+  const total = twists.reduce((a, b) => a + b, 0);
+  FOREARM_TWIST.forEach((t, i) => assert.ok(Math.abs(twists[i] - total * TWIST_PART[t.name]) < 1e-9, `${t.name} carries ${TWIST_PART[t.name].toFixed(3)} of the rotation`));
+  assert.equal(skel.joint(side, 'wrist').channels.twist, 0, 'the wrist joint does not pronate');
   // Channels measure pronation from thumb up neutral: palm down is 90, a
   // palm turned 40 degrees toward the thumb side is less pronated.
-  const total = t1 + t2 + tw;
   assert.ok(total > deg(10) && total <= deg(90) + 1e-9, `total pronation ${toDeg(total)}`);
   assert.ok(r.error < 0.002);
   // Arm straight ahead, palm down: the bind pose, which is 90 of pronation.
   solveArm(skel, side, [shoulder[0], shoulder[1], shoulder[2] - 2], handRotation([0, 0, -1], [0, -1, 0]), [shoulder[0], shoulder[1] - 1, shoulder[2] - 0.2]);
-  const full = skel.joint(side, 'forearm-twist-1').channels.twist * 3;
+  const full = FOREARM_TWIST.reduce((a, t) => a + skel.joint(side, t.name).channels.twist, 0);
   assert.ok(Math.abs(full - deg(90)) < deg(2), `palm down is 90 pronation, got ${toDeg(full)}`);
 });
 

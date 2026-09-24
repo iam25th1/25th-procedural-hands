@@ -1,11 +1,14 @@
 // Two bone arm IK (shoulder, elbow, wrist) with a pole target, anatomical
 // limits, reach clamping without elbow flips, and wrist orientation targets
-// whose forearm rotation is shared across the two twist bones and the hand.
+// whose forearm rotation is shared across the three twist bones as the
+// forearm's skin shares it (the wrist joint itself does not pronate).
 //
 // Law of cosines: for upper arm a, forearm b and shoulder to target d,
 //   cos(elbow interior) = (a^2 + b^2 - d^2) / (2ab)
 //   cos(shoulder offset) = (a^2 + d^2 - b^2) / (2ad)
-import { v3, quat, clamp } from './math.js';
+import { v3, quat, clamp, deg } from './math.js';
+import { FOREARM_TWIST, LIMITS_DEG } from './anatomy.js';
+import { TWIST_PART } from './skeleton.js';
 
 const REACH_MARGIN = 0.99995; // never fully lock the elbow (about 1.6 degrees of residual flex)
 
@@ -15,8 +18,7 @@ const REACH_MARGIN = 0.99995; // never fully lock the elbow (about 1.6 degrees o
 export function solveArm(skel, side, target, targetRot, pole) {
   const ua = skel.joint(side, 'upper-arm');
   const fa = skel.joint(side, 'forearm');
-  const t1 = skel.joint(side, 'forearm-twist-1');
-  const t2 = skel.joint(side, 'forearm-twist-2');
+  const chain = FOREARM_TWIST.map((t) => skel.joint(side, t.name));
   const wr = skel.joint(side, 'wrist');
   const S = ua.worldPos; // shoulder position is current (parent chain already updated)
   const a = ua.length;
@@ -69,13 +71,14 @@ export function solveArm(skel, side, target, targetRot, pole) {
   skel.setChannels(fa, flex, 0, 0);
 
   // Wrist orientation: relative rotation from the forearm frame, split into
-  // twist about the forearm (thirds) and swing at the wrist.
+  // twist about the forearm (the twist bones) and swing at the wrist.
   // Update the chain so the forearm's world rotation is current.
   skel.update();
   // Rest chain from the forearm to the wrist carries the bind pronation, so
   // the extra rotation the target needs is measured against it, then the
-  // total pronation from neutral is wrapped and clamped and shared in thirds.
-  const restChain = quat.multiply([0, 0, 0, 1], quat.multiply([0, 0, 0, 1], t1.restLocalRot, t2.restLocalRot), wr.restLocalRot);
+  // total pronation from neutral is wrapped and clamped and shared over the
+  // twist bones in their sourced parts (anatomy.js); the wrist takes none.
+  const restChain = [...chain, wr].reduce((q, j) => quat.multiply([0, 0, 0, 1], q, j.restLocalRot), [0, 0, 0, 1]);
   const base = quat.multiply([0, 0, 0, 1], fa.worldRot, restChain);
   const rel = quat.multiply([0, 0, 0, 1], quat.conjugate([0, 0, 0, 1], base), targetRot);
   // Twist about the forearm axis first (the chain's convention), then the
@@ -85,7 +88,7 @@ export function solveArm(skel, side, target, targetRot, pole) {
   const sn = Math.sqrt(Math.max(0, 1 - st.swing[3] * st.swing[3]));
   const axis = sn < 1e-9 ? [0, 0, 0] : [st.swing[0] / sn, st.swing[1] / sn, st.swing[2] / sn];
   const wc = { flex: -axis[0] * ang, abd: (axis[1] * ang) * wr.sideSign, twist: st.twist * wr.sideSign };
-  const offset = (wr.twistOffset || 0) * 3;
+  const offset = chain.reduce((acc, j) => acc + (j.twistOffset || 0), 0);
   let total = offset + wc.twist;
   total = ((total + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
   // Continuity: of the equivalent branches, take the one nearest the last solve.
@@ -94,15 +97,14 @@ export function solveArm(skel, side, target, targetRot, pole) {
     for (const cand of [total - 2 * Math.PI, total + 2 * Math.PI]) if (Math.abs(cand - last) < Math.abs(total - last)) total = cand;
   }
   wr.lastPronation = total;
-  const twistLimit = wr.limits.twist;
-  const third = clamp(total / 3, twistLimit[0], twistLimit[1]);
-  skel.setChannels(t1, 0, 0, third);
-  skel.setChannels(t2, 0, 0, third);
-  skel.setChannels(wr, wc.flex, wc.abd * wr.abdSign, third);
+  const range = LIMITS_DEG.forearm.twist.map(deg);
+  const pron = clamp(total, range[0], range[1]);
+  for (const j of chain) skel.setChannels(j, 0, 0, pron * TWIST_PART[j.name]);
+  skel.setChannels(wr, wc.flex, wc.abd * wr.abdSign, 0);
   skel.update();
 
   const err = v3.dist(wr.worldPos, target);
-  return { reachable, error: err, elbow: E.slice(), flex, twist: third * 3, wristFlex: wr.channels.flex, wristDev: wr.channels.abd };
+  return { reachable, error: err, elbow: E.slice(), flex, twist: pron, wristFlex: wr.channels.flex, wristDev: wr.channels.abd };
 }
 
 // Hand orientation from a desired finger direction (-Z) and palm direction (-Y).

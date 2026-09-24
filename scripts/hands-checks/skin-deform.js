@@ -5,7 +5,7 @@
 import { Skeleton } from '../../hands/src/skeleton.js';
 import { buildArmMesh, REGION } from '../../hands/src/mesh.js';
 import { v3, quat } from '../../hands/src/math.js';
-import { ARM_MM, MM } from '../../hands/src/anatomy.js';
+import { ARM_MM, MM, KULESH_SKIN_SHARE } from '../../hands/src/anatomy.js';
 
 // Skinned vertex positions for the skeleton's current pose.
 export function skinned(skel, mesh, side = 'right') {
@@ -175,12 +175,16 @@ export function volarReport() {
   const palmOut = (sk) => quat.rotate([0, 0, 0], sk.joint('right', 'wrist').worldRot, [0, -1, 0]);
   const bind = skinned(skel, mesh);
   const elbowRing = forearmRings2[0];
-  const atElbow = angleDeg(volarDirection(bind, mesh, elbowRing.ids, axis), anterior);
+  // In full pronation a ring whose skin carries a share s of the hand's
+  // turn lies wound s of the half turn from the elbow crease, (1 - s) from
+  // the palm; s is Kulesh's (kuleshShare). Each figure is how far the ring
+  // is from where that puts it.
+  const atElbow = Math.abs(angleDeg(volarDirection(bind, mesh, elbowRing.ids, axis), anterior) - kuleshShare(elbowRing.f) * 180);
   const lastRing = forearmRings2[forearmRings2.length - 1];
-  const atWristBind = angleDeg(volarDirection(bind, mesh, lastRing.ids, axis), v3.normalize([0, 0, 0], v3.reject([0, 0, 0], palmOut(skel), axis)));
+  const atWristBind = Math.abs(angleDeg(volarDirection(bind, mesh, lastRing.ids, axis), v3.normalize([0, 0, 0], v3.reject([0, 0, 0], palmOut(skel), axis))) - (1 - kuleshShare(lastRing.f)) * 180);
   // Full supination (the anatomical position): -90 degrees from thumb up,
   // shared among the twist bones as the bind pronation is shared.
-  const chain = ['forearm-twist-1', 'forearm-twist-2', 'wrist'].map((nm) => skel.joint('right', nm));
+  const chain = skel.sides.right.joints.filter((j) => j.twistOffset);
   const offs = chain.reduce((a, j) => a + (j.twistOffset || 0), 0);
   for (const j of chain) skel.setChannels(j, 0, 0, (-Math.PI / 2) * ((j.twistOffset || 0) / offs));
   skel.update();
@@ -223,12 +227,16 @@ export const skinDeformChecks = [
     },
   },
   {
-    name: 'skinning: forearm skin wound as the forearm is, facing the elbow crease at the elbow and the palm at the wrist in pronation, straight in supination',
+    // Corrected from "facing ... the palm at the wrist in pronation" (the last
+    // forearm ring within 20 deg of the palm, which needs skin at 95 percent
+    // of the forearm to turn nearly with the hand; Kulesh 2015 level VIII
+    // turns 0.728): each end ring is now held to its Kulesh wind.
+    name: 'skinning: forearm skin wound as the forearm is, in pronation lying as far from the elbow crease and the palm as Kulesh 2015 puts it, straight in supination',
     async run() {
       const r = volarReport();
       const worstStraight = r.straight.reduce((a, x) => Math.max(a, x.deg), 0);
       const worst = Math.max(r.atElbow, r.atWristBind, worstStraight);
-      return { pass: worst <= VOLAR_LIMIT_DEG, worst, limit: VOLAR_LIMIT_DEG, unit: 'deg', note: `pronation: volar side ${r.atElbow.toFixed(0)} deg from the elbow crease at the elbow, ${r.atWristBind.toFixed(0)} deg from the palm at the wrist; supination: volar side off the palm by ${r.straight.map((x) => `${x.deg.toFixed(0)} at ${x.f.toFixed(2)}`).join(', ')}` };
+      return { pass: worst <= VOLAR_LIMIT_DEG, worst, limit: VOLAR_LIMIT_DEG, unit: 'deg', note: `pronation: volar side ${r.atElbow.toFixed(0)} deg off its Kulesh wind at the elbow, ${r.atWristBind.toFixed(0)} deg off it at the wrist; supination: volar side off the palm by ${r.straight.map((x) => `${x.deg.toFixed(0)} at ${x.f.toFixed(2)}`).join(', ')}` };
     },
   },
   {
@@ -243,7 +251,7 @@ export const skinDeformChecks = [
       // Forearm rotation 90 degrees from the bind pose (palm down) to thumb
       // up, the twist channels set to 0 as the rig shares a rotation.
       skel.reset();
-      for (const nm of ['forearm-twist-1', 'forearm-twist-2', 'wrist']) skel.setChannels(skel.joint('right', nm), 0, 0, 0);
+      for (const j of skel.sides.right.joints.filter((jt) => jt.twistOffset || jt.name === 'wrist')) skel.setChannels(j, 0, 0, 0);
       skel.update();
       let P = skinned(skel, mesh);
       let N = skinnedNormals(skel, mesh);
@@ -270,6 +278,111 @@ export const skinDeformChecks = [
       }
       const row = rings.map((r, i) => `${r.f.toFixed(3)}: turn ${toDeg(turn[i]).toFixed(0)}, bend ${toDeg(bend[i]).toFixed(0)}`).join('; ');
       return { pass: notes.length === 0, worst: Math.max(0, worst), limit: tol * 100, unit: 'percent step back', note: `${notes.length ? `${notes.join(', ')}; ` : ''}rings (fraction of the forearm from the elbow): ${row}` };
+    },
+  },
+];
+
+// Turn the forearm from the bind pose (full pronation) toward supination by
+// deg, shared over the joints that carry the bind pronation as they carry it.
+function rotateForearm(skel, deg) {
+  skel.reset();
+  const chain = skel.sides.right.joints.filter((j) => j.twistOffset);
+  const offs = chain.reduce((a, j) => a + j.twistOffset, 0);
+  for (const j of chain) skel.setChannels(j, 0, 0, j.twistOffset - ((deg * Math.PI) / 180) * (j.twistOffset / offs));
+  skel.update();
+}
+
+// The skin's share of the hand's turn along the forearm, from Kulesh PN et
+// al. SICOT J 2015;1:3 (anatomy.js KULESH_SKIN_SHARE: eight levels, share
+// d_u / (d_u + d_r)), with the elbow at 0 and the wrist crease turning with
+// the hand; linear between.
+export function kuleshShare(f) {
+  const pts = [[0, 0], ...KULESH_SKIN_SHARE, [1, 1]];
+  for (let i = 1; i < pts.length; i++) {
+    if (f <= pts[i][0]) { const [f0, s0] = pts[i - 1]; const [f1, s1] = pts[i]; return s0 + ((f - f0) / (f1 - f0)) * (s1 - s0); }
+  }
+  return 1;
+}
+// Tolerance on a ring's share: 0.05 of the hand's turn, twice the largest
+// gap between the table and the rig's piecewise fit (0.025, level I), for
+// the ring fit's own noise.
+export const KULESH_TOLERANCE = 0.05;
+
+// The skinned surface's cross section across the forearm axis at fraction f
+// of the forearm: its area, from the skin triangles the plane cuts.
+function sectionArea(mesh, P, elbow, axis, f) {
+  const o = v3.addScaled([0, 0, 0], elbow, axis, f * ARM_MM.forearm * MM);
+  const segs = [];
+  const idx = mesh.indices;
+  for (let t = 0; t < idx.length; t += 3) {
+    const ids = [idx[t], idx[t + 1], idx[t + 2]];
+    if (ids.some((i) => mesh.meta[i].region !== REGION.SKIN)) continue;
+    const p = ids.map((i) => [P[i * 3], P[i * 3 + 1], P[i * 3 + 2]]);
+    const d = p.map((q) => v3.dot(v3.sub([0, 0, 0], q, o), axis));
+    const cut = [];
+    for (let k = 0; k < 3; k++) {
+      const a = k; const b = (k + 1) % 3;
+      if ((d[a] > 0) !== (d[b] > 0)) cut.push(v3.addScaled([0, 0, 0], p[a], v3.sub([0, 0, 0], p[b], p[a]), d[a] / (d[a] - d[b])));
+    }
+    if (cut.length === 2 && v3.len(v3.reject([0, 0, 0], v3.sub([0, 0, 0], cut[0], o), axis)) < 0.07) segs.push(cut);
+  }
+  const c = [0, 0, 0];
+  for (const [a, b] of segs) { v3.addScaled(c, c, a, 0.5 / segs.length); v3.addScaled(c, c, b, 0.5 / segs.length); }
+  let A = 0;
+  for (const [a, b] of segs) A += Math.abs(v3.dot(v3.cross([0, 0, 0], v3.sub([0, 0, 0], a, c), v3.sub([0, 0, 0], b, c)), axis)) / 2;
+  return A;
+}
+// Candy wrap: the forearm's narrowest cross section under a rotation, as the
+// radius of equal area over its radius at rest, sampled every 1 percent of
+// the forearm on the rendered surface (ring vertices and the facets between
+// them alike).
+export function forearmGirthUnderRotation(deg) {
+  const skel = new Skeleton();
+  const mesh = buildArmMesh(skel, 'right', { lod: 'high' });
+  skel.reset();
+  const elbow = skel.joint('right', 'forearm').restWorldPos;
+  const axis = v3.normalize([0, 0, 0], v3.sub([0, 0, 0], skel.joint('right', 'wrist').restWorldPos, elbow));
+  rotateForearm(skel, deg);
+  const P = skinned(skel, mesh);
+  let worst = Infinity; let at = 0;
+  for (let k = 2; k <= 100; k++) {
+    const f = k / 100;
+    const r = Math.sqrt(sectionArea(mesh, P, elbow, axis, f) / sectionArea(mesh, mesh.positions, elbow, axis, f));
+    if (r < worst) { worst = r; at = f; }
+  }
+  return { worst, at };
+}
+// The equal-thirds rig this replaced kept 0.792 of the forearm's radius at
+// its narrowest under 180 deg (full pronation to full supination), at 72
+// percent of the forearm. The sourced distribution may not wrap it further.
+export const CANDY_WRAP_MIN = 0.79;
+
+export const pronationChecks = [
+  {
+    name: 'skinning: forearm skin turns along the forearm as Kulesh 2015 measured it (a share of the hand\'s turn rising from the elbow to the wrist), under 90 deg of forearm rotation',
+    async run() {
+      const skel = new Skeleton();
+      const mesh = buildArmMesh(skel, 'right', { lod: 'high' });
+      const { rings, axis } = forearmRings(skel, mesh);
+      rotateForearm(skel, 90);
+      const hand = skel.joint('right', 'wrist');
+      const handTurn = Math.abs(quat.twistAngle(quat.multiply([0, 0, 0, 1], hand.worldRot, quat.conjugate([0, 0, 0, 1], hand.restWorldRot)), axis));
+      const P = skinned(skel, mesh);
+      const N = skinnedNormals(skel, mesh);
+      const rows = rings.filter((r) => r.f > 0.1 && r.f < 0.99).map((r) => {
+        const share = Math.abs(quat.twistAngle(ringRotation(mesh.positions, P, r.ids, mesh.normals, N), axis)) / handTurn;
+        return { f: r.f, share, want: kuleshShare(r.f) };
+      });
+      const worst = Math.max(...rows.map((x) => Math.abs(x.share - x.want)));
+      return { pass: worst <= KULESH_TOLERANCE, worst, limit: KULESH_TOLERANCE, unit: 'of the hand turn', note: `hand turned ${toDeg(handTurn).toFixed(0)} deg; rings: ${rows.map((x) => `${x.f.toFixed(2)} turns ${x.share.toFixed(3)} (Kulesh ${x.want.toFixed(3)})`).join(', ')}` };
+    },
+  },
+  {
+    name: 'skinning: the forearm keeps its girth from full pronation to full supination (no deeper candy wrap than the equal-thirds rig it replaced)',
+    async run() {
+      const full = forearmGirthUnderRotation(180);
+      const half = forearmGirthUnderRotation(90);
+      return { pass: full.worst >= CANDY_WRAP_MIN, worst: full.worst * 100, limit: CANDY_WRAP_MIN * 100, unit: 'percent of the rest radius', note: `narrowest at ${(full.at * 100).toFixed(0)} percent of the forearm under 180 deg; ${(half.worst * 100).toFixed(1)} percent at ${(half.at * 100).toFixed(0)} under 90 deg; the equal-thirds rig kept 79.2 under 180` };
     },
   },
 ];

@@ -1,13 +1,13 @@
 // Solver acceptance: limits, penetration, contacts, IK, determinism and
 // solver time. The manipulation checks add their own.
-import { Skeleton, FINGERS, XR_PREFIX } from '../../hands/src/skeleton.js';
+import { Skeleton, FINGERS, XR_PREFIX, TWIST_PART } from '../../hands/src/skeleton.js';
 import { Rig } from '../../hands/src/rig.js';
 import { POSES, POSE_NAMES } from '../../hands/src/poses.js';
 import { poseChannels, applyChannels, clonePose } from '../../hands/src/fingers.js';
 import { solveArm, handRotation } from '../../hands/src/ik.js';
 import { preShape, placeObject, solveGrasp, capsuleObjectDistance, aperture, tipGap, GRIPS } from '../../hands/src/grasp.js';
 import { v3, quat, toDeg, deg, segmentDistance } from '../../hands/src/math.js';
-import { MM } from '../../hands/src/anatomy.js';
+import { MM, FOREARM_TWIST } from '../../hands/src/anatomy.js';
 import { limitMargin, penetration, objectPenetration } from '../../hands/src/measure.js';
 import { mulberry32 } from '../../hands/src/rng.js';
 import { STEP } from '../../hands/src/clock.js';
@@ -201,7 +201,10 @@ export const solverChecks = [
     },
   },
   {
-    name: 'ik: forearm twist shared across the twist bones',
+    // Replaces "ik: forearm twist shared across the twist bones" (equal
+    // thirds, a third at the wrist joint): each twist bone takes its sourced
+    // part and the wrist joint none (anatomy.js FOREARM_TWIST, Kulesh 2015).
+    name: 'ik: forearm rotation shared over the three twist bones in the parts the forearm skin carries it (Kulesh 2015), none at the wrist joint',
     async run() {
       const skel = new Skeleton();
       const rng = mulberry32(33);
@@ -215,14 +218,14 @@ export const solverChecks = [
           const roll = (rng() - 0.5) * deg(160);
           const palm = [Math.sin(roll) * s, -Math.cos(roll), 0];
           solveArm(skel, side, t, handRotation([0, 0.1, -1], palm), [s * 0.5, -0.7, 0]);
-          const t1 = skel.joint(side, 'forearm-twist-1').channels.twist;
-          const t2 = skel.joint(side, 'forearm-twist-2').channels.twist;
-          const tw = skel.joint(side, 'wrist').channels.twist;
-          worst = Math.max(worst, Math.abs(t1 - t2), Math.abs(t2 - tw));
-          maxTwist = Math.max(maxTwist, Math.abs(t1 + t2 + tw));
+          const twists = FOREARM_TWIST.map((tb) => skel.joint(side, tb.name).channels.twist);
+          const total = twists.reduce((a, b) => a + b, 0);
+          FOREARM_TWIST.forEach((tb, k) => { worst = Math.max(worst, Math.abs(twists[k] - total * TWIST_PART[tb.name])); });
+          worst = Math.max(worst, Math.abs(skel.joint(side, 'wrist').channels.twist));
+          maxTwist = Math.max(maxTwist, Math.abs(total));
         }
       }
-      return { pass: worst < 1e-9, worst: toDeg(worst), limit: 0, unit: 'deg spread', note: `equal thirds; up to ${toDeg(maxTwist).toFixed(0)} deg total twist used` };
+      return { pass: worst < 1e-9, worst: toDeg(worst), limit: 0, unit: 'deg off the sourced part', note: `parts ${FOREARM_TWIST.map((tb) => `${tb.name} ${TWIST_PART[tb.name].toFixed(3)}`).join(', ')}, wrist 0; up to ${toDeg(maxTwist).toFixed(0)} deg total twist used` };
     },
   },
   {

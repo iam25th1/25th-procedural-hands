@@ -27,6 +27,7 @@ import { solveArm } from './ik.js';
 import { clonePose, poseChannels, applyChannels } from './fingers.js';
 import { handCapsules } from './measure.js';
 import { Body, Prop, Rope } from './physics.js';
+import { FOREARM_TWIST, LIMITS_DEG } from './anatomy.js';
 
 const SIDES = ['left', 'right'];
 const G = 9.81;
@@ -42,6 +43,8 @@ export function planFingerprint(side, grip, obj, hint, at, avoid) {
   const dims = ['r', 'h', 'hx', 'hy', 'hz', 'round'].map((k) => (typeof obj[k] === 'number' ? obj[k] : ''));
   return `${side}|${grip}|${obj.shape}|${dims.join(',')}|${avoid ? 1 : 0}|${nums.join(',')}`;
 }
+
+const FOREARM_ROOM_WEIGHT = 1 / 3;
 
 export function targetShape(target) {
   if (target instanceof Body) return target.graspShape();
@@ -382,7 +385,7 @@ export class Interaction {
       // Comfort: a wrist or forearm near the end of its range has no room to
       // follow the object once it moves, so poses with room are preferred.
       let room = Infinity;
-      for (const n of ['wrist', 'forearm-twist-1', 'forearm']) {
+      for (const n of ['wrist', 'forearm']) {
         const j = arm.joint(side, n);
         const m = arm.measureChannels(j);
         for (const ax of ['flex', 'abd', 'twist']) {
@@ -391,6 +394,13 @@ export class Interaction {
           room = Math.min(room, (Math.min(L[1] - m[ax], m[ax] - L[0]) * 180) / Math.PI);
         }
       }
+      // Forearm rotation: the whole pronation against its range, however the
+      // twist bones share it. It was read off forearm-twist-1 alone, a third
+      // of the rotation, so its room counted a third; that weighting is kept
+      // (FOREARM_ROOM_WEIGHT) now that no single bone carries a third.
+      const pron = FOREARM_TWIST.reduce((acc, t) => acc + arm.measureChannels(arm.joint(side, t.name)).twist, 0);
+      const PR = LIMITS_DEG.forearm.twist;
+      room = Math.min(room, FOREARM_ROOM_WEIGHT * Math.min(PR[1] - (pron * 180) / Math.PI, (pron * 180) / Math.PI - PR[0]));
       const bad = (posErr > 0.002 ? 1 + posErr : 0) + (rotErr > 0.035 ? 1 + rotErr : 0);
       const key = bad * 1000 - Math.min(room, 20);
       if (!bestArm || key < bestArm.key) bestArm = { key, posErr, rotErr, room, pole };

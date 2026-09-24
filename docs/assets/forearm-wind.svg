@@ -7,12 +7,12 @@
   <g fill="none" stroke="#8C969B" stroke-width="2">
     <circle cx="40" cy="90" r="30"/><circle cx="140" cy="90" r="30"/><circle cx="240" cy="90" r="28"/><circle cx="340" cy="90" r="25"/><circle cx="430" cy="90" r="22"/>
   </g>
-  <!-- s = 0, 0.28, 0.55, 0.85, 1: in pronation the tick sits at (1 - s) x 180 deg from the palm's side (down); supination turns each by s x 180. -->
+  <!-- s = 0, 0.17, 0.34, 0.64, 1 (Kulesh 2015 at 0, 28, 55, 85 and 100 percent of the forearm): in pronation the tick sits at (1 - s) x 180 deg from the palm's side (down); supination turns each by s x 180. -->
   <g stroke="#F2B705" stroke-width="5" stroke-linecap="round">
     <line x1="40" y1="90" x2="40" y2="60"><animateTransform attributeName="transform" type="rotate" values="0 40 90;0 40 90;0 40 90" dur="6s" repeatCount="indefinite"/></line>
-    <line x1="140" y1="90" x2="140" y2="60"><animateTransform attributeName="transform" type="rotate" values="50.4 140 90;0 140 90;50.4 140 90" dur="6s" repeatCount="indefinite"/></line>
-    <line x1="240" y1="90" x2="240" y2="62"><animateTransform attributeName="transform" type="rotate" values="99 240 90;0 240 90;99 240 90" dur="6s" repeatCount="indefinite"/></line>
-    <line x1="340" y1="90" x2="340" y2="65"><animateTransform attributeName="transform" type="rotate" values="153 340 90;0 340 90;153 340 90" dur="6s" repeatCount="indefinite"/></line>
+    <line x1="140" y1="90" x2="140" y2="60"><animateTransform attributeName="transform" type="rotate" values="31 140 90;0 140 90;31 140 90" dur="6s" repeatCount="indefinite"/></line>
+    <line x1="240" y1="90" x2="240" y2="62"><animateTransform attributeName="transform" type="rotate" values="61 240 90;0 240 90;61 240 90" dur="6s" repeatCount="indefinite"/></line>
+    <line x1="340" y1="90" x2="340" y2="65"><animateTransform attributeName="transform" type="rotate" values="115 340 90;0 340 90;115 340 90" dur="6s" repeatCount="indefinite"/></line>
     <line x1="430" y1="90" x2="430" y2="68"><animateTransform attributeName="transform" type="rotate" values="180 430 90;0 430 90;180 430 90" dur="6s" repeatCount="indefinite"/></line>
   </g>
   <text x="16" y="146" fill="#8C969B" font-family="sans-serif" font-size="12">pronation (palm down): wound. supination (palm up): every volar mark faces the same way.</text>

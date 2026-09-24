@@ -120,7 +120,9 @@ export function skinPalette(value) {
   ];
   // palmMatchesDorsal paints the palm the dorsal colour: only for measuring
   // how the palm-side view is lit, so the real palm can be compared fairly.
-  const palm = tone.palmMatchesDorsal ? hslToRgb([h, s, l]) : hslToRgb(palmHsl);
+  // palmKey paints it pure green: only for measuring, to find which pixels
+  // of a render are palm (glabrous) skin.
+  const palm = tone.palmKey ? [0, 1, 0] : tone.palmMatchesDorsal ? hslToRgb([h, s, l]) : hslToRgb(palmHsl);
   // The nail bed: a pink bed seen through the plate, drawn toward the palm
   // so it belongs to the same hand; a little deeper on the lightest tones so
   // the nail still reads against pale skin.
