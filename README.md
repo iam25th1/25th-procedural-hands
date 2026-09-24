@@ -182,6 +182,17 @@ The hands come in the ten tones of the **Monk Skin Tone Scale**, from `monk-1` (
 
 Every tone has its own undertone, a palm lighter than the back (slightly on the lightest tones, far lighter on the deepest), and a nail bed that stands out against it. Each is checked as rendered, not only in the palette: `npm run hands:check` draws every tone and keeps the back of the hand within 2.5 dE of the published swatch and the palm lighter than the back. The sandbox's picker sits beside the hand picker in the control centre, and the gallery has a sheet of every tone at the anatomy framing. See [hands/README.md](hands/README.md#skin-tones) for the model and the calibration.
 
+**Tone mapping.** The sandbox renders with three's `NeutralToneMapping` (Khronos PBR Neutral) at exposure 1.3. It used ACES filmic at exposure 1.05 until the skin tone work, and that could not show the light tones as published. ACES compresses and desaturates light colours, so Monk 1 to 3 rendered grey-white. Even with the albedo fitted in CIE Lab to the render, their channels saturate at white 6.4 to 7.5 dE short of the swatch. PBR Neutral passes colours through unchanged below its compression point and only rolls off near white. With the albedo fitted under it, every tone renders within 1.4 dE. At exposure 1.3 with the scene's lights unchanged, the fit lands inside the gamut: Monk 1's albedo is `#fffaf4`, its red channel already at full, so a lower exposure would leave it short. The measurements, from `scripts/skin-measure.js` (back of the hand, CIE76 dE to the published swatch):
+
+| Setting | Monk 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ACES 1.05, swatch painted as is (before) | 7.8 | 7.1 | 10.0 | 8.5 | 6.6 | 5.3 | 6.2 | 4.9 | 5.2 | 4.9 |
+| ACES 1.05, albedo fitted under ACES | 7.5 | 6.4 | 7.5 | 2.9 | 0.0 | 0.0 | 0.5 | 0.0 | 0.0 | 0.0 |
+| Neutral 1.3, swatch painted as is | 3.3 | 2.9 | 3.3 | 3.1 | 4.7 | 6.5 | 9.4 | 10.3 | 9.2 | 7.5 |
+| **Neutral 1.3, albedo fitted (now)** | **0.8** | **0.5** | **1.2** | **0.0** | **0.0** | **0.0** | **0.0** | **0.0** | **1.4** | **0.0** |
+
+Everything else in the scene (props, ground, sleeves) is drawn under the same tone mapping, so it too shows closer to its base colour than it did under ACES, with less contrast in the highlights. The eleven core sheets have not been re-reviewed by eye under it; that is a manual check.
+
 <details>
 <summary>The ten tones</summary>
 
