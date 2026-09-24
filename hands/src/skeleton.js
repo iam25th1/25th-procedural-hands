@@ -132,7 +132,8 @@ function handLayout() {
   }
   const t = BONES_MM.thumb;
   const tdir = v3.normalize([0, 0, 0], LAYOUT_MM.thumbDir);
-  const tdorsal = LAYOUT_MM.thumbDorsal;
+  // The thumb column's roll about its own axis (see thumbRoll in anatomy.js).
+  const tdorsal = quat.rotate([0, 0, 0], quat.fromAxisAngle([0, 0, 0, 1], tdir, deg(LAYOUT_MM.thumbRoll || 0)), LAYOUT_MM.thumbDorsal);
   let p = mm(LAYOUT_MM.thumbCmc);
   const tnames = THUMB_SEGMENTS.map((s) => `thumb-${s}`);
   const tlens = [t.metacarpal, t.proximal, t.distal + t.tip];

@@ -807,6 +807,14 @@ export function preShape(skel, side, obj, gripKey) {
     skel.updateSide(side);
     return p;
   };
+  // The aperture is the thumb to index gap: it sizes a grip the thumb
+  // opposes. A grip without the thumb (a hook, a flat press) keeps its
+  // pre-pose as authored; scaling it by where the thumb tip happens to be
+  // moved the fingers a hook places its handle against.
+  if (!grip.digits.includes('thumb') && !(grip.support || []).includes('thumb')) {
+    const pose = apply(1);
+    return { pose, gap: tipGap(skel, side), want };
+  }
   let lo = 0;
   let hi = 1.6;
   let pose = apply(1);

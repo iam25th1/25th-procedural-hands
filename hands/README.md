@@ -154,6 +154,10 @@ The mesh is skinned by linear blend skinning in Node. Each ring's rotation from 
 
 </details>
 
+## The thumb at rest
+
+The thumb column rests rolled toward opposition: measured as Cheema et al. measured it (J Hand Surg Am 2006;31(1):76-79: on an axial CT slice, the angle between the dorsal tangent of the second and third metacarpals and the line through the first metacarpal head), the relaxed pose reads 74.1 deg on both hands against their 74 +/- 10 deg at rest. The column is rolled -24.2 deg about its own axis from the layout's direction hint, which alone read 41.6 deg: the nail faced up and back, and the thumb read flat. The direction of the column out of the palm is unchanged, because no source gives it. `npm run hands:check` measures it (`anatomy: first metacarpal rotation at rest`).
+
 ## Proportion
 
 Segment lengths come from Drillis and Contini's ratios against a stature implied by the ANSUR II hand length (1753 mm). Checked against ANSUR II's direct measures (combined sample, N = 6068), the forearm (elbow to wrist, 255.9 mm) is 1.3 percent under radiale to stylion (259.2 mm, SD 19.8), and the upper arm (326.0 mm) matches acromion to radiale (327.4 mm). The wrist was thin: 157 mm round against ANSUR II's 169.0 (SD 13.1). The wrist ring is now sized to 169 mm, and the forearm tapers into it from the unchanged belly. `npm run hands:check` keeps forearm length and wrist girth within half a standard deviation of the ANSUR II means.

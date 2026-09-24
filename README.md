@@ -281,7 +281,7 @@ Shot mode renders any frame exactly from URL parameters, which is what the galle
 | `app/` | The sandbox: scenes, rendering, shot mode, interface |
 | `server/` | The static dev server |
 | `scripts/` | check, hands:check (`hands-checks/`), hands:matrix, hands:gallery |
-| `docs/` | The spec, the list of known minor issues ([HANDS_MINORS.md](docs/HANDS_MINORS.md)), why the arms and thumbs looked twisted and the three fixes held back as patches ([HANDS_TWIST_FINDINGS.md](docs/HANDS_TWIST_FINDINGS.md), [conflicts/](docs/conflicts)), images |
+| `docs/` | The spec, the list of known minor issues ([HANDS_MINORS.md](docs/HANDS_MINORS.md)), why the arms and thumbs looked twisted and how each cause was fixed ([HANDS_TWIST_FINDINGS.md](docs/HANDS_TWIST_FINDINGS.md)), images |
 
 ## Credits
 

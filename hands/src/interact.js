@@ -448,6 +448,21 @@ export class Interaction {
       const d = -capsuleObjectDistance(objT, c.a, c.b, c.r, 6) - (spare ? -0.0024 : 0.0006);
       if (d > pen) { pen = d; where = `${c.name} into the object`; }
     }
+    // A grip that arrives in its own approach shape (a hook comes in with
+    // its fingers flat) must be able to arrive: that shape, at this pose,
+    // may not pass into the object or the surroundings either.
+    const arrive = GRIPS[grip].approachPose;
+    if (arrive) {
+      sk.reset();
+      applyChannels(sk, side, poseChannels(this.rig.resolvePose(side, arrive)));
+      sk.update();
+      for (const c of handCapsules(sk, side)) {
+        for (const e of [...envT, objT]) {
+          const d = -capsuleObjectDistance(e, c.a, c.b, c.r, 6);
+          if (d > pen) { pen = d; where = `${c.name} into ${e === objT ? 'the object' : e.shape} on arrival`; }
+        }
+      }
+    }
     const need = GRIPS[grip].digits;
     const got = new Set(res.contacts.map((c) => c.digit));
     const missing = need.filter((d) => !got.has(d)).length;
@@ -471,9 +486,11 @@ export class Interaction {
   // lets the hand arrive without its fingers sweeping through the object;
   // false keeps the fingers as they are).
   reach(side, target, grip, { hint = null, at = [0, 0, 0], approach = 0, from = null, pole = null, snap = false, open = 2.5 } = {}) {
-    // A new aim replaces whatever the last letting go still had queued.
+    // A new aim replaces whatever the last letting go still had queued,
+    // moves asked for while it backed out included.
     this.pendingMove[side] = null;
     this.pendingOpen[side] = null;
+    this.leaving[side] = null;
     // Closing in on the target planned a moment ago keeps that plan (the
     // search could otherwise settle on another turn mid reach) unless the
     // target has moved since.
@@ -587,6 +604,12 @@ export class Interaction {
       // Well back toward the body, past a bar in between (hand over hand).
       [[f[0], f[1], farBack], [g[0], g[1], farBack]],
       [[f[0], f[1] - 0.04, farBack], [g[0], g[1] + 0.04, farBack]],
+      // Across at the depth the hand is at, then straight out or in to the
+      // goal (or the other way round): the way past something standing just
+      // beside the goal (a knob by the lever the hand let go of). Last, so a
+      // clear way above is still taken first.
+      [[g[0], g[1], f[2]]],
+      [[f[0], f[1], g[2]]],
     ];
     let best = { cost: direct, pts: null };
     const plans = [
@@ -975,7 +998,9 @@ export class Interaction {
         }
         // Eased fingers still round the object (a handle): open the hand
         // first, then back out, if that way is clearer.
-        if ((wraps || best.cost > 0.0006) && open) {
+        // (A body set down: the hand backs out eased and opens once away;
+        // fingers uncurling beside it would sweep through the table.)
+        if ((wraps || best.cost > 0.0006) && open && !keepThumb) {
           if (!best) best = { cost: Infinity, d: cands[0] };
           for (const d of cands) {
             const cost = this.pathCost(side, pose, open, envW, d, 0.04);
@@ -990,7 +1015,7 @@ export class Interaction {
      // Nothing else moves the hand until it has backed out: a move asked for
       // meanwhile would drag the body it just let go of (a thumb under it
       // would carry it up). Moves asked for meanwhile follow, in order.
-      if (keepThumb && withdraw) this.leaving[side] = { until: t0 + LEAVE_TIME, then: [] };
+      if (keepThumb && withdraw) this.leaving[side] = { until: t0 + LEAVE_TIME, then: [], way, body: held instanceof Body ? held : null, more: 4 };
       if (open) this.pendingOpen[side] = { at: openAfter != null ? this.rig.time + openAfter : t0 + 0.3, pose: openLater || open };
     }
     return object;
@@ -1061,6 +1086,20 @@ export class Interaction {
     return this.down[side];
   }
 
+  // Is the hand clear of a body: 3 mm off it, and the thumb not under it?
+  clearOf(side, body) {
+    const shape = body.graspShape();
+    for (const c of handCapsules(this.rig.skel, side)) {
+      if (capsuleObjectDistance(shape, c.a, c.b, c.r, 6) < 0.003) return false;
+      if (c.digit !== 'thumb') continue;
+      for (let i = 0; i <= 4; i++) {
+        const q = v3.lerp([0, 0, 0], c.a, c.b, i / 4);
+        if (capsuleObjectDistance(shape, q, [q[0], q[1] + 0.2, q[2]], 0, 6) < 0) return false;
+      }
+    }
+    return true;
+  }
+
   // The thumb's part of letting go a body that rests on its surface, held by
   // this hand alone with at least two other digits: the thumb takes a shape
   // off the body and clear of the surface (the grip eased off the body, the
@@ -1083,7 +1122,7 @@ export class Interaction {
       if (c.digit !== 'thumb') continue;
       for (let i = 0; i <= 4; i++) {
         const q = v3.lerp([0, 0, 0], c.a, c.b, i / 4);
-        if (capsuleObjectDistance(shape0, q, [q[0], q[1] + 0.2, q[2]], c.r, 6) < 0) return 'under';
+        if (capsuleObjectDistance(shape0, q, [q[0], q[1] + 0.2, q[2]], 0, 6) < 0) return 'under';
       }
     }
     const joints = sk.sides[side].joints.filter((j) => j.digit === 'thumb');
@@ -1145,7 +1184,7 @@ export class Interaction {
     const wr = sk.joint(side, 'wrist');
     const C = body.pos.slice();
     const caps = handCapsules(sk, side).map((c) => ({ a: c.a.slice(), b: c.b.slice(), r: c.r, digit: c.digit }));
-    const check = (q, shift) => {
+    const check = (q, shift, thumbClear = true) => {
       const move = (p) => v3.add([0, 0, 0], v3.add([0, 0, 0], C, quat.rotate([0, 0, 0], q, v3.sub([0, 0, 0], p, C))), shift);
       const at = v3.add([0, 0, 0], C, shift);
       // Only onto the same surface (a shift may not step off the table).
@@ -1167,7 +1206,7 @@ export class Interaction {
       // Nor may the thumb end up under it: letting go, the thumb comes off
       // first, and a thumb under the body cannot come out without lifting it.
       const shape = { ...body.graspShape(), pos: at, rot: rot0 };
-      for (const [p, r] of pts) if (capsuleObjectDistance(shape, p, [p[0], p[1] + 0.2, p[2]], r, 6) < 0) return null;
+      if (thumbClear) for (const [p, r] of pts) if (capsuleObjectDistance(shape, p, [p[0], p[1] + 0.2, p[2]], 0, 6) < 0) return null;
       const pos = move(wr.worldPos);
       const rot = quat.normalize([0, 0, 0, 1], quat.multiply([0, 0, 0, 1], q, wr.worldRot));
       const fitDown = this.armFit(side, { pos: [pos[0], pos[1] - objGap, pos[2]], rot });
@@ -1189,7 +1228,7 @@ export class Interaction {
     const turns = [{ cost: 0, q: [0, 0, 0, 1] }];
     for (const d of [15, 30, 45, 60, 90]) for (const sg of [1, -1]) turns.push({ cost: d, q: about([0, 1, 0], sg * d) });
     for (const axis of [across, flat]) for (const d of [5, 10, 15, 20, 30]) for (const sg of [1, -1]) turns.push({ cost: d * 1.5, q: about(axis, sg * d) });
-    for (const r of [45, 60, 75, 90, 105]) for (const rs of [1, -1]) for (const d of [0, 5, 10, 12.5, 15, 17.5, 20]) for (const sg of [1, -1]) turns.push({ cost: r * 0.5 + d * 1.5, q: quat.multiply([0, 0, 0, 1], about(across, sg * d), about(flat, rs * r)) });
+    for (const r of [45, 60, 75, 90, 105, 120, 135, 150, 165, 180]) for (const rs of [1, -1]) for (const d of [0, 5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 30]) for (const sg of [1, -1]) turns.push({ cost: r * 0.5 + d * 1.5, q: quat.multiply([0, 0, 0, 1], about(across, sg * d), about(flat, rs * r)) });
     for (const y of [15, 30, 45]) for (const ys of [1, -1]) for (const d of [5, 10, 15, 20]) for (const sg of [1, -1]) turns.push({ cost: y + d * 1.5, q: quat.multiply([0, 0, 0, 1], about([0, 1, 0], ys * y), about(across, sg * d)) });
     // The spot may shift a little over the same surface, a few centimetres
     // either way, where the arm takes the turn more easily.
@@ -1199,6 +1238,11 @@ export class Interaction {
     for (const t of turns) for (const sh of shifts) cands.push({ cost: t.cost + v3.len(sh) * 400, q: t.q, shift: sh });
     cands.sort((a, b) => a.cost - b.cost);
     for (const c of cands) { if (c.cost === 0) continue; const got = check(c.q, c.shift); if (got) return got; }
+    // A thumb wrapped round a handle is under some of it however the hand
+    // turns: then the body landing first is enough (letting go, the thumb
+    // stays put and the hand slides off level along the handle).
+    if (check([0, 0, 0, 1], [0, 0, 0], false)) return null;
+    for (const c of cands) { if (c.cost === 0) continue; const got = check(c.q, c.shift, false); if (got) return got; }
     return null;
   }
 
@@ -1391,6 +1435,14 @@ export class Interaction {
     });
     for (const side of SIDES) {
       const lv = this.leaving[side];
+      // Not out yet (a thumb under a long handle): on the same way a little
+      // further, a few times at most, before anything else.
+      if (lv && this.rig.time >= lv.until && lv.body && lv.more > 0 && !this.clearOf(side, lv.body)) {
+        lv.more--;
+        lv.until = this.rig.time + LEAVE_TIME;
+        const arm = this.rig.arms[side];
+        arm.set({ pos: v3.addScaled([0, 0, 0], arm.target.pos, lv.way, 0.035) });
+      }
       if (lv && this.rig.time >= lv.until) {
         this.leaving[side] = null;
         const next = lv.then.shift();

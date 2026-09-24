@@ -89,7 +89,8 @@ export const POSES = {
   // Pre-shapes for the grasp solver (the solver curls from here to contact).
   preCylinder: hand((F, T) => {
     F('index', 30, 2, 30); F('middle', 30, 0, 32); F('ring', 32, 1, 34); F('little', 34, 3, 36);
-    T(10, 40, 5, 5);
+    // CMC palmar abduction at its 37 degree limit (it was authored at 40, past it).
+    T(10, 37, 5, 5);
   }),
   preSphere: hand((F, T) => {
     F('index', 20, 10, 25); F('middle', 22, 0, 28); F('ring', 24, 8, 30); F('little', 26, 16, 32);

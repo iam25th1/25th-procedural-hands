@@ -65,6 +65,17 @@ export const LAYOUT_MM = {
   // (nail) direction hint; both in hand space, normalised in code.
   thumbDir: [-0.62, -0.40, -0.67],
   thumbDorsal: [-0.70, 0.71, 0],
+  // Roll of the thumb column about its own axis, degrees (negative turns the
+  // nail radially, the thumb's pronation). Cheema TA, Cheema NI, Tayyab R,
+  // Firoozbakhsh K. Measurement of rotation of the first metacarpal during
+  // opposition using computed tomography. J Hand Surg Am 2006;31(1):76-79:
+  // on axial CT, the angle between the dorsal tangent of the second and third
+  // metacarpals and the line through the first metacarpal head at the
+  // sesamoids is 74 +/- 10 degrees at rest (54 +/- 10 in retroposition, 100
+  // to 110 in opposition). The unrolled hint above gives 41.6 degrees in the
+  // relaxed pose; -24.2 is solved (scripts/hands-checks/thumb.js measures it
+  // the same way) so the relaxed pose gives the published 74.
+  thumbRoll: -24.2,
   // Fraction by which the extended phalanges turn from the metacarpal fan toward the hand axis.
   phalanxConverge: 0.6,
   // Ring and little metacarpal bases flex a little at their CMC joints so the
