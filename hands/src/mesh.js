@@ -740,7 +740,10 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
   const clothMeta = (inner) => () => ({ region: inner ? REGION.CLOTH_INNER : REGION.CLOTH, palmar: 0, shade: 1 });
   const grow = (pr, k) => [pr[0] + 2 * k, pr[1] + 2 * k];
   const sleeveStations = [
-    { d: -0.012, pr: grow(S.upperArm.shoulder, S.sleeve), w: [[bi('shoulder'), 0.6], [bi('upper-arm'), 0.4]], inner: false },
+    // The dome over the shoulder is weighted as the skin cap under it is
+    // (half shoulder, half upper arm): weighted apart, a raised and turned
+    // arm pushed the skin out through the dome.
+    { d: -0.012, pr: grow(S.upperArm.shoulder, S.sleeve), w: [[bi('shoulder'), 0.5], [bi('upper-arm'), 0.5]], inner: false },
     { d: 0.12 * Lua, pr: grow(S.upperArm.deltoid, S.sleeve + 1), w: [[bi('upper-arm'), 1]], inner: false },
     { d: 0.36 * Lua, pr: grow(S.upperArm.mid, S.sleeve + 2), w: [[bi('upper-arm'), 1]], inner: false },
     { d: 0.6 * Lua, pr: grow(S.upperArm.mid, S.sleeve + 4), w: [[bi('upper-arm'), 1]], inner: false },
@@ -757,7 +760,7 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     prevS = r;
     lastS = r;
   }
-  const domeCentre = b.vertex(along(ua, -0.034), [[bi('shoulder'), 0.6], [bi('upper-arm'), 0.4]], { region: REGION.CLOTH, palmar: 0, shade: 1 });
+  const domeCentre = b.vertex(along(ua, -0.034), [[bi('shoulder'), 0.5], [bi('upper-arm'), 0.5]], { region: REGION.CLOTH, palmar: 0, shade: 1 });
   b.fan(firstS, domeCentre, [0, 0, 1]);
   const innerCentre = b.vertex(along(ua, 0.44 * Lua), [[bi('upper-arm'), 1]], { region: REGION.CLOTH_INNER, palmar: 0, shade: 1 });
   // The inner cap faces the hollow where the arm sits, which is distal of it.

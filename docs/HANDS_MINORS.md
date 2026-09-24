@@ -11,7 +11,7 @@ Cosmetic nits from the gallery review, not blocking this run. Each line names th
 ## New
 
 - 01 anatomy: the idle hand peeks into the edge of the side and three-quarter views.
-- 01 anatomy, fingers-control, grips-hands-scene, skin-tones: the open end of the far sleeve shows its hollow rim.
+- ~~01 anatomy, fingers-control, grips-hands-scene, skin-tones: the open end of the far sleeve shows its hollow rim.~~ **Fixed.** It was the sleeve's shoulder end, not its hem: the skin's shoulder cap came out through the cloth dome as the arm rose and turned (the two were weighted differently). Now weighted alike; `sleeve: no skin the sleeve covers comes out through the cloth` checks it.
 - 01 anatomy: a faint seam where the wrist meets the forearm in the side view.
 - 10 props, cap-drawer, cap-pullLever: the near sleeve and upper arm fill a large part of the frame close to the camera.
 - 11 climb, cap-climb (desktop): the hands are small at sheet scale because the whole climb has to fit.
