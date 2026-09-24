@@ -92,9 +92,16 @@ export const SECTIONS_MM = {
   },
   thumb: { base: [40, 28], metacarpal: [30, 25], shaft: [22, 18], mcp: [24, 20], proximal: [21.5, 18], ip: [20.5, 17.5], distal: [19.5, 16], pad: [19, 15.5], tip: [13.5, 11] },
   // Palm stations from the wrist to the knuckle line: width and thickness.
-  wrist: [58, 40],
+  // Wrist girth from ANSUR II (combined sample, N = 6068, the public data
+  // file): wrist circumference 169.0 mm (SD 13.1). The wrist ring is sized
+  // to it (it was 157 mm), keeping its width to thickness ratio, and the
+  // rings toward the unchanged belly taper into it linearly with distance.
+  // Perimeters are of the mesh's own superellipse (n = 2.1). ANSUR II's only
+  // forearm girth is taken flexed with the fist clenched (295.0 mm), which
+  // is not a relaxed forearm, so the belly (239 mm) is left as it was.
+  wrist: [62.5, 43],
   palm: { proximal: [70, 36], mid: [82, 34], distal: [86, 30] },
-  forearm: { wrist: [58, 40], lower: [64, 46], belly: [84, 66], elbow: [80, 72] },
+  forearm: { wrist: [62.5, 43], distal: [63.5, 44], lower: [68, 49], mid: [76, 57.5], belly: [84, 66], elbow: [80, 72] },
   upperArm: { elbow: [82, 78], mid: [94, 90], deltoid: [100, 96], shoulder: [96, 92] },
   sleeve: 9, // clearance over the upper arm surface
 };

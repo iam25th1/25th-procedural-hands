@@ -132,6 +132,12 @@ The mesh is skinned by linear blend skinning in Node. Each ring's rotation from 
 
 </details>
 
+## Proportion
+
+Segment lengths come from Drillis and Contini's ratios against a stature implied by the ANSUR II hand length (1753 mm). Checked against ANSUR II's direct measures (combined sample, N = 6068), the forearm (elbow to wrist, 255.9 mm) is 1.3 percent under radiale to stylion (259.2 mm, SD 19.8), and the upper arm (326.0 mm) matches acromion to radiale (327.4 mm). The wrist was thin: 157 mm round against ANSUR II's 169.0 (SD 13.1). The wrist ring is now sized to 169 mm, and the forearm tapers into it from the unchanged belly. `npm run hands:check` keeps forearm length and wrist girth within half a standard deviation of the ANSUR II means.
+
+The forearm's largest girth (239 mm) is not checked. ANSUR II measures it flexed with the fist clenched (295.0 mm, SD 30.0), which is not a relaxed forearm, and sizing the belly ring to it leaves a ridge a quarter of the way down, where the mesh has one station.
+
 ## Isolation
 
 `test/isolation.test.js` (run by `npm test` in the gate) and the `isolation:` row of `npm run hands:check` lex every file under `hands/src`, strip comments and string bodies, and fail if an import resolves outside `hands/`, names any package but `three`, is a computed dynamic import, or if `window` or `document` appears in code.

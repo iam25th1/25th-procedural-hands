@@ -187,7 +187,38 @@ export function volarReport() {
   return { atElbow, atWristBind, straight };
 }
 
+// ANSUR II, combined sample (N = 6068, the public data file): mean and
+// standard deviation in mm. The check allows half a standard deviation.
+export const ANSUR = { wrist: [169.0, 13.1], radialeStylion: [259.2, 19.8] };
+function ringPerimeter(P, ids, axis) {
+  // Order the ring's points by angle about its centroid, then sum the edges.
+  const c = centroid(P, ids);
+  const u = v3.normalize([0, 0, 0], v3.reject([0, 0, 0], [P[ids[0] * 3] - c[0], P[ids[0] * 3 + 1] - c[1], P[ids[0] * 3 + 2] - c[2]], axis));
+  const w = v3.cross([0, 0, 0], axis, u);
+  const pts = ids.map((i) => { const d = [P[i * 3] - c[0], P[i * 3 + 1] - c[1], P[i * 3 + 2] - c[2]]; return { a: Math.atan2(v3.dot(d, w), v3.dot(d, u)), p: [P[i * 3], P[i * 3 + 1], P[i * 3 + 2]] }; }).sort((x, y) => x.a - y.a);
+  let s = 0;
+  for (let k = 0; k < pts.length; k++) s += v3.dist(pts[k].p, pts[(k + 1) % pts.length].p);
+  return s;
+}
+
 export const skinDeformChecks = [
+  {
+    name: 'proportion: forearm length and wrist girth within half a standard deviation of the ANSUR II means',
+    async run() {
+      const skel = new Skeleton();
+      const mesh = buildArmMesh(skel, 'right', { lod: 'high' });
+      const { rings, axis } = forearmRings(skel, mesh);
+      const byF = (f) => rings.reduce((a, r) => (Math.abs(r.f - f) < Math.abs(a.f - f) ? r : a));
+      const wrist = ringPerimeter(mesh.positions, byF(1.0).ids, axis) / MM;
+      const belly = ringPerimeter(mesh.positions, byF(0.28).ids, axis) / MM;
+      const length = v3.dist(skel.joint('right', 'forearm').restWorldPos, skel.joint('right', 'wrist').restWorldPos) / MM;
+      const rows = [['wrist girth', wrist, ANSUR.wrist], ['forearm length', length, ANSUR.radialeStylion]];
+      let worst = 0;
+      const bad = [];
+      for (const [n, v, [m, sd]] of rows) { const z = Math.abs(v - m) / sd; worst = Math.max(worst, z); if (z > 0.5) bad.push(n); }
+      return { pass: bad.length === 0, worst, limit: 0.5, unit: 'SD', note: `${rows.map(([n, v, [m, sd]]) => `${n} ${v.toFixed(1)} mm (ANSUR II ${m} +/- ${sd})`).join('; ')}${bad.length ? `; outside: ${bad.join(', ')}` : ''}; largest forearm girth ${belly.toFixed(1)} mm, not checked: ANSUR II measures it flexed with the fist clenched (295.0), not relaxed` };
+    },
+  },
   {
     name: 'skinning: forearm skin wound as the forearm is, facing the elbow crease at the elbow and the palm at the wrist in pronation, straight in supination',
     async run() {

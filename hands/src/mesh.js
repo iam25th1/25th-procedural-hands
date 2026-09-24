@@ -213,9 +213,9 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     { q: fa.restWorldRot, c: along(fa, 0), pr: [78, 74], w: [[bi('upper-arm'), 0.5], [bi('forearm'), 0.5]], crease: 'palmar' },
     { q: fa.restWorldRot, c: along(fa, 0.04), pr: S.forearm.elbow, w: [[bi('forearm'), 0.85], [bi('upper-arm'), 0.15]] },
     { q: fa.restWorldRot, c: along(fa, 0.28 * Lfa), pr: S.forearm.belly, w: forearmWeights(0.28) },
-    { q: fa.restWorldRot, c: along(fa, 0.55 * Lfa), pr: [74, 56], w: forearmWeights(0.55) },
+    { q: fa.restWorldRot, c: along(fa, 0.55 * Lfa), pr: S.forearm.mid, w: forearmWeights(0.55) },
     { q: fa.restWorldRot, c: along(fa, 0.85 * Lfa), pr: S.forearm.lower, w: forearmWeights(0.85) },
-    { q: fa.restWorldRot, c: along(fa, Lfa - 0.012), pr: [59, 41], w: forearmWeights(1 - 0.012 / Lfa) },
+    { q: fa.restWorldRot, c: along(fa, Lfa - 0.012), pr: S.forearm.distal, w: forearmWeights(1 - 0.012 / Lfa) },
     // The wrist ring is in the wrist frame (+Y dorsal), unlike the arm frames (+Y palmar), so its palmar side is not flipped.
     // It follows the wrist bone fully: the wrist's share of the weight only
     // grows toward the hand (0.45 at 85 percent of the forearm, 0.86 at the
