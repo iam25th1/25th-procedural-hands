@@ -1,0 +1,41 @@
+# The gate on every push and pull request to main: the same npm run gate
+# every commit passes locally (check, unit tests, hands:check, hands:matrix,
+# npm audit). The browser checks need Playwright's Chromium, which
+# npm ci --ignore-scripts does not download, so it is installed here.
+name: gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: gate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Linux is the usual runner; macOS is closest to the machine the
+        # budgets were measured on (ANGLE over Metal rather than SwiftShader).
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run gate

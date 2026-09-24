@@ -323,6 +323,8 @@ The browser checks need Playwright's Chromium, which `--ignore-scripts` does not
 | `npm run hands:gallery` | Renders the gallery sheets at 390x844, 844x390 and 1440x900 into `artifacts/gallery/` |
 | `npm run gate` | check, test, hands:check, hands:matrix and `npm audit --audit-level=high`: every commit passes it |
 
+GitHub Actions runs the same gate on every push and pull request to main, on Linux and macOS ([`.github/workflows/gate.yml`](https://github.com/iam25th1/25th-procedural-hands/blob/main/.github/workflows/gate.yml)).
+
 ## Repository
 
 | Path | What is there |

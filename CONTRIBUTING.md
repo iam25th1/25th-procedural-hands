@@ -16,6 +16,8 @@ npx playwright install chromium  # the browser checks need it; --ignore-scripts 
 npm run gate
 ```
 
+GitHub Actions runs the same gate on every push and pull request to main, on Linux and macOS (`.github/workflows/gate.yml`). A pull request is ready when both runs pass.
+
 ## Working rules
 
 - **Installs never run package scripts, and new dependencies are pinned exactly**: `npm install <pkg> --save-exact --ignore-scripts`. `package-lock.json` is committed.
