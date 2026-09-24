@@ -8,6 +8,7 @@ import { SCENARIOS } from '../../app/scenes/capabilities.js';
 import { capsuleObjectDistance } from '../../hands/src/grasp.js';
 import { handCapsules } from '../../hands/src/measure.js';
 import { STEP } from '../../hands/src/clock.js';
+import { NODE_BUDGET } from './budget.js';
 
 const MM = 0.001;
 export const LIMITS = {
@@ -214,7 +215,7 @@ export const manipulationChecks = [
       const at = (q) => ms[Math.min(ms.length - 1, Math.floor(q * ms.length))];
       const median = at(0.5);
       // docs/dev-notes/HANDS_SANDBOX_SPEC.md, BUDGETS: sandbox scene loaded.
-      return { pass: median <= 1.2, worst: median, limit: 1.2, unit: 'ms median', note: `p95 ${at(0.95).toFixed(3)} ms over ${ms.length} frames in Node` };
+      return { pass: median <= NODE_BUDGET.simStepMs, worst: median, limit: NODE_BUDGET.simStepMs, unit: 'ms median', note: `p95 ${at(0.95).toFixed(3)} ms over ${ms.length} frames in Node` };
     },
   },
 ];

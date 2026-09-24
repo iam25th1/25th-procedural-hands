@@ -51,7 +51,7 @@ Everything else is machine-independent: counts, geometry, anatomy, physics, grip
 - **No em dashes** in code, comments, UI strings, docs or commit messages. `npm run check` looks for them.
 - **Motion safety**: the camera moves only from the user's input. No screen shake, recoil, head-bob, sway, FOV punches, motion blur, chromatic aberration or full-screen flashes, nothing flashing more than three times a second, and `prefers-reduced-motion` is respected.
 - **Mobile first**: layout, controls and performance budgets start from phones in portrait and landscape.
-- **Docs change with the code.** If a change alters what [README.md](README.md) or [hands/README.md](hands/README.md) says, update them in the same commit.
+- **Docs change with the code.** If a change alters what [README.md](README.md) or [hands/README.md](hands/README.md) says, update them in the same commit. `npm run hands:docs`, in both gates, holds them to it: each figure the docs quote is a fact in `scripts/docs-facts.js`, tied to the sentence that quotes it, and a sentence rewritten without its fact fails until both agree. A new figure worth quoting gets a fact. Timings are the exception: they are device-dependent, so the docs date them and name the machine instead.
 - **New systems go in new files**; changes to existing files stay as small as the change needs.
 
 ## What a check looks like

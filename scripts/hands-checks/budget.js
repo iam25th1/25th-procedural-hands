@@ -5,6 +5,9 @@ import { Skeleton } from '../../hands/src/skeleton.js';
 import { buildArmMesh } from '../../hands/src/mesh.js';
 
 export const BUDGET = { trianglesHigh: 20000, trianglesLow: 8000, drawCalls: 6, bones: 80 };
+// Wall-clock step budgets in Node (device-dependent; see CONTRIBUTING.md):
+// one rig step of the hands module alone, and one sandbox sim step.
+export const NODE_BUDGET = { rigStepMs: 0.5, simStepMs: 1.2 };
 
 export function rigTriangles(lod, extra = 0) {
   const skel = new Skeleton();

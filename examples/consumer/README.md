@@ -4,7 +4,7 @@ The library used from outside itself: a fresh three.js scene that imports `25th-
 
 ```sh
 cd examples/consumer
-npm install --ignore-scripts
+npm ci --ignore-scripts
 npm run dev
 ```
 

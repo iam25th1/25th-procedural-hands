@@ -11,6 +11,7 @@ import { MM, FOREARM_TWIST } from '../../hands/src/anatomy.js';
 import { limitMargin, penetration, objectPenetration } from '../../hands/src/measure.js';
 import { mulberry32 } from '../../hands/src/rng.js';
 import { STEP } from '../../hands/src/clock.js';
+import { NODE_BUDGET } from './budget.js';
 
 const DIGIT_NAMES = ['thumb', ...FINGERS];
 
@@ -304,7 +305,7 @@ export const solverChecks = [
       }
       times.sort((a, b) => a - b);
       const median = times[Math.floor(times.length / 2)];
-      return { pass: median <= 0.5, worst: median, limit: 0.5, unit: 'ms', note: `p95 ${times[Math.floor(times.length * 0.95)].toFixed(3)} ms in Node` };
+      return { pass: median <= NODE_BUDGET.rigStepMs, worst: median, limit: NODE_BUDGET.rigStepMs, unit: 'ms', note: `p95 ${times[Math.floor(times.length * 0.95)].toFixed(3)} ms in Node` };
     },
   },
 ];
