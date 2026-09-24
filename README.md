@@ -13,24 +13,42 @@ Procedural human hands and arms for the browser, with no animation files: every 
 
 ## Install and run
 
+The library in `hands/src` is the product: install it into your own three.js project (see [Use the module](#use-the-module)). This repository also ships two things that run from a clean clone: the **sandbox**, the demo that exercises every capability, and a small **consumer example** that uses the library from outside itself.
+
 Node 20 or newer. Dependencies are pinned exactly and installed without running package scripts:
 
 ```sh
+git clone https://github.com/iam25th1/25th-procedural-hands.git
+cd 25th-procedural-hands
 npm ci --ignore-scripts
-PORT=3100 npm start
+npm run sandbox            # or: PORT=3100 npm start
 ```
 
-The server prints the sandbox URL on this machine and on the local network (open the LAN one on a phone). Port 3100 is the default; a taken port exits with a clear message.
+The server prints the sandbox URL on this machine and on the local network (open the LAN one on a phone). Port 3100 is the default; set `PORT` for another, and a taken port exits with a clear message.
+
+The consumer example is its own small project:
+
+```sh
+npm --prefix examples/consumer ci --ignore-scripts
+npm run example            # Vite prints the URL
+```
+
+The checks that render in a browser (`hands:check`, `hands:matrix`, `hands:gallery`, and so `gate`) need Playwright's Chromium, which `--ignore-scripts` does not download:
+
+```sh
+npx playwright install chromium
+```
 
 | Command | What it does |
 | --- | --- |
-| `npm start` | The static dev server: whitelisted files only (the app, the module source, listed vendor files and listed data files such as the plan table, each by exact path), strict CSP (no inline scripts, no eval, workers only from the same origin), `nosniff`, `frame-ancestors 'none'` |
+| `npm run sandbox`, `npm start` | The sandbox's static dev server: whitelisted files only (the app, the module source, listed vendor files and listed data files such as the plan table, each by exact path), strict CSP (no inline scripts, no eval, workers only from the same origin), `nosniff`, `frame-ancestors 'none'` |
 | `npm run check` | `node --check` over every source folder, and a scan for characters the house style bans |
 | `npm test` | `node --test`: module, physics, server and isolation tests |
 | `npm run hands:check` | The acceptance suite: every check with its worst measured value against its limit |
 | `npm run hands:matrix` | The capability matrix: one row per capability, the checks and sheet that prove it, PASS or FAIL |
 | `npm run hands:plans` | Rebuilds the recorded plan table the sandbox replays scripted actions from (needed after any change to `hands/src` or `app/scenes`; `hands:check` fails while it is stale) |
 | `npm run hands:gallery` | Renders the sheets in a real browser at 390x844, 844x390 and 1440x900 into `artifacts/gallery/` |
+| `npm run example` | The consumer example (`examples/consumer`), served by Vite |
 | `npm run gate` | check, test, hands:check, hands:matrix and `npm audit --audit-level=high`: every commit passes it |
 
 ## Use the module
