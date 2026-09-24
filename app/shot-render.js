@@ -11,6 +11,7 @@ import { cameraFor } from '/scenes/cameras.js';
 import { createHandsScene } from '/scenes/hands-scene.js';
 import { SKIN_TONES, SLEEVE_COLOURS } from '/hands/src/defaults.js';
 import { skinTone } from '/hands/src/skin.js';
+import { create } from '/hands/src/index.js';
 
 export function renderShot(canvas, shot) {
   const view = createView(canvas, { preserveDrawingBuffer: true });
@@ -30,6 +31,42 @@ export function renderShot(canvas, shot) {
     applyCamera(cameraFor({ scene: 'hands', hands: scene.hands, shot, aspect: view.camera.aspect }));
     const draw = () => { hands.update(); scene.update(); return view.render(); };
     return { info: draw(), advance: (t) => { scene.stepTo(t); return draw(); } };
+  }
+
+  // One right arm on a plain backdrop, straight forward from the shoulder,
+  // the hand in a named pose and the forearm turned to shot.pron degrees
+  // (0 thumb up, 90 palm down): for inspecting the rest pose, the skinning
+  // and the forearm's twist from fixed views (cam palm, back, side for the
+  // radial side, ulnar; focus 'forearm' frames the forearm instead).
+  if (shot.scene === 'arm') {
+    const hands = create({ seed: shot.seed });
+    if (shot.pose) hands.setPose('right', shot.pose, { snap: true });
+    const skel = hands.skeleton;
+    const deg = Math.PI / 180;
+    for (const n of ['forearm-twist-1', 'forearm-twist-2', 'wrist']) {
+      const j = skel.joint('right', n);
+      skel.setChannels(j, 0, 0, (shot.pron * deg) / 3);
+    }
+    for (const n of ['upper-arm', 'forearm']) { const j = skel.joint('right', n); j.localRot = [0, 0, 0, 1]; j.channels.flex = 0; }
+    skel.update();
+    view.setBackdrop('plain');
+    const arms = createThreeView(hands, look);
+    arms.arms.left.group.visible = false;
+    view.root.add(arms.group);
+    arms.update();
+    view.resize(true);
+    const j = (n) => skel.joint('right', n);
+    const onForearm = shot.focus === 'left'; // focus=left is reused as "frame the forearm"
+    const target = onForearm ? j('forearm-twist-1').worldPos.map((v, i) => (v + j('forearm-twist-2').worldPos[i]) / 2) : j('wrist').worldPos.map((v, i) => (v * 0.35 + j('middle-finger-phalanx-proximal').worldPos[i] * 0.65));
+    // Views in the bind frame (arm along -Z, palm down at pron 90), fixed
+    // whatever the forearm's turn so before and after compare like for like.
+    const dirs = { palm: [0, -1, -0.2], back: [0, 1, -0.2], side: [-1, 0.1, -0.05], ulnar: [1, 0.1, -0.05], three: [-0.6, 0.55, -0.3] };
+    const d = dirs[shot.cam] || dirs.back;
+    const L = Math.hypot(d[0], d[1], d[2]);
+    const yaw = Math.atan2(d[0], d[2]);
+    const pitch = Math.asin(d[1] / L);
+    view.setOrbit({ target, yaw: shot.yaw ?? yaw, pitch: shot.pitch ?? pitch, dist: (shot.dist ?? (onForearm ? 0.5 : 0.22)) / shot.zoom });
+    return { info: view.render(), advance: () => view.render() };
   }
 
   const id = shot.cap && SCENARIOS[shot.cap] ? shot.cap : 'grabCarryPlace';

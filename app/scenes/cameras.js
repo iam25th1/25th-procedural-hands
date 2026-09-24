@@ -103,7 +103,8 @@ export function cameraFor({ scene, scenario, sb, shot, hands, aspect }) {
   if (cam === 'front') dir = [0, 0.05, 1];
   else if (cam === 'palm') dir = rot(wr, [0, -1, 0]);
   else if (cam === 'back') dir = rot(wr, [0, 1, 0]);
-  else if (cam === 'side') dir = rot(wr, [-s, 0, 0]);
+  else if (cam === 'side') dir = rot(wr, [-s, 0, 0]); // from the radial (thumb) side
+  else if (cam === 'ulnar') dir = rot(wr, [s, 0, 0]); // from the little finger side
   else dir = rot(wr, [-0.6 * s, 0.55, 0.3]); // three-quarter, from the thumb side above
   // Tilt a little toward the fingertips so the digits read along their length.
   const f = rot(wr, [0, 0, -1]);

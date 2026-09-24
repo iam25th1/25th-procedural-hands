@@ -217,7 +217,12 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     { q: fa.restWorldRot, c: along(fa, 0.85 * Lfa), pr: S.forearm.lower, w: forearmWeights(0.85) },
     { q: fa.restWorldRot, c: along(fa, Lfa - 0.012), pr: [59, 41], w: forearmWeights(1 - 0.012 / Lfa) },
     // The wrist ring is in the wrist frame (+Y dorsal), unlike the arm frames (+Y palmar), so its palmar side is not flipped.
-    { q: wr.restWorldRot, c: along(wr, 0), pr: S.wrist, w: [[bi('forearm-twist-2'), 0.5], [bi('wrist'), 0.5]], crease: 'palmar', flip: false },
+    // It follows the wrist bone fully: the wrist's share of the weight only
+    // grows toward the hand (0.45 at 85 percent of the forearm, 0.86 at the
+    // last forearm ring, 1 here and in the palm), so the skin's turn and its
+    // bend never step backward across the crease. (It was 0.5, a ring that
+    // turned and bent less than the rings on either side of it.)
+    { q: wr.restWorldRot, c: along(wr, 0), pr: S.wrist, w: [[bi('wrist'), 1]], crease: 'palmar', flip: false },
   ];
   if (L.reduced) armStations.splice(7, 1);
   let prev = null;
@@ -268,7 +273,7 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     const share = thumbShare * (1 - smoothstep((d - 0.35) / 0.5));
     return [[bi('wrist'), 1 - share], [bi('thumb-metacarpal'), share]];
   };
-  const st11 = ring(wq, along(wr, 0.012), profile(NA, 61, 39, { n: 2.4, bumps: palmBumps(1, 1) }), [[bi('wrist'), 0.85], [bi('forearm-twist-2'), 0.15]], skinMeta());
+  const st11 = ring(wq, along(wr, 0.012), profile(NA, 61, 39, { n: 2.4, bumps: palmBumps(1, 1) }), [[bi('wrist'), 1]], skinMeta());
   b.bridge(prev, st11);
   // The thenar eminence: the radial region of the palm loop is displaced
   // palmar and radial, most at the branch station where the thumb leaves and

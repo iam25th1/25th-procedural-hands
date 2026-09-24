@@ -104,6 +104,26 @@ Each tone carries more than its hue:
 
 The swatches are skin as it appears, not a surface albedo, so each tone also has an `albedo`: fitted by `node scripts/skin-measure.js --calibrate`, which renders the back of the hand at the anatomy framing in the real app, reads the lit skin back from the canvas and moves the albedo in CIE Lab until the render matches the published swatch. The fit is for the sandbox's lighting (a warm key, a cool fill and a rim riding with the camera, Khronos PBR Neutral tone mapping at exposure 1.3, chosen because under ACES filmic no albedo renders as Monk 1 to 3: see [the README](../README.md#skin-tones)); a consumer with very different lights can paint with `tone.hex` instead. `npm run hands:check` renders every tone and keeps the back within 2.5 dE of its swatch and the palm lighter than the back.
 
+## Skin along the forearm and across the wrist
+
+Pronation is shared across three bones (`forearm-twist-1`, `forearm-twist-2`, `wrist`), and the skin between the elbow and the palm blends them by distance, so a ring of skin turns and bends by the share of its bones. The wrist's share of the weight rises in order toward the hand and never steps back:
+
+| Ring | Where | Wrist share | Turn at 90 deg of forearm rotation | Bend at 73 deg of wrist flexion |
+| --- | --- | --- | --- | --- |
+| Forearm | 85 percent of the way from the elbow | 0.45 | 77 deg | 41 deg |
+| Forearm | last ring, 12 mm short of the wrist | 0.86 | 86 deg | 65 deg |
+| Wrist crease | the wrist joint | 1 | 90 deg | 73 deg |
+| Palm | 12 mm past the wrist | 1 | 90 deg | 73 deg |
+
+The wrist crease ring used to be 0.5, and the first palm ring 0.85: both turned and bent less than the ring before them, a band that twisted back under rotation (75 deg against 86 either side) and folded under flexion (36 deg against 65). `npm run hands:check` now skins the mesh in Node the way three.js does and checks every ring from the elbow to the palm in order (`scripts/hands-checks/skin-deform.js`).
+
+<details>
+<summary>How the check measures a ring</summary>
+
+The mesh is skinned by linear blend skinning in Node. Each ring's rotation from rest is fitted with Horn's quaternion method, using its points and their skinned normals: a ring is flat, so its points alone leave the fit ill conditioned. The eigenvector is found by Jacobi rotations. The turn is the fitted rotation's twist about the forearm axis, and the bend is its full angle.
+
+</details>
+
 ## Isolation
 
 `test/isolation.test.js` (run by `npm test` in the gate) and the `isolation:` row of `npm run hands:check` lex every file under `hands/src`, strip comments and string bodies, and fail if an import resolves outside `hands/`, names any package but `three`, is a computed dynamic import, or if `window` or `document` appears in code.

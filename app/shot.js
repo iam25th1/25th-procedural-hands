@@ -2,8 +2,8 @@
 // camera and the settings; the clock steps there in fixed steps, one frame
 // is rendered and window.__handsShot reports it. The gallery drives this.
 
-const SCENES = new Set(['hands', 'sandbox']);
-const CAMS = new Set(['fp', 'view', 'palm', 'back', 'side', 'three', 'front', 'orbit']);
+const SCENES = new Set(['hands', 'sandbox', 'arm']);
+const CAMS = new Set(['fp', 'view', 'palm', 'back', 'side', 'ulnar', 'three', 'front', 'orbit']);
 
 function num(v, fallback, lo, hi) {
   const n = Number.parseFloat(v);
@@ -39,6 +39,9 @@ export function parseShot(search) {
     palmMatch: q.get('palmmatch') === '1',
     sleeve: Math.floor(num(q.get('sleeve'), 0, 0, 9)),
     lod: q.get('lod') === 'low' ? 'low' : 'high',
+    // scene=arm: forearm rotation in degrees from thumb-up neutral (positive
+    // pronation); the bind pose, palm down, is 90.
+    pron: q.has('pron') ? num(q.get('pron'), 90, -90, 90) : 90,
     reduced: q.get('reduced') === '1',
     ui: q.get('ui') !== '0',
   };
