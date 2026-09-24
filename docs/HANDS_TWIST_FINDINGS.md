@@ -1,6 +1,6 @@
 # Why the arms and thumbs looked twisted
 
-Every automated check passed while the arms and thumbs still looked twisted by eye. The checks measured the bones, and the bones were not the problem. This page records what was measured on the rendered skin and the skeleton, the sources behind each anatomical value, what was fixed, and three fixes that conflict with existing checks. Those three are kept as patches in [`docs/conflicts/`](conflicts) and are not applied.
+Every automated check passed while the arms and thumbs still looked twisted by eye. The checks measured the bones, and the bones were not the problem. This page records what was measured on the rendered skin and the skeleton, the sources behind each anatomical value, what was fixed, and one fix still held. Three fixes were first held as patches because they failed existing checks; the palm colour and the pronation distribution have since landed with those checks corrected against their sources. The thumb's rest roll is still a patch in [`docs/conflicts/`](conflicts), held for the reason given below.
 
 ![Forearm skin wound in pronation, straight in supination](assets/forearm-wind.svg)
 
@@ -59,7 +59,7 @@ Each image has the before row on top and the after row below, with the same fram
 | Forearm winding (e7eae3f) | bind from above and below; thumb up; full supination | ![](assets/twist/forearm.png) |
 | Wrist girth (8096e5d) | bind; thumb up from the side; full supination | ![](assets/twist/girth.png) |
 | Pronation on three twist bones in Kulesh's shares (landed) | back at 90, 0 and -90 deg; palm and side at -90 | ![](assets/twist/pronation.png) |
-| Thumb roll (patch, not applied) | palm, back, radial, ulnar, three quarter | ![](assets/twist/thumb.png) |
+| Thumb roll (held patch, planner work included) | palm, back, radial, ulnar, three quarter | ![](assets/twist/thumb.png) |
 | Glabrous colour (landed) | bind from above and below; thumb up; full supination | ![](assets/twist/colour.png) |
 | Gallery: counting, desktop | the core sheet before and after the three commits | ![](assets/twist/gallery-counting.png) |
 
@@ -81,20 +81,31 @@ Each image has the before row on top and the after row below, with the same fram
 
 ## The conflicts
 
-Each patch applies to the committed tree with `git apply docs/conflicts/<name>.patch`. Each carries its fix and the check that would have caught the cause, and each fails existing checks as listed. Per the rule for this work, no existing check was loosened, deleted or re-baselined to make room for them.
+The held patch applies to the committed tree with `git apply docs/conflicts/thumb-rest-roll.patch` (then `npm run hands:plans`, since it changes `hands/src`). It carries the fix, the check that would have caught the cause, and the planner work done so far. No existing check was loosened, deleted or re-baselined for it.
 
 ```mermaid
 flowchart TD
-  T["thumb-rest-roll.patch: roll -24.2 deg, pre-shape abduction 37"] -->|fails| T1["Hook, Pull a lever, Drag a crate, Handover + 4 aggregates"]
+  T["thumb-rest-roll.patch: roll -24.2 deg, pre-shape abduction 37, planner fixes"] -->|fixed| T2["Hook, Drag a crate, Pull a lever"]
+  T -->|still fails| T1["Handover (1 frame floating) + contact aggregate"]
 ```
 
-### thumb-rest-roll.patch
+### thumb-rest-roll.patch (held)
 
 This rolls the thumb column -24.2 deg about its own axis, so the relaxed pose measures 74.1 deg by Cheema's method (was 41.6). It also sets the power-grip pre-shape's CMC abduction to 37, the joint's limit; it was authored at 40, past the limit. The new check, `anatomy: first metacarpal rotation at rest`, fails the current rig and passes with the patch.
 
-It fails 8 existing checks: Hook (16.8 mm into the strap), Pull a lever (23.7 mm), Drag a crate (26.3 mm), and Handover (a floating handle), plus the four aggregates over them. The cause was traced for Drag a crate. The rolled thumb no longer blocks a grip pose the reach planner used to reject. The planner now picks that pose, the flat approaching fingers graze the handle's top, and the physics shoves the crate up 18 mm. The live wrist lands exactly on the planned pose, so this is planner behaviour exposed by the correct thumb, not a thumb error. Fixing it means changing how the reach planner scores hook approaches: out of scope for this pass, and reported rather than tuned.
+With the roll alone, Hook, Drag a crate, Pull a lever and Handover failed, plus four aggregate rows. The patch now also carries three planner fixes, each traced to its cause:
 
-The visible effect alone is modest. The pad turns toward the fingers and the nail faces radially. The column's direction out of the palm is unchanged, because it has no source.
+| Scenario | Cause | Fix in the patch |
+| --- | --- | --- |
+| Drag a crate, Hook | `preShape` scaled every grip's pre-pose until the thumb-to-index tip gap matched the object's aperture, the hook included. The hook places its handle against the index proximal phalanx of that scaled pose, so rolling the thumb moved the placement, and the flat arriving fingers came down on the handle (index proximal 2.4 mm into it) and lifted the crate 2 cm before the grip closed | A grip without the thumb (hook, press) keeps its pre-pose as authored. Grip scoring now also checks the grip's arrival shape (a hook arrives flat), which it never did |
+| Pull a lever | The rolled thumb takes the lever differently, so the hand lets go closer to the body. From there none of the route planner's detours home was clear; its best still ran the ring finger 20.9 mm into the knob beside the lever | Two routes added last in the list: across at the current depth then straight to the goal, and the reverse. A clear route earlier in the list is still taken first |
+| Handover | **Not fixed.** The left hand sets the handle down on the bench with its thumb and fingers under it, so the handle stops about 1 cm above the bench. When the hand opens, the handle rests on the thumb's proximal phalanx for about 0.35 s and rolls off it; for one frame its speed falls under the floating check's 0.02 m/s while it is off the bench | Needs a set-down that ends with the object on its surface, not on the digits under it: the thumb out from under first, then the fingers. That is new set-down behaviour, not a scoring fix |
+
+The Handover defect is not new. The rig without the roll does the same, the handle resting on the thumb for the same 0.35 s, and passes only because its slowest sampled speed is 0.028 m/s, just over the limit. The check is right: the handle is off its surface and not held. So per the rule for this work, the roll stays unlanded until the set-down is fixed.
+
+Denser transit sampling (below) was also tried and not kept.
+
+The visible effect of the roll alone is modest. The pad turns toward the fingers and the nail faces radially. The column's direction out of the palm is unchanged, because it has no source.
 
 ### Landed: pronation on three twist bones, in Kulesh's shares
 
@@ -102,7 +113,7 @@ The held patch put pronation on two twist bones, half each, and required the dis
 
 What landed instead: three twist bones at 0.5625 (share 0.346), 0.9375 (0.728) and the distal radius (1), and the wrist joint's pronation at 0. Every ring turns within 0.021 of Kulesh's share. Candy wrap improved rather than worsened: the narrowest section of the rendered surface at 180 deg keeps 83.1 percent of its radius, against 79.2 under equal thirds. (The recon's 87 and 74 percent were ring vertices only; the facets between rings narrow further.) Dual quaternion skinning was not needed and was not chosen. It would remove the blend narrowing but not the facet narrowing between rings, and it would replace three.js's skinning shader for every bone of the hand.
 
-Hang from a rung (the thumb metacarpal 14.1 mm into the rung under the patch) passes. The patch's ±45 deg per-bone limits changed which arm poses the reach planner judged roomy (it scores room on `forearm-twist-1`'s range). With each bone limited to its own part of the ±90 deg range, the chosen poses and the hand's orientation are the same as before, since the twist bones turn about one axis and their sum is unchanged.
+Hang from a rung (the thumb metacarpal 14.1 mm into the rung under the held patch) was traced and passes. The reach planner scored the forearm's room to follow on `forearm-twist-1`'s channel alone, so the room's scale followed the bone split: the patch's halves doubled it, which changed the arm pose chosen. With that pose, the transit check's six samples straddled the rung and a route straight through it passed (reproduced, and confirmed by restoring the old scale on the patch tree, which passes). The room is now read off the whole pronation, whatever the split, at the weight it always had: a third. The sparse transit sampling itself is listed under findings not fixed.
 
 ### Landed: palm colour on glabrous skin only
 
@@ -119,6 +130,14 @@ It also explains the rendered skin-tone drift. The winding commit (e7eae3f) turn
 | skinning: forearm and wrist skin turn and bend toward the hand in order | yes | the wrist crease ring turning 12.1 percent and bending 38.4 percent less than the ring before it |
 | skinning: forearm skin wound as the forearm is | yes | the forearm's volar side 180 deg off the elbow crease at bind, and spiralled in supination |
 | proportion: forearm length and wrist girth within half an SD of ANSUR II | yes | the wrist at 156.6 mm against 169.0 |
-| anatomy: first metacarpal rotation at rest (Cheema 2006) | in thumb-rest-roll.patch | the thumb at 41.6 deg against 74 +/- 10 |
+| anatomy: first metacarpal rotation at rest (Cheema 2006) | in thumb-rest-roll.patch (held) | the thumb at 41.6 deg against 74 +/- 10 |
 | skinning: the distal third of the forearm turns with the hand | in pronation-split.patch | a third of pronation at the wrist joint (85 percent at 85 percent of the forearm) |
 | colour: the palm colour stops at the wrist crease | yes | the palm colour painted up the volar forearm (6.7 dE76) |
+| ik: forearm rotation shared over the three twist bones in the parts the forearm skin carries it (replaces the equal-thirds check) | yes | a third of every rotation on the wrist joint |
+| skinning: forearm skin turns along the forearm as Kulesh 2015 measured it | yes | equal thirds: 0.56 of the hand's turn at 55 percent of the forearm against Kulesh's 0.34 (0.22 off, limit 0.05) |
+| skinning: the forearm keeps its girth from full pronation to full supination | yes | candy wrap deeper than the equal-thirds rig's 79.2 percent (the held two-bone patch would have reached it) |
+
+## Findings not fixed
+
+- **Transit sampling in the reach planner.** `solveTransitCost` samples a leg at six points, 6 cm apart on a 35 cm leg, so a hand can pass straight through a 32 mm rung between samples. This is how the held pronation patch put the thumb metacarpal 14.1 mm into the rung in Hang. Sampling every 1.5 cm catches it, but it changes route choice elsewhere (Hang on the way home 23 mm, a missed lever grasp), because the arm's springs cut the corners of the planned legs. Fixing it needs the planner to check the path the arm will actually take.
+- **Set-down onto the digits.** A handle set down with the fingers and thumb under it ends about 1 cm above its surface and rolls off the thumb as the hand opens. This blocks the thumb roll; see above.

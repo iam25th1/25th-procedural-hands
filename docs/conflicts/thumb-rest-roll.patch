@@ -1,5 +1,5 @@
 diff --git a/hands/src/anatomy.js b/hands/src/anatomy.js
-index 266b926..50be7b5 100644
+index 9321369..acacef6 100644
 --- a/hands/src/anatomy.js
 +++ b/hands/src/anatomy.js
 @@ -65,6 +65,17 @@ export const LAYOUT_MM = {
@@ -20,6 +20,64 @@ index 266b926..50be7b5 100644
    // Fraction by which the extended phalanges turn from the metacarpal fan toward the hand axis.
    phalanxConverge: 0.6,
    // Ring and little metacarpal bases flex a little at their CMC joints so the
+diff --git a/hands/src/grasp.js b/hands/src/grasp.js
+index 9fa6430..2cacefc 100644
+--- a/hands/src/grasp.js
++++ b/hands/src/grasp.js
+@@ -807,6 +807,14 @@ export function preShape(skel, side, obj, gripKey) {
+     skel.updateSide(side);
+     return p;
+   };
++  // The aperture is the thumb to index gap: it sizes a grip the thumb
++  // opposes. A grip without the thumb (a hook, a flat press) keeps its
++  // pre-pose as authored; scaling it by where the thumb tip happens to be
++  // moved the fingers a hook places its handle against.
++  if (!grip.digits.includes('thumb') && !(grip.support || []).includes('thumb')) {
++    const pose = apply(1);
++    return { pose, gap: tipGap(skel, side), want };
++  }
+   let lo = 0;
+   let hi = 1.6;
+   let pose = apply(1);
+diff --git a/hands/src/interact.js b/hands/src/interact.js
+index 5fb9fcc..3a9d5a6 100644
+--- a/hands/src/interact.js
++++ b/hands/src/interact.js
+@@ -431,6 +431,21 @@ export class Interaction {
+       const d = -capsuleObjectDistance(objT, c.a, c.b, c.r, 6) - (spare ? -0.0024 : 0.0006);
+       if (d > pen) { pen = d; where = `${c.name} into the object`; }
+     }
++    // A grip that arrives in its own approach shape (a hook comes in with
++    // its fingers flat) must be able to arrive: that shape, at this pose,
++    // may not pass into the object or the surroundings either.
++    const arrive = GRIPS[grip].approachPose;
++    if (arrive) {
++      sk.reset();
++      applyChannels(sk, side, poseChannels(this.rig.resolvePose(side, arrive)));
++      sk.update();
++      for (const c of handCapsules(sk, side)) {
++        for (const e of [...envT, objT]) {
++          const d = -capsuleObjectDistance(e, c.a, c.b, c.r, 6);
++          if (d > pen) { pen = d; where = `${c.name} into ${e === objT ? 'the object' : e.shape} on arrival`; }
++        }
++      }
++    }
+     const need = GRIPS[grip].digits;
+     const got = new Set(res.contacts.map((c) => c.digit));
+     const missing = need.filter((d) => !got.has(d)).length;
+@@ -570,6 +585,12 @@ export class Interaction {
+       // Well back toward the body, past a bar in between (hand over hand).
+       [[f[0], f[1], farBack], [g[0], g[1], farBack]],
+       [[f[0], f[1] - 0.04, farBack], [g[0], g[1] + 0.04, farBack]],
++      // Across at the depth the hand is at, then straight out or in to the
++      // goal (or the other way round): the way past something standing just
++      // beside the goal (a knob by the lever the hand let go of). Last, so a
++      // clear way above is still taken first.
++      [[g[0], g[1], f[2]]],
++      [[f[0], f[1], g[2]]],
+     ];
+     let best = { cost: direct, pts: null };
+     const plans = [
 diff --git a/hands/src/poses.js b/hands/src/poses.js
 index 9177407..e668eda 100644
 --- a/hands/src/poses.js
@@ -35,7 +93,7 @@ index 9177407..e668eda 100644
    preSphere: hand((F, T) => {
      F('index', 20, 10, 25); F('middle', 22, 0, 28); F('ring', 24, 8, 30); F('little', 26, 16, 32);
 diff --git a/hands/src/skeleton.js b/hands/src/skeleton.js
-index f5f5868..fa40751 100644
+index 41e3467..ae9d7c2 100644
 --- a/hands/src/skeleton.js
 +++ b/hands/src/skeleton.js
 @@ -132,7 +132,8 @@ function handLayout() {
@@ -49,21 +107,21 @@ index f5f5868..fa40751 100644
    const tnames = THUMB_SEGMENTS.map((s) => `thumb-${s}`);
    const tlens = [t.metacarpal, t.proximal, t.distal + t.tip];
 diff --git a/scripts/hands-checks/index.js b/scripts/hands-checks/index.js
-index 5b85420..9c66c11 100644
+index 475090a..aa32649 100644
 --- a/scripts/hands-checks/index.js
 +++ b/scripts/hands-checks/index.js
-@@ -15,6 +15,7 @@ import { planChecks } from './plans.js';
- import { videoChecks } from './video.js';
+@@ -16,6 +16,7 @@ import { videoChecks } from './video.js';
  import { planningChecks } from './planning.js';
- import { skinDeformChecks } from './skin-deform.js';
+ import { skinDeformChecks, pronationChecks } from './skin-deform.js';
+ import { glabrousChecks } from './glabrous.js';
 +import { thumbRestChecks } from './thumb-rest.js';
  
  export const CHECKS = [
    ...servedChecks,
-@@ -32,5 +33,6 @@ export const CHECKS = [
-   ...uiChecks,
-   ...skinChecks,
+@@ -35,5 +36,6 @@ export const CHECKS = [
    ...skinDeformChecks,
+   ...pronationChecks,
+   ...glabrousChecks,
 +  ...thumbRestChecks,
    ...videoChecks,
  ];
