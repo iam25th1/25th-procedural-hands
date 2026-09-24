@@ -1,0 +1,111 @@
+diff --git a/hands/src/anatomy.js b/hands/src/anatomy.js
+index 266b926..50be7b5 100644
+--- a/hands/src/anatomy.js
++++ b/hands/src/anatomy.js
+@@ -65,6 +65,17 @@ export const LAYOUT_MM = {
+   // (nail) direction hint; both in hand space, normalised in code.
+   thumbDir: [-0.62, -0.40, -0.67],
+   thumbDorsal: [-0.70, 0.71, 0],
++  // Roll of the thumb column about its own axis, degrees (negative turns the
++  // nail radially, the thumb's pronation). Cheema TA, Cheema NI, Tayyab R,
++  // Firoozbakhsh K. Measurement of rotation of the first metacarpal during
++  // opposition using computed tomography. J Hand Surg Am 2006;31(1):76-79:
++  // on axial CT, the angle between the dorsal tangent of the second and third
++  // metacarpals and the line through the first metacarpal head at the
++  // sesamoids is 74 +/- 10 degrees at rest (54 +/- 10 in retroposition, 100
++  // to 110 in opposition). The unrolled hint above gives 41.6 degrees in the
++  // relaxed pose; -24.2 is solved (scripts/hands-checks/thumb.js measures it
++  // the same way) so the relaxed pose gives the published 74.
++  thumbRoll: -24.2,
+   // Fraction by which the extended phalanges turn from the metacarpal fan toward the hand axis.
+   phalanxConverge: 0.6,
+   // Ring and little metacarpal bases flex a little at their CMC joints so the
+diff --git a/hands/src/poses.js b/hands/src/poses.js
+index 9177407..e668eda 100644
+--- a/hands/src/poses.js
++++ b/hands/src/poses.js
+@@ -89,7 +89,8 @@ export const POSES = {
+   // Pre-shapes for the grasp solver (the solver curls from here to contact).
+   preCylinder: hand((F, T) => {
+     F('index', 30, 2, 30); F('middle', 30, 0, 32); F('ring', 32, 1, 34); F('little', 34, 3, 36);
+-    T(10, 40, 5, 5);
++    // CMC palmar abduction at its 37 degree limit (it was authored at 40, past it).
++    T(10, 37, 5, 5);
+   }),
+   preSphere: hand((F, T) => {
+     F('index', 20, 10, 25); F('middle', 22, 0, 28); F('ring', 24, 8, 30); F('little', 26, 16, 32);
+diff --git a/hands/src/skeleton.js b/hands/src/skeleton.js
+index f5f5868..fa40751 100644
+--- a/hands/src/skeleton.js
++++ b/hands/src/skeleton.js
+@@ -132,7 +132,8 @@ function handLayout() {
+   }
+   const t = BONES_MM.thumb;
+   const tdir = v3.normalize([0, 0, 0], LAYOUT_MM.thumbDir);
+-  const tdorsal = LAYOUT_MM.thumbDorsal;
++  // The thumb column's roll about its own axis (see thumbRoll in anatomy.js).
++  const tdorsal = quat.rotate([0, 0, 0], quat.fromAxisAngle([0, 0, 0, 1], tdir, deg(LAYOUT_MM.thumbRoll || 0)), LAYOUT_MM.thumbDorsal);
+   let p = mm(LAYOUT_MM.thumbCmc);
+   const tnames = THUMB_SEGMENTS.map((s) => `thumb-${s}`);
+   const tlens = [t.metacarpal, t.proximal, t.distal + t.tip];
+diff --git a/scripts/hands-checks/index.js b/scripts/hands-checks/index.js
+index 5b85420..9c66c11 100644
+--- a/scripts/hands-checks/index.js
++++ b/scripts/hands-checks/index.js
+@@ -15,6 +15,7 @@ import { planChecks } from './plans.js';
+ import { videoChecks } from './video.js';
+ import { planningChecks } from './planning.js';
+ import { skinDeformChecks } from './skin-deform.js';
++import { thumbRestChecks } from './thumb-rest.js';
+ 
+ export const CHECKS = [
+   ...servedChecks,
+@@ -32,5 +33,6 @@ export const CHECKS = [
+   ...uiChecks,
+   ...skinChecks,
+   ...skinDeformChecks,
++  ...thumbRestChecks,
+   ...videoChecks,
+ ];
+diff --git a/scripts/hands-checks/thumb-rest.js b/scripts/hands-checks/thumb-rest.js
+new file mode 100644
+index 0000000..d37f558
+--- /dev/null
++++ b/scripts/hands-checks/thumb-rest.js
+@@ -0,0 +1,36 @@
++// The thumb column at rest, measured the way the published value was:
++// Cheema TA, Cheema NI, Tayyab R, Firoozbakhsh K. Measurement of rotation of
++// the first metacarpal during opposition using computed tomography. J Hand
++// Surg Am 2006;31(1):76-79. On an axial slice, the angle between the dorsal
++// tangent of the second and third metacarpals and the line through the first
++// metacarpal head at the sesamoids: 74 +/- 10 degrees at rest.
++import { create, quat } from '../../hands/src/index.js';
++
++export const THUMB_REST = { mean: 74, sd: 10 };
++
++export function thumbRestAngle(side = 'right') {
++  const h = create({ seed: 1 });
++  h.setPose('both', 'relaxed', { snap: true });
++  for (let i = 0; i < 60; i++) h.step();
++  const s = h.skeleton;
++  const inv = quat.conjugate([0, 0, 0, 1], s.joint(side, 'wrist').worldRot);
++  // The first metacarpal head's transverse line is the thumb frame's X axis;
++  // the hand's axial plane is its X (across the palm) and Y (dorsal).
++  const x = quat.rotate([0, 0, 0], inv, quat.rotate([0, 0, 0], s.joint(side, 'thumb-metacarpal').worldRot, [1, 0, 0]));
++  // The left hand is the mirror image: its frame X points the other way.
++  const sgn = side === 'right' ? 1 : -1;
++  const v = [sgn * x[0], sgn * x[1]];
++  return (Math.atan2(v[1], sgn * v[0]) * 180) / Math.PI;
++}
++
++export const thumbRestChecks = [
++  {
++    name: 'anatomy: first metacarpal rotation at rest within one SD of Cheema 2006 (74 +/- 10 deg, measured as they measured it)',
++    async run() {
++      const r = thumbRestAngle('right');
++      const l = thumbRestAngle('left');
++      const worst = Math.max(Math.abs(r - THUMB_REST.mean), Math.abs(l - THUMB_REST.mean));
++      return { pass: worst <= THUMB_REST.sd, worst, limit: THUMB_REST.sd, unit: 'deg off the mean', note: `relaxed pose: right ${r.toFixed(1)} deg, left ${l.toFixed(1)} deg against 74 +/- 10` };
++    },
++  },
++];

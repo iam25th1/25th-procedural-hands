@@ -178,8 +178,11 @@ export function volarReport() {
   const atElbow = angleDeg(volarDirection(bind, mesh, elbowRing.ids, axis), anterior);
   const lastRing = forearmRings2[forearmRings2.length - 1];
   const atWristBind = angleDeg(volarDirection(bind, mesh, lastRing.ids, axis), v3.normalize([0, 0, 0], v3.reject([0, 0, 0], palmOut(skel), axis)));
-  // Full supination (the anatomical position): twist channels at -90 in thirds.
-  for (const nm of ['forearm-twist-1', 'forearm-twist-2', 'wrist']) skel.setChannels(skel.joint('right', nm), 0, 0, -Math.PI / 6);
+  // Full supination (the anatomical position): -90 degrees from thumb up,
+  // shared among the twist bones as the bind pronation is shared.
+  const chain = ['forearm-twist-1', 'forearm-twist-2', 'wrist'].map((nm) => skel.joint('right', nm));
+  const offs = chain.reduce((a, j) => a + (j.twistOffset || 0), 0);
+  for (const j of chain) skel.setChannels(j, 0, 0, (-Math.PI / 2) * ((j.twistOffset || 0) / offs));
   skel.update();
   const sup = skinned(skel, mesh);
   const palm = v3.normalize([0, 0, 0], v3.reject([0, 0, 0], palmOut(skel), axis));
