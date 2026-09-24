@@ -77,7 +77,7 @@ export const FACTS = [
   { doc: 'README.md', find: /The hands come in the (\w+) tones of the/, value: () => word(MONK_TONES.length), what: 'Monk tones' },
   { doc: 'README.md', find: /\| Gestures \| ([^|]+) \|/, value: () => '', what: 'gestures row lists every registry gesture', test: (got) => Object.keys(GESTURES).length === got.split(',').length ? '' : `${got.split(',').length} listed, ${Object.keys(GESTURES).length} in GESTURES` },
   { doc: 'README.md', find: /leaving out the (\d+) device-dependent ones/, value: () => String(CHECKS.filter((c) => c.device).length), what: 'device-dependent checks (README)' },
-  { doc: 'CONTRIBUTING.md', find: /<summary>The device-dependent checks, and why a shared runner cannot hold them<\/summary>\n\n\| Check \| Why it is device-dependent \|\n\| --- \| --- \|\n((?:\|[^\n]*\n)+)/, value: () => '', what: 'device-dependent checks (CONTRIBUTING table)', test: (got) => { const rows = got.trim().split('\n').reduce((n, l) => n + (/three checks/.test(l) ? 3 : 1), 0); const want = CHECKS.filter((c) => c.device).length; return rows === want ? '' : `${rows} in the table, ${want} tagged in the code`; } },
+  { doc: 'CONTRIBUTING.md', find: /<summary>The device-dependent checks, and why a shared runner cannot hold them<\/summary>\n\n\| Check \| Why it is device-dependent \|\n\| --- \| --- \|\n((?:\|[^\n]*\n)+)/, value: () => '', what: 'device-dependent checks (CONTRIBUTING table)', test: (got) => { const rows = got.trim().split('\n').reduce((n, l) => n + (/three checks/.test(l) ? 3 : 1), 0); const want = CHECKS.filter((c) => c.device).length; return rows === want ? '' : `${rows} in the table, ${want} tagged in the code`; }, summary: (got) => `${CHECKS.filter((c) => c.device).length} checks in ${got.trim().split('\n').length} rows` },
   // Anatomy
   { doc: 'README.md', find: /\\frac\{([\d.]+)\\ \\text\{mm\}\}\{0\.108\}/, value: () => fixed(HAND_MM.length, 1), what: 'ANSUR II hand length' },
   { doc: 'README.md', find: /\\frac\{L_\{\\text\{hand\}\}\}\{([\d.]+)\}/, value: () => String(SEGMENT_FRACTION.hand), what: 'hand fraction of stature' },
@@ -182,7 +182,7 @@ export async function checkFacts(root, report) {
       const ms = [...text.matchAll(new RegExp(f.find.source, f.find.flags.includes('g') ? f.find.flags : `${f.find.flags}g`))];
       if (ms.length !== 1) { rows.push({ doc: f.doc, what: f.what, ok: false, note: `the sentence is ${ms.length ? `there ${ms.length} times` : 'not there'}: update the doc and this fact together` }); continue; }
       const got = f.both ? `${ms[0][1]}|${ms[0][2]}` : ms[0][1];
-      if (f.test) { const bad = f.test(got); rows.push({ doc: f.doc, what: f.what, ok: !bad, note: bad || got }); continue; }
+      if (f.test) { const bad = f.test(got); rows.push({ doc: f.doc, what: f.what, ok: !bad, note: bad || (f.summary ? f.summary(got) : got.includes('\n') ? `${got.trim().split('\n').length} table rows` : got) }); continue; }
       const want = await f.value(ctx);
       rows.push({ doc: f.doc, what: f.what, ok: got === want, note: got === want ? got : `doc says ${got}, code gives ${want}` });
     } catch (e) {
