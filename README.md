@@ -283,6 +283,34 @@ Shot mode renders any frame exactly from URL parameters, which is what the galle
 | `scripts/` | check, hands:check (`hands-checks/`), hands:matrix, hands:gallery |
 | `docs/` | The spec, the list of known minor issues ([HANDS_MINORS.md](docs/HANDS_MINORS.md)), why the arms and thumbs looked twisted and how each cause was fixed ([HANDS_TWIST_FINDINGS.md](docs/HANDS_TWIST_FINDINGS.md)), images |
 
+## Sourced values
+
+Every length, range and colour the rig is built from comes from a published measurement. They are used as data: numbers taken from the tables and figures cited, not reproduced text. Each is cited again beside the value in the code (`hands/src/anatomy.js`, `hands/src/skin.js`, `hands/src/mesh.js`).
+
+| Source | Used for |
+| --- | --- |
+| Buryanov A, Kotiuk V. Proportions of hand segments. *Int J Morphol* 2010;28(3):755-758 | Every phalanx and metacarpal length and the fingertip soft tissue (Table I); the finger web heights (Table III) |
+| Drillis R, Contini R. *Body segment parameters*. New York University, 1966 (as reproduced in Winter DA, *Biomechanics and Motor Control of Human Movement*) | Upper arm, forearm and hand lengths as fractions of stature (0.186, 0.146 and 0.108) |
+| ANSUR II, 2012 Anthropometric Survey of US Army Personnel (combined sample, N = 6068) | Hand length and breadth, from which stature and the knuckle spacing follow; wrist circumference; the forearm length it is checked against |
+| Cheema TA, Cheema NI, Tayyab R, Firoozbakhsh K. Measurement of rotation of the first metacarpal during opposition using computed tomography. *J Hand Surg Am* 2006;31(1):76-79 | The thumb column's rest rotation, 74 +/- 10 deg, and the method it is measured by |
+| Kulesh PN, Fletcher MDA, Solomin LN. Avoidance of external fixation pin induced rotational stiffness in the forearm. *SICOT J* 2015;1:3 | How forearm rotation is shared along the forearm's skin, and so where the three twist bones sit and what share each carries |
+| Yamaguchi Y et al. Mesenchymal-epithelial interactions in the skin. *J Cell Biol* 2004;165(2):275-285 | Why the palm's lighter colour stops at the wrist crease: palmoplantar (glabrous) skin has a fifth of the melanocytes of other sites |
+| Monk E. The Monk Skin Tone Scale. SocArXiv, 2023 (doi:10.31235/osf.io/pdf4c), with the colour values Google publishes at skintone.google | The ten skin tones and the swatches the rendered skin is held to |
+
+<details>
+<summary>Also cited in the code, for joint ranges</summary>
+
+- Ryu JY et al. Functional ranges of motion of the wrist joint. *J Hand Surg Am* 1991;16(3):409-419: wrist flexion, extension and deviation.
+- Wheeless' Textbook of Orthopaedics, elbow joint: elbow flexion and forearm rotation.
+- AAOS normal values, as listed by goniometer.io: finger and shoulder ranges.
+- El-Shennawy et al. 2001: the mobile fourth and fifth carpometacarpal joints.
+- B K et al. *Indian J Plast Surg* 2024: finger hyperextension; Physiopedia goniometry: MCP abduction.
+
+</details>
+
 ## Credits
 
-Fonts vendored in `app/fonts` under the SIL Open Font License 1.1 (OFL-1.1): **Alfa Slab One** by JM Solé and **Barlow Condensed** by Jeremy Tribby, via Fontsource. The license texts are in `app/fonts/OFL-*.txt`. three.js and anime.js are MIT licensed.
+The code is MIT licensed (`LICENSE`, copyright 2026 25TH).
+
+
+Fonts vendored in `app/fonts` under the SIL Open Font License 1.1 (OFL-1.1): **Alfa Slab One** by JM Solé and **Barlow Condensed** by Jeremy Tribby, via Fontsource. The license texts are in `app/fonts/OFL-*.txt`. three.js (copyright three.js authors) and anime.js (copyright Julian Garnier) are MIT licensed; the library needs only three, and anime.js is used by the sandbox alone.
