@@ -69,10 +69,14 @@ export function startApp({ canvas, shot }) {
   // from the recorded plan table where it can and solves the rest itself.
   // Without module workers the page falls back to the table here and solves
   // the rest on this thread.
+  // A table this engine cannot replay to the last bit is refused, not
+  // used: every plan is then solved live, and planNote says why.
   let planLoaded = false;
-  const loadTableHere = () => fetch('/scenes/plans.json').then((r) => (r.ok ? r.json() : null)).then((t) => { if (t) { setPlanTable(t); planLoaded = true; } }).catch(() => {});
+  let planNote = '';
+  const tableRefused = (reason) => { planNote = reason; if (reason) console.warn(`Recorded plans not used: ${reason}`); };
+  const loadTableHere = () => fetch('/scenes/plans.json').then((r) => (r.ok ? r.json() : null)).then((t) => { const use = setPlanTable(t); planLoaded = use.ok; tableRefused(use.reason); }).catch(() => tableRefused('the plan table did not load'));
   const planner = createPlanner({
-    onTable: (ok) => { planLoaded = ok; },
+    onTable: (ok, reason) => { planLoaded = ok; tableRefused(reason); },
     onError: (m) => console.warn(m),
     // The worker failed: rebuild the scene with plans solved here.
     onFail: () => { note('Planning moved to the page: the planning worker stopped', 'alert'); loadTableHere().then(() => { build(state.scene, state.reduced); resync(); frameCamera(); }); },
@@ -754,6 +758,8 @@ export function startApp({ canvas, shot }) {
     get replaying() { return recorder.replaying; },
     get result() { return lastResult; },
     get plansLoaded() { return Boolean(planLoaded); },
+    // Why the recorded plans are not in use, if they are not.
+    get plansNote() { return planNote; },
     // Planning off the main thread: whether it is on, how far the worker has
     // answered, and how long the page has been waiting on it.
     planning: () => ({ worker: planner.available, active: planner.active, ready: planner.ready, frame: clock.frame, waitingMs: waitingSince ? performance.now() - waitingSince : 0, workerStepMs: planner.workerMs.slice(-120) }),

@@ -3,13 +3,15 @@
 // solve, and write app/scenes/plans.json with the hash of the sources it was
 // built from. The server serves the table only while that hash still
 // matches (server/plan-hash.js), and hands:check replays every scenario from
-// it and requires the same state, bit for bit, as a live run.
+// it, with reduced motion off and on, and requires the same state, bit for
+// bit at every frame, as a live run.
 //   npm run hands:plans
 import fs from 'node:fs';
 import { SCENARIOS } from '../app/scenes/capabilities.js';
 import { runScenario } from '../app/scenes/runner.js';
 import { planRecorder, planKey } from '../app/scenes/plans.js';
 import { planSourceHash, PLAN_TABLE } from '../server/plan-hash.js';
+import { signature } from '../hands/src/dmath.js';
 
 export const PLAN_SEED = 1;
 
@@ -22,7 +24,9 @@ export function buildPlans() {
       runs[planKey(id, reduced)] = rec.list;
     }
   }
-  return { sourceHash: planSourceHash(), seed: PLAN_SEED, runs };
+  // math: the engine's signature for the rig's elementary functions; the
+  // sandbox replays the table only where its engine computes the same.
+  return { sourceHash: planSourceHash(), math: signature(), seed: PLAN_SEED, runs };
 }
 
 const isMain = process.argv[1] && new URL(import.meta.url).pathname === process.argv[1];

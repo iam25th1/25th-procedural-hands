@@ -16,6 +16,7 @@ import { solveArm, handRotation } from './ik.js';
 import { solveGrasp, placeObject, attachToHand, attachedWorld, preShape, settleThumb, restThumbOn, openedGraspPose, capsuleObjectDistance, GRIPS } from './grasp.js';
 import { deg } from './math.js';
 import { guardThumb, guardFingers, guardEnvironment } from './selfcontact.js';
+import * as dmath from './dmath.js';
 
 // Poses solved as grips on a virtual object rather than authored angles.
 export const POSE_GRIPS = {
@@ -128,13 +129,13 @@ export class RotSpring {
     if (quat.dot(t, this.q) < 0) for (let i = 0; i < 4; i++) t[i] = -t[i];
     const e = quat.multiply([0, 0, 0, 1], t, quat.conjugate([0, 0, 0, 1], this.q));
     quat.normalize(e, e);
-    const ang = 2 * Math.acos(clamp(e[3], -1, 1));
+    const ang = 2 * dmath.acos(clamp(e[3], -1, 1));
     const s = Math.sqrt(Math.max(0, 1 - e[3] * e[3]));
     const axis = s < 1e-9 ? [0, 0, 0] : [e[0] / s, e[1] / s, e[2] / s];
     const err = [axis[0] * ang, axis[1] * ang, axis[2] * ang];
     const w = this.w;
     for (let i = 0; i < 3; i++) this.omega[i] += (w * w * err[i] - 2 * w * this.omega[i]) * dt;
-    const rate = Math.hypot(this.omega[0], this.omega[1], this.omega[2]);
+    const rate = dmath.hypot(this.omega[0], this.omega[1], this.omega[2]);
     if (rate > this.maxRate) for (let i = 0; i < 3; i++) this.omega[i] *= this.maxRate / rate;
     const dq = quat.fromRotationVector([0, 0, 0, 1], [this.omega[0] * dt, this.omega[1] * dt, this.omega[2] * dt]);
     this.q = quat.normalize([0, 0, 0, 1], quat.multiply([0, 0, 0, 1], dq, this.q));
@@ -537,15 +538,15 @@ export class Rig {
     const ph = this.phases;
     const arm = this.arms[side];
     const i = side === 'left' ? 0 : 4;
-    arm.offset[0] = k * 0.003 * Math.sin(t * 2 * Math.PI * 0.21 + ph[i]);
-    arm.offset[1] = k * 0.004 * Math.sin(t * 2 * Math.PI * 0.26 + ph[i + 1]);
-    arm.offset[2] = k * 0.002 * Math.sin(t * 2 * Math.PI * 0.17 + ph[i + 2]);
+    arm.offset[0] = k * 0.003 * dmath.sin(t * 2 * Math.PI * 0.21 + ph[i]);
+    arm.offset[1] = k * 0.004 * dmath.sin(t * 2 * Math.PI * 0.26 + ph[i + 1]);
+    arm.offset[2] = k * 0.002 * dmath.sin(t * 2 * Math.PI * 0.17 + ph[i + 2]);
     const offs = {};
     const drift = k * deg(2.5);
     let n = 0;
     for (const f of FINGERS) {
       const p = { index: 'index-finger', middle: 'middle-finger', ring: 'ring-finger', little: 'pinky-finger' }[f];
-      const a = drift * Math.sin(t * 2 * Math.PI * 0.31 + ph[(i + n) % 16]) * Math.sin(t * 2 * Math.PI * 0.07 + ph[(i + n + 3) % 16]);
+      const a = drift * dmath.sin(t * 2 * Math.PI * 0.31 + ph[(i + n) % 16]) * dmath.sin(t * 2 * Math.PI * 0.07 + ph[(i + n + 3) % 16]);
       offs[`${p}-phalanx-proximal`] = { flex: a };
       offs[`${p}-phalanx-intermediate`] = { flex: a * 0.7 };
       n++;
@@ -554,7 +555,7 @@ export class Rig {
       const amp = this.tremor * (this.reduced ? 0.3 : 1) * deg(1.4);
       let m = 0;
       for (const name of HAND_CHANNEL_JOINTS) {
-        const j = amp * Math.sin(t * 2 * Math.PI * 7.5 + ph[m % 16] + m);
+        const j = amp * dmath.sin(t * 2 * Math.PI * 7.5 + ph[m % 16] + m);
         offs[name] = { flex: (offs[name]?.flex || 0) + j };
         m++;
       }

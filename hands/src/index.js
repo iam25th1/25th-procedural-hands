@@ -23,6 +23,7 @@ import { World, Body, Prop, Rope } from './physics.js';
 import { Interaction, targetShape } from './interact.js';
 import { POSES, COUNTING, countPoseName, setPoseName, fingerSetPose } from './poses.js';
 import { GESTURES, registerGesture, compileGesture, isDynamic, gestureChannels, gestureArm } from './gestures.js';
+import * as dmath from './dmath.js';
 
 export const HANDS = ['left', 'right'];
 export const EVENTS = ['contact', 'grasped', 'released', 'slipped'];
@@ -212,7 +213,7 @@ export class Hands {
     if (this.interaction && this.interaction.via[side]) return false;
     const a = this.rig.arms[side];
     const w = this.rig.skel.joint(side, 'wrist').worldPos;
-    const speed = Math.hypot(...a.pos.map((s) => s.v));
+    const speed = dmath.hypot(...a.pos.map((s) => s.v));
     // Near the target and nearly still; or stopped as close as the arm can get.
     return (v3.dist(w, a.target.pos) <= tol && speed < 0.05) || (speed < 0.005 && v3.dist(w, a.target.pos) <= 0.03);
   }
@@ -439,6 +440,9 @@ export { Clock, RATES } from './clock.js';
 export { buildArmMesh, colorize } from './mesh.js';
 export { buildStone, buildSachet } from './stones.js';
 export { v3, quat, m4, deg, toDeg, hashNumbers } from './math.js';
+// sin, cos, pow and the rest as the rig computes them: the same bits on
+// every engine and CPU (Math's are not; see dmath.js).
+export * as dmath from './dmath.js';
 export { mulberry32 } from './rng.js';
 export { createThreeView, makeSkinMaterial } from './three-view.js';
 export { World, Body, Prop, Rope, Interaction, targetShape };

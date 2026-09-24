@@ -3,6 +3,7 @@
 // when a shot, a scene choice or the user's orbit sets it.
 
 import { fovFor } from '../render/fov.js';
+import * as dmath from '../../hands/src/dmath.js';
 
 const NARROW = 1.3; // portrait phones see a narrower slice: stand further back
 
@@ -61,8 +62,8 @@ function rot(q, v) {
 
 // Orbit angles that look from `dir` (a unit vector from the target toward the eye).
 function anglesFrom(dir) {
-  const len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
-  return { yaw: Math.atan2(dir[0], dir[2]), pitch: Math.asin(Math.max(-1, Math.min(1, dir[1] / len))) };
+  const len = dmath.hypot(dir[0], dir[1], dir[2]) || 1;
+  return { yaw: dmath.atan2(dir[0], dir[2]), pitch: dmath.asin(Math.max(-1, Math.min(1, dir[1] / len))) };
 }
 
 export function handCentre(hands, side) {
@@ -117,10 +118,10 @@ export function cameraFor({ scene, scenario, sb, shot, hands, aspect }) {
     // fit across the frame with a margin: nothing cropped on a phone.
     const l = handCentre(hands, 'left');
     const r = handCentre(hands, 'right');
-    const half = Math.hypot(l[0] - r[0], l[2] - r[2]) / 2 + 0.17;
+    const half = dmath.hypot(l[0] - r[0], l[2] - r[2]) / 2 + 0.17;
     const vfov = (fovFor(aspect) * Math.PI) / 180;
-    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
-    dist = Math.max(dist, half / Math.tan(hfov / 2) / shot.zoom);
+    const hfov = 2 * dmath.atan(dmath.tan(vfov / 2) * aspect);
+    dist = Math.max(dist, half / dmath.tan(hfov / 2) / shot.zoom);
   }
   return { target, yaw: shot.yaw ?? a.yaw, pitch: shot.pitch ?? Math.max(-1.45, Math.min(1.45, a.pitch)), dist };
 }

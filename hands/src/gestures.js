@@ -15,6 +15,7 @@ import { deg, quat } from './math.js';
 import { handRotation } from './ik.js';
 import { XR_PREFIX } from './skeleton.js';
 import { OBJECTS } from './defaults.js';
+import * as dmath from './dmath.js';
 
 const FINGER_JOINT = { mcp: 'phalanx-proximal', pip: 'phalanx-intermediate', dip: 'phalanx-distal' };
 const THUMB_JOINT = { cmc: 'metacarpal', mcp: 'phalanx-proximal', ip: 'phalanx-distal' };
@@ -83,10 +84,10 @@ export const isDynamic = (g) => Boolean(g.osc || g.armOsc || g.arm || g.object);
 
 function waveform(kind, x) {
   switch (kind) {
-    case 'cos01': return 0.5 - 0.5 * Math.cos(x);
+    case 'cos01': return 0.5 - 0.5 * dmath.cos(x);
     // A short lift then rest: the first third of each cycle is a half sine.
-    case 'tap': { const p = ((x / (2 * Math.PI)) % 1 + 1) % 1; return p < 0.32 ? Math.sin((p / 0.32) * Math.PI) : 0; }
-    default: return Math.sin(x);
+    case 'tap': { const p = ((x / (2 * Math.PI)) % 1 + 1) % 1; return p < 0.32 ? dmath.sin((p / 0.32) * Math.PI) : 0; }
+    default: return dmath.sin(x);
   }
 }
 
@@ -119,7 +120,7 @@ export function gestureArm(entry, side, t, k) {
   const m = (v) => [v[0] * s, v[1], v[2]];
   let rot = handRotation(m(entry.arm.finger), m(entry.arm.palm));
   if (entry.armOsc) {
-    const a = deg(entry.armOsc.amp) * k * Math.sin(2 * Math.PI * entry.armOsc.hz * t);
+    const a = deg(entry.armOsc.amp) * k * dmath.sin(2 * Math.PI * entry.armOsc.hz * t);
     // About a body space axis (the wave swings about the forward axis).
     rot = quat.multiply([0, 0, 0, 1], quat.fromAxisAngle([0, 0, 0, 1], entry.armOsc.axis, a * s), rot);
   }

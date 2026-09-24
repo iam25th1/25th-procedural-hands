@@ -30,7 +30,7 @@ const M = {
   solverLiveP95: 'budget: sim step ms, 95th percentile, sandbox loaded live in a browser (the perf overlay figure)',
   solverLiveWorst: 'budget: sim step ms, worst step, sandbox loaded live in a browser, under one 60 Hz frame (16.7 ms)',
   planning: 'planning: switching actions and cold solves after a slider move never hold a frame; the worker answers every solve',
-  plans: 'plans: the recorded plan table matches the sources, and every scenario replayed from it ends bit for bit where the live run does',
+  plans: 'plans: the recorded plan table matches the sources and this engine\'s math, and every scenario replayed from it, reduced motion off and on, ends bit for bit where the live run does at every frame',
 };
 const P = {
   rest: 'physics: sphere, box and capsule bodies fall and come to rest on the ground and on a table, then sleep',
@@ -39,6 +39,8 @@ const P = {
   rope: 'physics: a rope hangs from its pinned top at its length (stretch under 2 percent)',
   contact: 'physics: a hand moves an object only through contact, the object stops the hand passing into it, a rung holds a load',
   replay: 'physics: fixed timestep and seeded, the same calls replay bit for bit',
+  math: 'determinism: the rig, the world, the scenarios and the planner use only the Math the standard fixes exactly (sin, pow and the rest go through dmath)',
+  signature: 'determinism: this engine computes dmath to the recorded bits (the signature a plan table must match to be replayed)',
 };
 
 export const CAPABILITIES = [
@@ -97,7 +99,7 @@ export const CAPABILITIES = [
   { group: 'physics', name: 'Rope as a chain of points', checks: [P.rope, S('Hold a rope')], sheet: 'cap-rope' },
   { group: 'physics', name: 'Hands move objects, objects resist hands', checks: [P.contact, M.contact, S('Push a crate')], sheet: '09-push-drag' },
   { group: 'physics', name: 'Climbing moves the body anchor between hands, one hand always attached', checks: [M.climb], sheet: '11-climb' },
-  { group: 'physics', name: 'Deterministic: fixed timestep, seeded, replays hash identically', checks: [P.replay, M.replay], sheet: '07-grab-carry-place' },
+  { group: 'physics', name: 'Deterministic: fixed timestep, seeded, replays hash identically', checks: [P.replay, M.replay, P.math, P.signature], sheet: '07-grab-carry-place' },
   { group: 'budget', name: 'Sim step time with the sandbox loaded, in Node and live', checks: [M.solver, M.solverLive], sheet: '07-grab-carry-place' },
   { group: 'budget', name: 'Sim step tail live: 95th percentile and worst step', checks: [M.solverLiveP95, M.solverLiveWorst], sheet: '07-grab-carry-place' },
   { group: 'budget', name: 'Planning off the frame: recorded plans and cold solves never hold a frame', checks: [M.plans, M.planning], sheet: '07-grab-carry-place' },

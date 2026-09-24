@@ -6,6 +6,7 @@
 // +X completes a right handed frame. Rest lengths come from anatomy.js.
 import { v3, quat, deg } from './math.js';
 import { BONES_MM, LAYOUT_MM, CARPUS_MM, ARM_MM, SHOULDER_M, SECTIONS_MM, MM, LIMITS_DEG, FOREARM_TWIST } from './anatomy.js';
+import * as dmath from './dmath.js';
 
 export const SIDES = ['left', 'right'];
 export const FINGERS = ['index', 'middle', 'ring', 'little'];
@@ -241,7 +242,7 @@ export function capsuleEnd(j, out = [0, 0, 0]) {
   const c = j.children[0].worldPos;
   if (j.segment !== 'phalanx-distal') return v3.copy(out, c);
   const d = [c[0] - j.worldPos[0], c[1] - j.worldPos[1], c[2] - j.worldPos[2]];
-  const L = Math.hypot(d[0], d[1], d[2]) || 1;
+  const L = dmath.hypot(d[0], d[1], d[2]) || 1;
   const k = Math.max(0, L - j.radius) / L;
   return v3.set(out, j.worldPos[0] + d[0] * k, j.worldPos[1] + d[1] * k, j.worldPos[2] + d[2] * k);
 }
@@ -273,17 +274,17 @@ export function quatToChannels(q, sideSign = 1) {
   const r22 = 1 - 2 * (x * x + y * y);
   const r10 = 2 * (x * y + w * z);
   const r00 = 1 - 2 * (y * y + z * z);
-  const abd = Math.asin(Math.max(-1, Math.min(1, -r20)));
+  const abd = dmath.asin(Math.max(-1, Math.min(1, -r20)));
   let a;
   let c;
   if (Math.abs(r20) < 0.999999) {
-    a = Math.atan2(r21, r22);
-    c = Math.atan2(r10, r00);
+    a = dmath.atan2(r21, r22);
+    c = dmath.atan2(r10, r00);
   } else {
     // Gimbal lock: fold everything into the flex term.
     const r01 = 2 * (x * y - w * z);
     const r11 = 1 - 2 * (x * x + z * z);
-    a = Math.atan2(-r01, r11);
+    a = dmath.atan2(-r01, r11);
     c = 0;
   }
   return { flex: -a, abd: abd * sideSign, twist: c * sideSign };
@@ -371,16 +372,16 @@ export class Skeleton {
     const dWorld = quat.rotate([0, 0, 0], rp, quat.rotate([0, 0, 0], joint.cmcBasis, d0));
     const d = quat.rotate([0, 0, 0], Bi, dWorld);
     // d = Ry(phi) Rx(a) d0 with d0 = (0, dy, dz): y1 = r cos(theta0 + a)
-    const r = Math.hypot(d0[1], d0[2]);
-    const theta0 = Math.atan2(d0[2], d0[1]);
+    const r = dmath.hypot(d0[1], d0[2]);
+    const theta0 = dmath.atan2(d0[2], d0[1]);
     const cy = Math.max(-1, Math.min(1, d[1] / r));
     // Two candidates for the angle; keep the one whose z sign matches.
-    let a = Math.acos(cy) - theta0;
-    const z1 = r * Math.sin(theta0 + a);
-    const zLen = Math.hypot(d[0], d[2]);
-    if (Math.abs(z1 - zLen) > Math.abs(-z1 - zLen)) a = -Math.acos(cy) - theta0;
-    const zz = r * Math.sin(theta0 + a);
-    const phi = Math.atan2(d[0], zz === 0 ? 1e-12 : d[2] * Math.sign(zz)) * (zz < 0 ? 1 : 1);
+    let a = dmath.acos(cy) - theta0;
+    const z1 = r * dmath.sin(theta0 + a);
+    const zLen = dmath.hypot(d[0], d[2]);
+    if (Math.abs(z1 - zLen) > Math.abs(-z1 - zLen)) a = -dmath.acos(cy) - theta0;
+    const zz = r * dmath.sin(theta0 + a);
+    const phi = dmath.atan2(d[0], zz === 0 ? 1e-12 : d[2] * Math.sign(zz)) * (zz < 0 ? 1 : 1);
     const flex = -phi / joint.sideSign;
     // Twist: remove the swing and read the rotation left about the bone.
     const ry = quat.fromAxisAngle([0, 0, 0, 1], [0, 1, 0], phi);

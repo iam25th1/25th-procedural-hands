@@ -120,6 +120,7 @@ Only `three-view.js` imports three. Everything else is plain modules with no DOM
 | `Skeleton`, `XR_JOINT_NAMES`, `ARM_JOINT_NAMES` | The skeleton and its joint names (WebXR Hand Input names for the hand) |
 | `buildArmMesh`, `colorize`, `buildStone`, `buildSachet` | Mesh builders, renderer free |
 | `handRotation`, `v3`, `quat`, `m4`, `deg`, `toDeg`, `mulberry32`, `Clock`, `STEP` | Math, the seeded generator and the fixed step clock |
+| `dmath` | `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `exp`, `log`, `pow`, `hypot` as the rig computes them: the same bits on every engine and CPU, where `Math`'s are not |
 | `limitMargin`, `penetration`, `objectPenetration`, `handCapsules` | The measurements the tests and checks use |
 
 </details>

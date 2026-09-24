@@ -10,6 +10,7 @@ import { v3, quat, clamp, lerp, smoothstep } from './math.js';
 import { SECTIONS_MM, BONES_MM, MM, NAIL, fingerExternal, ARM_MM, FOREARM_TWIST } from './anatomy.js';
 import { FINGERS, XR_PREFIX } from './skeleton.js';
 import { DEFAULTS } from './defaults.js';
+import * as dmath from './dmath.js';
 
 export const LODS = {
   high: { F: 7, reduced: false, nailCells: [4, 5] },
@@ -38,18 +39,18 @@ export function profile(N, w, t, opts = {}) {
   const pts = [];
   for (let i = 0; i < N; i++) {
     const th = TWO_PI * (i + 0.5) / N;
-    const c = Math.cos(th);
-    const s = Math.sin(th);
-    let x = (w / 2) * Math.sign(c) * Math.pow(Math.abs(c), 2 / n);
-    let y = (t / 2) * Math.sign(s) * Math.pow(Math.abs(s), 2 / n);
+    const c = dmath.cos(th);
+    const s = dmath.sin(th);
+    let x = (w / 2) * Math.sign(c) * dmath.pow(Math.abs(c), 2 / n);
+    let y = (t / 2) * Math.sign(s) * dmath.pow(Math.abs(s), 2 / n);
     y *= s > 0 ? (opts.dorsalScale ?? 1) : (opts.palmarScale ?? 1);
     let r = 0;
     for (const b of opts.bumps || []) {
       const d = angDiff(th, b.center);
-      r += b.amp * Math.exp(-(d * d) / (2 * b.width * b.width));
+      r += b.amp * dmath.exp(-(d * d) / (2 * b.width * b.width));
     }
     if (r) {
-      const len = Math.hypot(x, y) || 1;
+      const len = dmath.hypot(x, y) || 1;
       x += (x / len) * r;
       y += (y / len) * r;
     }
@@ -69,7 +70,7 @@ function lerpProfile(a, b, t) {
 // Dorsal surface height of a superellipse section at lateral offset x (mm).
 function dorsalY(w, t, x, n = 2.3, scale = 1) {
   const u = clamp(Math.abs(x) / (w / 2), 0, 1);
-  return (t / 2) * Math.pow(Math.max(0, 1 - Math.pow(u, n)), 1 / n) * scale;
+  return (t / 2) * dmath.pow(Math.max(0, 1 - dmath.pow(u, n)), 1 / n) * scale;
 }
 
 function normalizeWeights(list) {
@@ -142,7 +143,7 @@ function alignRing(builder, target, ring) {
 
 // Palmar skin runs from the front to just past the sides, blending over the
 // sides so the lighter palm never reads as a hard glove seam.
-const palmarness = (th) => smoothstep((-Math.sin(th) + 0.05) / 0.9);
+const palmarness = (th) => smoothstep((-dmath.sin(th) + 0.05) / 0.9);
 
 export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
   const L = LODS[lod] || LODS.high;
@@ -180,7 +181,7 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     const p = palmarness(flip ? th + Math.PI : th);
     let s = shade;
     if (creaseOn === 'palmar' && p > 0.55) s = CREASE.palmar;
-    if (creaseOn === 'knuckle' && Math.sin(th) > 0.35) s = CREASE.knuckle;
+    if (creaseOn === 'knuckle' && dmath.sin(th) > 0.35) s = CREASE.knuckle;
     if (thenarLine && Math.abs(angDiff(th, THENAR_CREASE)) < 0.05) s *= 0.88;
     return { region: REGION.SKIN, palmar: p, shade: s };
   };
@@ -308,7 +309,7 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
   // tapering on either side, so the thumb springs from a mound, not an edge.
   const thenar = (pts, amount, radial = 0.3) => pts.map(([x, y, th]) => {
     const d = Math.abs(angDiff(th, Math.PI));
-    const w = Math.exp(-(d * d) / (2 * 0.55 * 0.55));
+    const w = dmath.exp(-(d * d) / (2 * 0.55 * 0.55));
     return [x - radial * amount * w, y - amount * w, th];
   });
   const st12 = ring(wq, along(wr, 0.022), thenar(profile(NA, S.palm.proximal[0], S.palm.proximal[1], { n: 2.5, dorsalScale: 0.92, bumps: palmBumps(3, 2) }), 4 * MM), palmWeights(0.15), skinMeta(1, null, false, true));
@@ -369,19 +370,19 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     for (let k = 0; k < NP; k++) {
       const th = palmAngles13[k];
       // Re-evaluate the ellipse at the original angle of this slot.
-      const c = Math.cos(th), s = Math.sin(th);
+      const c = dmath.cos(th), s = dmath.sin(th);
       const n = opts.n ?? 2.5;
-      let x = (pr[0] / 2) * Math.sign(c) * Math.pow(Math.abs(c), 2 / n);
-      let y = (pr[1] / 2) * Math.sign(s) * Math.pow(Math.abs(s), 2 / n);
+      let x = (pr[0] / 2) * Math.sign(c) * dmath.pow(Math.abs(c), 2 / n);
+      let y = (pr[1] / 2) * Math.sign(s) * dmath.pow(Math.abs(s), 2 / n);
       y *= s > 0 ? (opts.dorsalScale ?? 1) : 1;
       let r = 0;
       for (const bump of opts.bumps || []) {
         const dd = angDiff(th, bump.center);
-        r += bump.amp * Math.exp(-(dd * dd) / (2 * bump.width * bump.width));
+        r += bump.amp * dmath.exp(-(dd * dd) / (2 * bump.width * bump.width));
       }
-      if (r) { const len = Math.hypot(x, y) || 1; x += (x / len) * r; y += (y / len) * r; }
+      if (r) { const len = dmath.hypot(x, y) || 1; x += (x / len) * r; y += (y / len) * r; }
       const dd = Math.abs(angDiff(th, Math.PI));
-      const tw = Math.exp(-(dd * dd) / (2 * 0.55 * 0.55));
+      const tw = dmath.exp(-(dd * dd) / (2 * 0.55 * 0.55));
       const e = v3.add([0, 0, 0], along(wr, d), rot(wq, [(x - 0.3 * opts.thenar * tw) * MM, (y - opts.thenar * tw) * MM, 0]));
       const p = v3.lerp([0, 0, 0], e, k0Back[k], blend);
       ids.push(b.vertex(p, weightsFn(k, th), meta(k, th)));
@@ -412,7 +413,7 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     const mb = bi(`${XR_PREFIX[f]}-metacarpal`);
     const pb = bi(`${XR_PREFIX[f]}-phalanx-proximal`);
     const r0 = ring(D.m.restWorldRot, along(D.m, D.Lm - 0.008), k0Profiles[f],
-      (i, th) => (Math.sin(th) > 0 ? [[mb, 1]] : [[mb, 0.85], [pb, 0.15]]), skinMeta());
+      (i, th) => (dmath.sin(th) > 0 ? [[mb, 1]] : [[mb, 0.85], [pb, 0.15]]), skinMeta());
     rings[f] = [r0];
   }
   const k0Virtual = virtualLoop((f, i) => rings[f][0][i]);
@@ -432,7 +433,7 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     const knuckle = P('head', { bumps: [{ center: Math.PI / 2, width: 0.6, amp: 2.2 }] });
     const Ltip = D.Lpd; // distal bone plus tip soft tissue
     const list = [
-      { j: D.pp, d: 0, pr: lerpProfile(knuckle, P('proximal'), 0.5), w: (i, th) => (Math.sin(th) > 0 ? [[mb, 0.6], [pb, 0.4]] : [[mb, 0.4], [pb, 0.6]]), meta: skinMeta(1, 'knuckle'), tag: 'K1' },
+      { j: D.pp, d: 0, pr: lerpProfile(knuckle, P('proximal'), 0.5), w: (i, th) => (dmath.sin(th) > 0 ? [[mb, 0.6], [pb, 0.4]] : [[mb, 0.4], [pb, 0.6]]), meta: skinMeta(1, 'knuckle'), tag: 'K1' },
       { j: D.pp, d: D.web * 0.5, pr: lerpProfile(knuckle, P('proximal'), 0.8), w: [[pb, 0.75], [mb, 0.25]], meta: skinMeta(), tag: 'K2', reducedSkip: true },
       { j: D.pp, d: D.web, pr: P('proximal'), w: [[pb, 0.92], [mb, 0.08]], meta: skinMeta(), tag: 'W' },
       { j: D.pp, d: 0.55 * D.Lpp, pr: P('proximal', { palmarScale: 1.06 }), w: [[pb, 1]], meta: skinMeta(), tag: 'Pmid', reducedSkip: true },
@@ -795,7 +796,7 @@ function finish(b, side) {
     }
   }
   for (let i = 0; i < n; i++) {
-    const l = Math.hypot(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]) || 1;
+    const l = dmath.hypot(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]) || 1;
     normals[i * 3] /= l; normals[i * 3 + 1] /= l; normals[i * 3 + 2] /= l;
   }
   const skinIndex = new Uint16Array(n * 4);
@@ -824,7 +825,7 @@ function hexToRgb(hex) {
   const v = parseInt(hex.replace('#', ''), 16);
   return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
 }
-const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : dmath.pow((c + 0.055) / 1.055, 2.4));
 const mix = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
 
@@ -869,7 +870,7 @@ export function colorize(mesh, { skinTone = DEFAULTS.skinTone, shirt = DEFAULTS.
         // Gentle mottling from the rest position (about 3 cm wavelength, plus
         // or minus 4 percent) so large flat areas do not read as plastic.
         const x = mesh.positions[i * 3], y = mesh.positions[i * 3 + 1], z = mesh.positions[i * 3 + 2];
-        const mottle = 1 + 0.04 * (Math.sin(210 * x + 1.7) * Math.sin(180 * y + 0.4) + 0.6 * Math.sin(150 * z + 240 * x));
+        const mottle = 1 + 0.04 * (dmath.sin(210 * x + 1.7) * dmath.sin(180 * y + 0.4) + 0.6 * dmath.sin(150 * z + 240 * x));
         c = mul(c, m.shade * mottle);
         r = lerp(0.72, 0.78, m.palmar);
       }

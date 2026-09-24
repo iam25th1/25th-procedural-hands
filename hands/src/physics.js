@@ -16,6 +16,7 @@
 // local Z (the axis the grasp solver's cylinder uses).
 import { v3, quat, clamp, segmentDistance, pointSegmentDistance } from './math.js';
 import { mulberry32 } from './rng.js';
+import * as dmath from './dmath.js';
 
 export const GRAVITY = -9.81;
 const SLOP = 0.0003;
@@ -156,7 +157,7 @@ export class Prop {
     const a = v3.reject([0, 0, 0], p0, this.axis);
     const b = v3.reject([0, 0, 0], t, this.axis);
     if (v3.len(a) < 1e-9 || v3.len(b) < 1e-9) return this.q;
-    const ang = Math.atan2(v3.dot(v3.cross([0, 0, 0], a, b), this.axis), v3.dot(a, b));
+    const ang = dmath.atan2(v3.dot(v3.cross([0, 0, 0], a, b), this.axis), v3.dot(a, b));
     // Unwrap to the branch nearest the current angle.
     let q = ang;
     while (q - this.q > Math.PI) q -= 2 * Math.PI;
@@ -256,11 +257,11 @@ function boundOf(x) {
   let r;
   if (x.shape === 'capsule' && x.a) { c = v3.lerp([0, 0, 0], x.a, x.b, 0.5); r = v3.dist(x.a, x.b) / 2 + x.r; } else {
     c = x.pos;
-    r = x.shape === 'sphere' ? x.r : x.shape === 'capsule' ? (x.h || 0) + x.r : Math.hypot(x.hx || 0, x.hy || 0, x.hz || 0);
+    r = x.shape === 'sphere' ? x.r : x.shape === 'capsule' ? (x.h || 0) + x.r : dmath.hypot(x.hx || 0, x.hy || 0, x.hz || 0);
   }
   if (x.parts && x.parts.length) {
     for (const p of x.parts) {
-      const reach = v3.len(p.pos || [0, 0, 0]) + (p.shape === 'sphere' ? p.r : p.shape === 'capsule' ? (p.h || 0) + p.r : Math.hypot(p.hx || 0, p.hy || 0, p.hz || 0));
+      const reach = v3.len(p.pos || [0, 0, 0]) + (p.shape === 'sphere' ? p.r : p.shape === 'capsule' ? (p.h || 0) + p.r : dmath.hypot(p.hx || 0, p.hy || 0, p.hz || 0));
       r = Math.max(r, reach);
     }
   }
@@ -432,7 +433,7 @@ export class World {
       if (b.kinematic || b.asleep) continue;
       v3.addScaled(b.pos, b.pos, b.vel, dt);
       const w = b.ang;
-      const wl = Math.hypot(w[0], w[1], w[2]);
+      const wl = dmath.hypot(w[0], w[1], w[2]);
       if (wl > 1e-9) b.rot = quat.normalize([0, 0, 0, 1], quat.multiply([0, 0, 0, 1], quat.fromAxisAngle([0, 0, 0, 1], [w[0] / wl, w[1] / wl, w[2] / wl], wl * dt), b.rot));
       const ld = Math.max(0, 1 - b.linDamp * dt);
       const ad = Math.max(0, 1 - b.angDamp * dt);

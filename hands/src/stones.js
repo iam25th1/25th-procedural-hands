@@ -5,6 +5,7 @@
 // the same seed always gives the same stone.
 import { v3 } from './math.js';
 import { mulberry32 } from './rng.js';
+import * as dmath from './dmath.js';
 
 // Deterministic 3D value noise from a seeded lattice.
 function makeNoise(seed) {
@@ -64,7 +65,7 @@ function finish(points, indices, colorFn) {
     for (const k of [a, b, c]) { normals[k * 3] += fn[0]; normals[k * 3 + 1] += fn[1]; normals[k * 3 + 2] += fn[2]; }
   }
   for (let i = 0; i < n; i++) {
-    const l = Math.hypot(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]) || 1;
+    const l = dmath.hypot(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]) || 1;
     normals[i * 3] /= l; normals[i * 3 + 1] /= l; normals[i * 3 + 2] /= l;
     const c = colorFn(points[i], i);
     colors.set(c, i * 3);
@@ -72,7 +73,7 @@ function finish(points, indices, colorFn) {
   return { positions, normals, colors, indices: idx, stats: { vertices: n, triangles: idx.length / 3 } };
 }
 
-const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : dmath.pow((c + 0.055) / 1.055, 2.4));
 const lin = (hex) => { const v = parseInt(hex.slice(1), 16); return [srgbToLinear(((v >> 16) & 255) / 255), srgbToLinear(((v >> 8) & 255) / 255), srgbToLinear((v & 255) / 255)]; };
 const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
@@ -127,7 +128,7 @@ export function buildSachet(seed = 3) {
         const v = iy / ny * 2 - 1;
         // Inflation: a pillow profile that goes to zero thickness at the sealed edges.
         const edge = Math.max(Math.abs(u), Math.abs(v));
-        const puff = Math.pow(Math.max(0, 1 - Math.pow(edge, 4)), 0.5);
+        const puff = dmath.pow(Math.max(0, 1 - dmath.pow(edge, 4)), 0.5);
         const wrinkle = 1 + 0.05 * noise(u * 3 + 7, v * 3 + 7, sign);
         row.push(points.push([u * hx, v * hy, sign * hz * puff * wrinkle]) - 1);
       }

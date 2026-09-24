@@ -12,7 +12,7 @@ import { createThreeView } from '/hands/src/three-view.js';
 import { SLEEVE_COLOURS, DEFAULTS } from '/hands/src/defaults.js';
 import { createWorldView } from '/render/world-view.js';
 import { createSandbox, startScenario, scenarioSteps } from '/scenes/runner.js';
-import { planPlayer, planKey } from '/scenes/plans.js';
+import { planPlayer, planKey, usablePlanTable } from '/scenes/plans.js';
 import { SCENARIOS } from '/scenes/capabilities.js';
 import { STATIONS } from '/scenes/sandbox-world.js';
 import { createHandsScene, GRIP_OBJECTS } from '/scenes/hands-scene.js';
@@ -28,7 +28,14 @@ export function setSkinTone(id) {
 }
 // The recorded plan table (see app/scenes/plans.js), once it has loaded.
 let planTable = null;
-export function setPlanTable(table) { planTable = table; }
+// Kept only if this engine computes the rig's math as the table's builder
+// did (usablePlanTable): otherwise every plan is solved live, and the
+// returned reason says why.
+export function setPlanTable(table) {
+  const use = usablePlanTable(table);
+  planTable = use.ok ? table : null;
+  return use;
+}
 function plansFor(id, seed, reduced) {
   if (!planTable || planTable.seed !== seed) return null;
   const list = planTable.runs[planKey(id, reduced)];

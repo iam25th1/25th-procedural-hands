@@ -9,6 +9,7 @@ import { FINGERS, XR_PREFIX, capsuleEnd } from './skeleton.js';
 import { POSES } from './poses.js';
 import { clonePose, poseChannels, applyChannels } from './fingers.js';
 import { MM } from './anatomy.js';
+import * as dmath from './dmath.js';
 
 // Signed distance of a point to an object given in the object's own frame.
 export function objectSdf(obj, p) {
@@ -17,16 +18,16 @@ export function objectSdf(obj, p) {
       return v3.len(p) - obj.r;
     case 'cylinder': {
       // Axis along local Z, radius r, half length h, rounded ends.
-      const radial = Math.hypot(p[0], p[1]) - obj.r;
+      const radial = dmath.hypot(p[0], p[1]) - obj.r;
       const axial = Math.abs(p[2]) - obj.h;
-      const outside = Math.hypot(Math.max(radial, 0), Math.max(axial, 0));
+      const outside = dmath.hypot(Math.max(radial, 0), Math.max(axial, 0));
       return outside + Math.min(Math.max(radial, axial), 0);
     }
     case 'box':
     case 'pillow': {
       const round = obj.round || 0;
       const q = [Math.abs(p[0]) - obj.hx + round, Math.abs(p[1]) - obj.hy + round, Math.abs(p[2]) - obj.hz + round];
-      const outside = Math.hypot(Math.max(q[0], 0), Math.max(q[1], 0), Math.max(q[2], 0));
+      const outside = dmath.hypot(Math.max(q[0], 0), Math.max(q[1], 0), Math.max(q[2], 0));
       return outside + Math.min(Math.max(q[0], q[1], q[2]), 0) - round;
     }
     default:
@@ -54,9 +55,9 @@ export function capsuleObjectDistance(obj, a, b, r, samples = 6) {
 export function boundRadius(obj) {
   switch (obj.shape) {
     case 'sphere': return obj.r;
-    case 'cylinder': return Math.hypot(obj.r, obj.h);
+    case 'cylinder': return dmath.hypot(obj.r, obj.h);
     case 'box':
-    case 'pillow': return Math.hypot(obj.hx, obj.hy, obj.hz);
+    case 'pillow': return dmath.hypot(obj.hx, obj.hy, obj.hz);
     default: return Infinity;
   }
 }

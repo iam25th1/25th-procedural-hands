@@ -2,6 +2,7 @@
 // by the browser lab and the Node checks. Vectors are [x, y, z], quaternions
 // [x, y, z, w], matrices 16 numbers column major (the three.js layout, so a
 // matrix can be handed to Matrix4.fromArray unchanged).
+import * as dmath from './dmath.js';
 
 export const DEG = Math.PI / 180;
 export const deg = (d) => d * DEG;
@@ -26,11 +27,11 @@ export const v3 = {
     o[0] = x; o[1] = y; o[2] = z;
     return o;
   },
-  len: (a) => Math.hypot(a[0], a[1], a[2]),
+  len: (a) => dmath.hypot(a[0], a[1], a[2]),
   len2: (a) => a[0] * a[0] + a[1] * a[1] + a[2] * a[2],
-  dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
+  dist: (a, b) => dmath.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
   normalize: (o, a) => {
-    const l = Math.hypot(a[0], a[1], a[2]);
+    const l = dmath.hypot(a[0], a[1], a[2]);
     if (l < 1e-12) { o[0] = 0; o[1] = 0; o[2] = 0; return o; }
     o[0] = a[0] / l; o[1] = a[1] / l; o[2] = a[2] / l;
     return o;
@@ -48,13 +49,13 @@ export const quat = {
   copy: (o, a) => { o[0] = a[0]; o[1] = a[1]; o[2] = a[2]; o[3] = a[3]; return o; },
   fromAxisAngle: (o, axis, angle) => {
     const h = angle / 2;
-    const s = Math.sin(h);
-    o[0] = axis[0] * s; o[1] = axis[1] * s; o[2] = axis[2] * s; o[3] = Math.cos(h);
+    const s = dmath.sin(h);
+    o[0] = axis[0] * s; o[1] = axis[1] * s; o[2] = axis[2] * s; o[3] = dmath.cos(h);
     return o;
   },
   // Rotation about a unit axis stored as a scaled axis (Rodrigues vector).
   fromRotationVector: (o, r) => {
-    const a = Math.hypot(r[0], r[1], r[2]);
+    const a = dmath.hypot(r[0], r[1], r[2]);
     if (a < 1e-12) return quat.identity(o);
     return quat.fromAxisAngle(o, [r[0] / a, r[1] / a, r[2] / a], a);
   },
@@ -69,7 +70,7 @@ export const quat = {
   },
   conjugate: (o, a) => { o[0] = -a[0]; o[1] = -a[1]; o[2] = -a[2]; o[3] = a[3]; return o; },
   normalize: (o, a) => {
-    const l = Math.hypot(a[0], a[1], a[2], a[3]) || 1;
+    const l = dmath.hypot(a[0], a[1], a[2], a[3]) || 1;
     o[0] = a[0] / l; o[1] = a[1] / l; o[2] = a[2] / l; o[3] = a[3] / l;
     return o;
   },
@@ -96,10 +97,10 @@ export const quat = {
       wa = 1 - t;
       wb = t;
     } else {
-      const th = Math.acos(cos);
-      const s = Math.sin(th);
-      wa = Math.sin((1 - t) * th) / s;
-      wb = Math.sin(t * th) / s;
+      const th = dmath.acos(cos);
+      const s = dmath.sin(th);
+      wa = dmath.sin((1 - t) * th) / s;
+      wb = dmath.sin(t * th) / s;
     }
     o[0] = a[0] * wa + bx * wb; o[1] = a[1] * wa + by * wb; o[2] = a[2] * wa + bz * wb; o[3] = a[3] * wa + bw * wb;
     return quat.normalize(o, o);
@@ -140,14 +141,14 @@ export const quat = {
     return quat.normalize(o, o);
   },
   // Angle of rotation in radians, 0..pi.
-  angle: (q) => 2 * Math.acos(clamp(Math.abs(q[3]), 0, 1)),
+  angle: (q) => 2 * dmath.acos(clamp(Math.abs(q[3]), 0, 1)),
   // Angle between two orientations.
-  angleBetween: (a, b) => 2 * Math.acos(clamp(Math.abs(quat.dot(a, b)), 0, 1)),
+  angleBetween: (a, b) => 2 * dmath.acos(clamp(Math.abs(quat.dot(a, b)), 0, 1)),
   // Split q into twist about unit axis and the remaining swing: q = swing * twist.
   swingTwist: (q, axis) => {
     const d = q[0] * axis[0] + q[1] * axis[1] + q[2] * axis[2];
     const twist = quat.normalize([0, 0, 0, 1], [axis[0] * d, axis[1] * d, axis[2] * d, q[3]]);
-    if (Math.hypot(twist[0], twist[1], twist[2], twist[3]) < 1e-9) quat.identity(twist);
+    if (dmath.hypot(twist[0], twist[1], twist[2], twist[3]) < 1e-9) quat.identity(twist);
     const swing = quat.multiply([0, 0, 0, 1], q, quat.conjugate([0, 0, 0, 1], twist));
     return { swing, twist };
   },
@@ -161,7 +162,7 @@ export const quat = {
   // Signed twist angle about unit axis, -pi..pi.
   twistAngle: (q, axis) => {
     const d = q[0] * axis[0] + q[1] * axis[1] + q[2] * axis[2];
-    let a = 2 * Math.atan2(d, q[3]);
+    let a = 2 * dmath.atan2(d, q[3]);
     if (a > Math.PI) a -= 2 * Math.PI;
     if (a < -Math.PI) a += 2 * Math.PI;
     return a;

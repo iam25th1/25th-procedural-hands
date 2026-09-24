@@ -35,7 +35,7 @@ export function createPlanner({ onTable = () => {}, onError = () => {}, onFail =
   if (worker) {
     worker.onmessage = (ev) => {
       const m = ev.data;
-      if (m.t === 'table') { tableLoaded = m.loaded; onTable(m.loaded); return; }
+      if (m.t === 'table') { tableLoaded = m.loaded; onTable(m.loaded, m.reason || ''); return; }
       if (m.epoch !== epoch) return;
       if (m.t === 'progress') {
         if (stream && m.records.length) stream.push(m.records);

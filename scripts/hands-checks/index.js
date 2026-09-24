@@ -19,6 +19,7 @@ import { glabrousChecks } from './glabrous.js';
 import { thumbRestChecks } from './thumb-rest.js';
 import { sleeveChecks } from './sleeve.js';
 import { thumbShapeChecks } from './thumb-shape.js';
+import { determinismChecks } from './determinism.js';
 
 export const CHECKS = [
   ...servedChecks,
@@ -29,6 +30,7 @@ export const CHECKS = [
   ...physicsChecks,
   ...manipulationChecks,
   ...scenarioChecks,
+  ...determinismChecks,
   ...planChecks,
   ...planningChecks,
   ...budgetChecks,

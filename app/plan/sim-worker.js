@@ -10,7 +10,7 @@
 //   { t: 'act', epoch, seq, stamp, a }           apply action a after step `stamp`
 //   { t: 'advance', epoch, to }                  step until frame `to`
 // Messages out:
-//   { t: 'table', loaded }                       the recorded plan table arrived (or not)
+//   { t: 'table', loaded, reason }               the recorded plan table is in use (or not, and why)
 //   { t: 'progress', epoch, frame, acked, records, ms }  after each step
 //   { t: 'error', epoch, message }
 import { createController, setPlanTable, planPlayerFor } from '../ui/controllers.js';
@@ -30,8 +30,8 @@ const post = (m) => self.postMessage(m);
 // The recorded plan table, fetched here: only this copy solves.
 fetch('/scenes/plans.json')
   .then((r) => (r.ok ? r.json() : null))
-  .then((t) => { if (t) setPlanTable(t); post({ t: 'table', loaded: Boolean(t) }); })
-  .catch(() => post({ t: 'table', loaded: false }));
+  .then((t) => { const use = setPlanTable(t); post({ t: 'table', loaded: use.ok, reason: use.reason }); })
+  .catch(() => post({ t: 'table', loaded: false, reason: 'the plan table did not load' }));
 
 function apply(p) {
   try {

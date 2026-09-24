@@ -6,6 +6,8 @@
 //
 // The step uses the exact closed form solution over dt, so it is stable for
 // any step and bit for bit repeatable for a given sequence of targets.
+import * as dmath from './dmath.js';
+
 export class Spring {
   constructor(omega, x = 0, maxRate = Infinity) {
     this.w = omega;
@@ -26,7 +28,7 @@ export class Spring {
     const w = this.w;
     const A = this.x - this.target;
     const B = this.v + w * A;
-    const e = Math.exp(-w * dt);
+    const e = dmath.exp(-w * dt);
     let x = this.target + (A + B * dt) * e;
     let v = (B - w * (A + B * dt)) * e;
     // Neither the speed at the end of the step nor the distance covered in
@@ -91,6 +93,6 @@ export class Oscillator {
   }
   // Envelope amplitude relative to a unit displacement after t seconds.
   static envelope(omega, zeta, t) {
-    return Math.exp(-zeta * omega * t);
+    return dmath.exp(-zeta * omega * t);
   }
 }

@@ -9,6 +9,7 @@
 import { v3, quat, clamp, deg } from './math.js';
 import { FOREARM_TWIST, LIMITS_DEG } from './anatomy.js';
 import { TWIST_PART } from './skeleton.js';
+import * as dmath from './dmath.js';
 
 const REACH_MARGIN = 0.99995; // never fully lock the elbow (about 1.6 degrees of residual flex)
 
@@ -36,22 +37,22 @@ export function solveArm(skel, side, target, targetRot, pole) {
 
   // Elbow interior angle and flexion, clamped to the joint limit.
   let cosE = clamp((a * a + b * b - d * d) / (2 * a * b), -1, 1);
-  let flex = Math.PI - Math.acos(cosE);
+  let flex = Math.PI - dmath.acos(cosE);
   const fl = fa.limits.flex;
   const flexClamped = clamp(flex, fl[0], fl[1]);
   if (flexClamped !== flex) {
     flex = flexClamped;
-    cosE = Math.cos(Math.PI - flex);
+    cosE = dmath.cos(Math.PI - flex);
     d = Math.sqrt(Math.max(1e-9, a * a + b * b - 2 * a * b * cosE));
   }
   const cosS = clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1);
-  const alpha = Math.acos(cosS);
+  const alpha = dmath.acos(cosS);
 
   // Elbow in the plane of shoulder, target and pole, on the pole side.
   let pdir = v3.reject([0, 0, 0], v3.sub([0, 0, 0], pole, S), u);
   if (v3.len(pdir) < 1e-6) pdir = v3.reject([0, 0, 0], [0, -1, 0], u);
   v3.normalize(pdir, pdir);
-  const E = v3.add([0, 0, 0], S, v3.add([0, 0, 0], v3.scale([0, 0, 0], u, a * Math.cos(alpha)), v3.scale([0, 0, 0], pdir, a * Math.sin(alpha))));
+  const E = v3.add([0, 0, 0], S, v3.add([0, 0, 0], v3.scale([0, 0, 0], u, a * dmath.cos(alpha)), v3.scale([0, 0, 0], pdir, a * dmath.sin(alpha))));
   const W = v3.addScaled([0, 0, 0], S, u, d); // where the wrist lands (equals target when reachable)
 
   // Upper arm frame: -Z toward the elbow, -Y toward the forearm's bend side.

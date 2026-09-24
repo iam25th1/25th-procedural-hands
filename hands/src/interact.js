@@ -28,6 +28,7 @@ import { clonePose, poseChannels, applyChannels } from './fingers.js';
 import { handCapsules } from './measure.js';
 import { Body, Prop, Rope } from './physics.js';
 import { FOREARM_TWIST, LIMITS_DEG } from './anatomy.js';
+import * as dmath from './dmath.js';
 
 const SIDES = ['left', 'right'];
 const G = 9.81;
@@ -1383,7 +1384,7 @@ export class Interaction {
       // On to the next leg once near this one's end, or once the hand has
       // stopped short of it (an end out of reach).
       const arm = this.rig.arms[side];
-      const still = v && Math.hypot(...arm.pos.map((sp) => sp.v)) < 0.02 && this.rig.time - (v.since ?? (v.since = this.rig.time)) > 0.3;
+      const still = v && dmath.hypot(...arm.pos.map((sp) => sp.v)) < 0.02 && this.rig.time - (v.since ?? (v.since = this.rig.time)) > 0.3;
       if (v && (still || v3.dist(this.rig.skel.joint(side, 'wrist').worldPos, v.legs[0].pos) < 0.025)) {
         v.since = this.rig.time;
         v.legs.shift();
@@ -1560,7 +1561,7 @@ export class Interaction {
       tr.acc = v3.scale([0, 0, 0], v3.sub([0, 0, 0], vel, tr.vel), 1 / dt);
       tr.prevVel = tr.vel.slice();
       const dq = quat.multiply([0, 0, 0, 1], b.rot, quat.conjugate([0, 0, 0, 1], tr.rot));
-      const ang = 2 * Math.acos(clamp(Math.abs(dq[3]), 0, 1));
+      const ang = 2 * dmath.acos(clamp(Math.abs(dq[3]), 0, 1));
       const sn = Math.sqrt(Math.max(0, 1 - dq[3] * dq[3]));
       const sign = dq[3] < 0 ? -1 : 1;
       tr.ang = sn < 1e-9 ? [0, 0, 0] : [dq[0] / sn * ang / dt * sign, dq[1] / sn * ang / dt * sign, dq[2] / sn * ang / dt * sign];
@@ -1583,7 +1584,7 @@ export class Interaction {
     if (this.world.isSupported(body)) return 0;
     const tr = this.track.get(body.id);
     const acc = tr ? tr.acc : [0, 0, 0];
-    return body.mass * Math.hypot(acc[0], acc[1] + G, acc[2]);
+    return body.mass * dmath.hypot(acc[0], acc[1] + G, acc[2]);
   }
   capacity(body) {
     let c = 0;

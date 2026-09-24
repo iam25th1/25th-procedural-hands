@@ -9,6 +9,7 @@ import { capsuleObjectDistance } from '../../hands/src/grasp.js';
 import { limitMargin, penetration, handCapsules } from '../../hands/src/measure.js';
 import { STEP } from '../../hands/src/clock.js';
 import { capsuleEnd } from '../../hands/src/skeleton.js';
+import { exactStateHash } from '../../app/scenes/plans.js';
 
 const MM = 0.001;
 // A body set down counts as resting within 1.5 mm of a surface (the floating
@@ -66,6 +67,7 @@ export function auditScenario(id, { seed = 1 } = {}) {
     stepMs: [],
     measures: {}, runState: {}, handled: new Set(), moved: new Map(), start: null,
     hashes: [],
+    exact: [], // every frame's whole state, bit for bit (the plans check)
     setDowns: [],
   };
   let prevRot = null;
@@ -218,6 +220,7 @@ export function auditScenario(id, { seed = 1 } = {}) {
       }
       prevState = state;
       if (Math.abs(t - Math.round(t)) < STEP / 2) r.hashes.push(hands.hash());
+      r.exact.push(exactStateHash(hands));
     },
   });
   // Hands attached from the first grip to the last letting go (a climb).
