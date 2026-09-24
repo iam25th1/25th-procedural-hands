@@ -62,7 +62,11 @@ export function renderShot(canvas, shot) {
     view.resize(true);
     const j = (n) => skel.joint('right', n);
     const onForearm = shot.focus === 'left'; // focus=left is reused as "frame the forearm"
-    const target = onForearm ? j('forearm').worldPos.map((v, i) => (v + j('wrist').worldPos[i]) / 2) : j('wrist').worldPos.map((v, i) => (v * 0.35 + j('middle-finger-phalanx-proximal').worldPos[i] * 0.65));
+    // focus=thumb frames the thumb from its metacarpal to its tip.
+    const onThumb = shot.focus === 'thumb';
+    const target = onForearm ? j('forearm').worldPos.map((v, i) => (v + j('wrist').worldPos[i]) / 2)
+      : onThumb ? j('thumb-phalanx-proximal').worldPos.slice()
+        : j('wrist').worldPos.map((v, i) => (v * 0.35 + j('middle-finger-phalanx-proximal').worldPos[i] * 0.65));
     // Views in the bind frame (arm along -Z, palm down at pron 90), fixed
     // whatever the forearm's turn so before and after compare like for like.
     const dirs = { palm: [0, -1, -0.2], back: [0, 1, -0.2], side: [-1, 0.1, -0.05], ulnar: [1, 0.1, -0.05], three: [-0.6, 0.55, -0.3] };
@@ -70,7 +74,7 @@ export function renderShot(canvas, shot) {
     const L = Math.hypot(d[0], d[1], d[2]);
     const yaw = Math.atan2(d[0], d[2]);
     const pitch = Math.asin(d[1] / L);
-    view.setOrbit({ target, yaw: shot.yaw ?? yaw, pitch: shot.pitch ?? pitch, dist: (shot.dist ?? (onForearm ? 0.5 : 0.22)) / shot.zoom });
+    view.setOrbit({ target, yaw: shot.yaw ?? yaw, pitch: shot.pitch ?? pitch, dist: (shot.dist ?? (onForearm ? 0.5 : onThumb ? 0.14 : 0.22)) / shot.zoom });
     return { info: view.render(), advance: () => view.render() };
   }
 

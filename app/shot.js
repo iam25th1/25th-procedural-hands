@@ -34,7 +34,7 @@ export function parseShot(search) {
     pitch: q.has('pitch') ? num(q.get('pitch'), 0, -1.5, 1.5) : null,
     dist: q.has('dist') ? num(q.get('dist'), 0.5, 0.05, 6) : null,
     zoom: num(q.get('zoom'), 1, 0.2, 5),
-    focus: ['left', 'right', 'both'].includes(q.get('focus')) ? q.get('focus') : null,
+    focus: ['left', 'right', 'both', 'thumb'].includes(q.get('focus')) ? q.get('focus') : null,
     skin: Math.floor(num(q.get('skin'), 7, 0, 9)),
     palmMatch: q.get('palmmatch') === '1',
     palmKey: q.get('palmkey') === '1',

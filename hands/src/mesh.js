@@ -540,10 +540,10 @@ export function buildArmMesh(skel, side, { lod = 'high' } = {}) {
     // The thenar: a broad flat wedge that narrows into the thumb over the
     // metacarpal, so the thumb rises from a mound rather than a tube.
     { q: tiltFrame(0.5), c: along(tm, 0.52 * Ltm), pr: TP('base', { n: 2.4, palmarScale: 1.2, dorsalScale: 0.9 }), w: [[tmb, 0.7], [bi('wrist'), 0.3]], meta: skinMeta() },
-    { q: tiltFrame(0.85), c: along(tm, 0.72 * Ltm), pr: lerpProfile(TP('base', { n: 2.4, palmarScale: 1.1 }), TP('metacarpal'), 0.55), w: [[tmb, 0.9], [bi('wrist'), 0.1]], meta: skinMeta() },
+    { q: tiltFrame(0.85), c: along(tm, 0.72 * Ltm), pr: lerpProfile(TP('base', { n: 2.4, palmarScale: 1.1 }), TP('metacarpal'), 0.7), w: [[tmb, 0.9], [bi('wrist'), 0.1]], meta: skinMeta() },
     { q: tm.restWorldRot, c: along(tm, Ltm - 0.007), pr: lerpProfile(TP('metacarpal'), TP('mcp'), 0.5), w: [[tmb, 0.88], [tpb, 0.12]], meta: skinMeta() },
     { q: tm.restWorldRot, c: along(tm, Ltm - 0.0015), pr: lerpProfile(TP('metacarpal'), TP('mcp'), 0.9), w: [[tmb, 0.7], [tpb, 0.3]], meta: skinMeta(), reducedSkip: true },
-    { q: tp.restWorldRot, c: along(tp, 0), pr: TP('mcp', { bumps: [{ center: Math.PI / 2, width: 0.7, amp: 1.2 }] }), w: [[tmb, 0.5], [tpb, 0.5]], meta: skinMeta(1, 'palmar') },
+    { q: tp.restWorldRot, c: along(tp, 0), pr: TP('mcp'), w: [[tmb, 0.5], [tpb, 0.5]], meta: skinMeta() },
     { q: tp.restWorldRot, c: along(tp, 0.0015), pr: lerpProfile(TP('mcp'), TP('proximal'), 0.25), w: [[tpb, 0.7], [tmb, 0.3]], meta: skinMeta(), reducedSkip: true },
     { q: tp.restWorldRot, c: along(tp, 0.007), pr: lerpProfile(TP('mcp'), TP('proximal'), 0.65), w: [[tpb, 0.88], [tmb, 0.12]], meta: skinMeta() },
     { q: tp.restWorldRot, c: along(tp, 0.55 * Ltp), pr: TP('proximal', { palmarScale: 1.06 }), w: [[tpb, 1]], meta: skinMeta(), reducedSkip: true },

@@ -18,6 +18,7 @@ import { skinDeformChecks, pronationChecks } from './skin-deform.js';
 import { glabrousChecks } from './glabrous.js';
 import { thumbRestChecks } from './thumb-rest.js';
 import { sleeveChecks } from './sleeve.js';
+import { thumbShapeChecks } from './thumb-shape.js';
 
 export const CHECKS = [
   ...servedChecks,
@@ -39,5 +40,6 @@ export const CHECKS = [
   ...glabrousChecks,
   ...thumbRestChecks,
   ...sleeveChecks,
+  ...thumbShapeChecks,
   ...videoChecks,
 ];

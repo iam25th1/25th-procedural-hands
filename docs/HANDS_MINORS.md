@@ -18,8 +18,8 @@ Cosmetic nits from the gallery review, not blocking this run. Each line names th
 - 04 pinch and tripod, cap-padPinch (phone landscape): the idle left hand sits close to the camera in the 5 to 7 s frames.
 - cap-inHandRoll (desktop): the near forearm crosses much of the frame during the roll.
 - cap-hook, grips-hands-scene: the thumb rests straight up along the strap instead of relaxed.
-- 01 anatomy: a crease at the thumb base in the side and three-quarter views.
-- 02 counting: folded fingers read as dark stubs; the extended thumb is stiff and flat with a seam at its base.
+- ~~01 anatomy: a crease at the thumb base in the side and three-quarter views.~~ **Fixed:** the MCP's knuckle bump and crease ring are gone; the thumb tapers through the MCP (`thumb: the skin tapers from the thenar to the IP joint without a step, a bulge or a cuff`).
+- 02 counting: folded fingers read as dark stubs; the extended thumb is stiff and flat with a seam at its base. (The seam at the MCP is fixed; the flat reading is helped by the thumb's rest roll, 74 deg as Cheema 2006 measured it.)
 - 03 gestures: in thumbs up the thumb reads as a separate peg; beckon fingers are only half curled at the frame's moment.
 - 04 pinch and tripod: the stone is mostly hidden inside the hand in some frames; the three stone sizes are hard to tell apart at sheet scale.
 - 05 power and spherical: the folded forearm with a rounded elbow reads as a stump at powerGrip 1.60 s; a dark post crosses the left edge on wide screens.
