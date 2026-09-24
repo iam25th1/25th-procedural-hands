@@ -43,6 +43,9 @@
   "engines": {
     "node": ">=20"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "start": "node server/index.js",
     "check": "node scripts/check.js",
