@@ -7,7 +7,8 @@ import { launchBrowser, serve } from '../shoot.js';
 // A frame held longer than this is a hitch: three frames at 60 Hz.
 export const PLANNING_LIMIT = { frameMs: 50 };
 // Actions whose plans after a slider move include the costliest cold solves
-// measured (pad pinch 1 s, climb and lever 0.25 to 0.4 s on the main thread).
+// measured (headless Chromium on an Apple M4, 2026-09-24: pad pinch 0.86 s,
+// lever 0.19 s and climb 0.15 s for the costliest single solve of each).
 const RUNS = ['Pad pinch on three sizes', 'Pull a lever', 'Climb hand over hand'];
 
 export const planningChecks = [

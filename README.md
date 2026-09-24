@@ -256,7 +256,7 @@ The albedo behind each swatch is fitted for the sandbox's lighting (Khronos PBR 
 
 ## Budgets
 
-Measured by `npm run hands:check` (values from the run on 2026-09-24; limits and the reasons for them in [the spec](https://github.com/iam25th1/25th-procedural-hands/blob/main/docs/dev-notes/HANDS_SANDBOX_SPEC.md#budgets)).
+Measured by `npm run hands:check` on 2026-09-24, on an Apple M4 MacBook (10 cores, 16 GB, macOS 26.5.2), in Node 24.18.0 and in headless Chromium 153.0.8010.12. Other work was running on the same machine throughout (load average 3.4 to 4.9). The timings are the range over four runs, since they move with whatever else the machine is doing. Counts do not move: they are the same on every run and every machine. Limits, and the reasons for them, are in [the spec](https://github.com/iam25th1/25th-procedural-hands/blob/main/docs/dev-notes/HANDS_SANDBOX_SPEC.md#budgets).
 
 | The library alone | Measured | Limit |
 | --- | --- | --- |
@@ -264,7 +264,7 @@ Measured by `npm run hands:check` (values from the run on 2026-09-24; limits and
 | Triangles, both arms, low LOD | 5 960 | 8 000 |
 | Draw calls, both arms | 2 | 6 |
 | Bones | 62 | 80 |
-| Rig step (one fixed step), median in Node | 0.049 ms | 0.5 ms |
+| Rig step (one fixed step), median in Node | 0.037 to 0.049 ms | 0.5 ms |
 
 <details>
 <summary>With the sandbox scene loaded</summary>
@@ -273,12 +273,13 @@ Measured by `npm run hands:check` (values from the run on 2026-09-24; limits and
 | --- | --- | --- |
 | Triangles, worst of six stations | 23 786 | 30 000 |
 | Draw calls, worst of six stations | 37 | 45 |
-| Sim step (script keys, rig, interaction, physics), median in Node | 0.891 ms | 1.2 ms |
-| Sim step, median, live in headless Chromium | 2.3 to 2.4 ms (bimodal run to run) | 3.0 ms |
-| Sim step, 95th percentile, live | 3.1 to 3.3 ms | 4.5 ms |
-| Sim step, worst step, live | 6.5 to 6.6 ms (a new scene's first settling steps) | 16.7 ms |
+| Sim step (script keys, rig, interaction, physics), median in Node | 0.767 to 1.061 ms | 1.2 ms |
+| Sim step, median, live in headless Chromium | 1.7 to 2.6 ms | 3.0 ms |
+| Sim step, 95th percentile, live | 3.4 to 3.7 ms | 4.5 ms |
+| Sim step, worst step, live | 6.3 to 8.1 ms (a new scene's first settling steps) | 16.7 ms |
+| Worst frame while switching actions and solving cold plans, live | 16.8 ms (one 60 Hz frame) | 50 ms |
 
-The live figures are the sandbox's perf overlay figures, read in headless Chromium on the machine running the check, not on a phone; on-device numbers come from the overlay itself.
+The live figures are the sandbox's perf overlay figures, read in headless Chromium on the machine running the check, not on a phone; on-device numbers come from the overlay itself. They are device-dependent: `npm run gate` holds them on your machine, and CI does not run them ([CONTRIBUTING.md](https://github.com/iam25th1/25th-procedural-hands/blob/main/CONTRIBUTING.md)).
 
 </details>
 
