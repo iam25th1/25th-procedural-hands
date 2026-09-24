@@ -135,6 +135,12 @@ It also explains the rendered skin-tone drift. The winding commit (e7eae3f) turn
 | skinning: forearm skin turns along the forearm as Kulesh 2015 measured it | yes | equal thirds: 0.56 of the hand's turn at 55 percent of the forearm against Kulesh's 0.34 (0.22 off, limit 0.05) |
 | skinning: the forearm keeps its girth from full pronation to full supination | yes | candy wrap deeper than the equal-thirds rig's 79.2 percent (the held two-bone patch would have reached it) |
 
+## Two mesh faults found alongside
+
+- The thumb's cuff at the MCP (a knuckle ring and a crease band where the taper turned sharply) is fixed; see [the spec](HANDS_SANDBOX_SPEC.md#mesh-fixes) and the renders in `assets/mesh/thumb-shape.png` (before above, after below; palm, back, radial, ulnar).
+- The far sleeve's jagged end (the skin coming out through the sleeve's shoulder dome) is fixed; renders in `assets/mesh/sleeve-*.png` at the three viewports.
+- The thumb at rest before and after the roll, four views: `assets/twist/thumb-rest.png`.
+
 ## Findings not fixed
 
 - **Transit sampling in the reach planner.** `solveTransitCost` samples a leg at six points, 6 cm apart on a 35 cm leg, so a hand can pass straight through a 32 mm rung between samples. This is how the held pronation patch put the thumb metacarpal 14.1 mm into the rung in Hang. Sampling every 1.5 cm catches it, but it changes route choice elsewhere (Hang on the way home 23 mm, a missed lever grasp), because the arm's springs cut the corners of the planned legs. Fixing it needs the planner to check the path the arm will actually take.

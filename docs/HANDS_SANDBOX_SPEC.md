@@ -196,6 +196,16 @@ A body set down is held or resting on its surface at every frame, from the set-d
 
 </details>
 
+## MESH FIXES
+
+<details>
+<summary>The sleeve's shoulder end, and the thumb's cuff</summary>
+
+- Sleeve: the anatomy sheet's jagged "open end" was the far sleeve's shoulder end. The skin's shoulder cap (weighted half shoulder, half upper arm) came out through the cloth dome over it (weighted 0.6 and 0.4) when the arm rose and turned. The dome is now weighted as the skin is. `sleeve: no skin the sleeve covers comes out through the cloth, in any shoulder pose` skins 25 shoulder poses (flex 0 to 160 deg, twist -90 to 90): 16.2 mm out before, at least 2.7 mm in now. No triangles added.
+- Thumb: it read as a tube with a cuff at the MCP. The taper turned sharply there (1.0 mm per 1.5 mm slice) and the MCP ring carried a knuckle bump and a palmar crease band. The bump and band are gone from the MCP and the thenar ring nearest it blends further toward the metacarpal. `thumb: the skin tapers from the thenar to the IP joint without a step, a bulge or a cuff` holds the change of taper to 0.75 mm per slice (0.52 now); no published figure gives a thumb's taper, so the limit is a visual judgement. No ring, triangle or bone added.
+
+</details>
+
 ## BUDGETS
 
 Two sets, each measured on its own subject. npm run hands:check fails if any value goes over its limit.
